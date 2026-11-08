@@ -15,12 +15,14 @@ assert.ok(css.length > 0, 'Run npm run build before verifying the styled setup U
 let state;
 let posts=[];
 let rejectVerify=false;
+let capabilityResponse=null;let capabilityCalls=0;
 const fixture = () => ({ready:false,steps:['tailscale','infisical','cliproxy','builtin'].map(id=>({id,status:'unconfigured',config:{},verifiedAt:null,message:'Configure and verify this connection'}))});
 const browser = await chromium.launch({ ...(process.env.FLEETHUB_BROWSER_CHANNEL ? {channel:process.env.FLEETHUB_BROWSER_CHANNEL} : {}), headless:true });
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.route('http://setup.fixture/**',async route=>{
  const request=route.request();
+ if(new URL(request.url()).pathname==='/api/onboarding/cliproxy-capabilities') { capabilityCalls++; if(capabilityResponse==='hang') return; return route.fulfill(capabilityResponse); }
  if(new URL(request.url()).pathname==='/api/onboarding') {
    if(request.method()==='POST'){
      const body=request.postDataJSON();posts.push(body);
@@ -95,6 +97,46 @@ try {
  await page.screenshot({path:join(out,'setup-mobile-local.png'),fullPage:true});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
  checks.push('Existing and local-install panels fit a 390px viewport without document overflow.');
+ const gateway=fixture();
+ await fresh(gateway);capabilityCalls=0;
+ await page.getByRole('button',{name:'CLIProxyAPI gateway',exact:false}).click();
+ assert.equal(await page.getByRole('heading',{name:'Gateway capabilities',exact:true}).count(),0);
+ const proxy=gateway.steps.find(s=>s.id==='cliproxy');proxy.status='configured';proxy.config={apiUrl:'http://cli-proxy-api:8317',consoleUrl:'http://localhost:8317/management.html'};
+ await fresh(gateway);capabilityCalls=0;
+ await page.getByRole('button',{name:'CLIProxyAPI gateway',exact:false}).click();
+ await page.getByRole('heading',{name:'Gateway capabilities',exact:true}).waitFor();
+ assert.equal(capabilityCalls,0);
+ capabilityResponse={json:{schemaVersion:1,adapter:'cliproxy-v8',serverVersion:null,checkedAt:new Date().toISOString(),inference:{state:'supported',authentication:'authenticated',modelCount:7,upstreamAvailability:'unknown'},management:{state:'supported',authentication:'authenticated'},quota:{state:'unsupported',reason:'adapter_has_no_quota_reader'},credentials:[{id:'a',provider:'codex',enablement:'enabled',authentication:'unknown',upstreamAvailability:'reported_available',quota:{state:'unsupported',reason:'adapter_has_no_quota_reader'}},{id:'b',provider:'claude',enablement:'disabled',authentication:'unknown',upstreamAvailability:'unknown',quota:{state:'unsupported',reason:'adapter_has_no_quota_reader'}}]}};
+ await page.getByRole('button',{name:'Check capabilities',exact:true}).click();
+ await page.getByText('Key accepted, 7 models listed',{exact:true}).waitFor();
+ await page.getByText('2 accounts (claude 1, codex 1); 1 disabled',{exact:true}).waitFor();
+ await page.getByText('Not measured; this gateway adapter has no quota reader',{exact:true}).waitFor();
+ assert.equal(capabilityCalls,1);
+ await page.getByRole('heading',{name:'Gateway capabilities',exact:true}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:join(out,'setup-mobile-capabilities.png')});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
+ capabilityResponse={status:422,json:{error:'Gateway capabilities are unavailable; check saved settings and allowed origins'}};
+ await page.getByRole('button',{name:'Check again',exact:true}).click();
+ await page.getByText('Gateway capabilities are unavailable; check saved settings and allowed origins',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Key accepted, 7 models listed',{exact:true}).count(),0);
+ capabilityResponse='hang';
+ await page.getByRole('button',{name:'Check capabilities',exact:true}).click();
+ await page.getByRole('button',{name:'Checking…',exact:true}).waitFor();
+ await page.getByText('The capability check took too long. Check that the gateway is reachable, then try again.',{exact:true}).waitFor({timeout:30000});
+ assert.equal(await page.getByRole('button',{name:'Check capabilities',exact:true}).isEnabled(),true);
+ capabilityResponse={json:{schemaVersion:1,adapter:'cliproxy-v8',serverVersion:null,checkedAt:new Date().toISOString(),inference:{state:'supported',authentication:'authenticated',modelCount:7},management:{state:'not_configured',authentication:'not_configured'},quota:{state:'unsupported'},credentials:[]}};
+ await page.getByRole('button',{name:'Check capabilities',exact:true}).click();
+ await page.getByText('Key accepted, 7 models listed',{exact:true}).waitFor();
+ proxy.config={...proxy.config,apiUrl:'http://gateway-two:8317'};
+ await page.getByRole('button',{name:'Verify connection',exact:true}).click();
+ await page.getByText('Connection verified.',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Key accepted, 7 models listed',{exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'Check capabilities',exact:true}).count(),1);
+ posts=[];
+ await page.getByLabel('API URL (reachable from FleetHub)',{exact:true}).fill('http://other:8317');
+ assert.equal(await page.getByRole('heading',{name:'Gateway capabilities',exact:true}).count(),0);
+ assert.equal(posts.length,0);
+ checks.push('Gateway capabilities appear only for saved, unchanged CLIProxy settings, call the gateway only on request, summarise keys, accounts and unmeasured quota, show route errors, recover from a stalled request after 20 seconds, reset when the saved gateway URL changes, and fit 390px.');
  assert.deepEqual(errors,[]);
  await writeFile(join(out,'results.json'),JSON.stringify({checks,cssLoaded:css.length>0,pageErrors:errors},null,2));
  console.log(JSON.stringify({checks,cssLoaded:css.length>0,pageErrors:errors},null,2));
