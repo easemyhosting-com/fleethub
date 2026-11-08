@@ -52,6 +52,36 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("session and p
   expect(results.filter(result => result.status === "fulfilled")).toHaveLength(maxPendingPairings);
   for (const result of results.filter(result => result.status === "rejected")) expect((result as PromiseRejectedResult).reason).toBeInstanceOf(PairingLimitReached);
  });
+ it("cancels pending codes when the session that created them is revoked", async () => {
+  await clean();
+  const creatorSid = await createServerSession(user, "browser", "operator", "Creator");
+  const otherSid = await createServerSession(user, "browser", "operator", "Other");
+  const creator = { ...user, sid: creatorSid };
+  const revokedByLogout = await createPairing(pairingInput.parse({ label: "lost" }), creator);
+  const consumed = await createPairing(pairingInput.parse({ label: "used" }), creator); expect(await redeemPairing(consumed.code)).not.toBeNull();
+  const fromOther = await createPairing(pairingInput.parse({ label: "other" }), { ...user, sid: otherSid });
+  const legacy = await createPairing(pairingInput.parse({ label: "legacy" }), user);
+  const [stored] = await queryClient`SELECT created_by_session FROM device_pairings WHERE id = ${revokedByLogout.id}`; expect(stored.created_by_session).toBe(creatorSid);
+  expect(await revokeSession(creatorSid)).toBe(true);
+  const status = async (id: string) => (await listPairings()).find(item => item.id === id)?.status;
+  expect(await status(revokedByLogout.id)).toBe("cancelled"); expect(await status(consumed.id)).toBe("used");
+  expect(await status(fromOther.id)).toBe("pending"); expect(await status(legacy.id)).toBe("pending");
+  expect(await redeemPairing(revokedByLogout.code)).toBeNull();
+  const keepSid = await createServerSession(user, "browser", "operator", "Keep");
+  const keptCode = await createPairing(pairingInput.parse({ label: "kept" }), { ...user, sid: keepSid });
+  expect(await revokeOtherSessions(keepSid)).toBeGreaterThanOrEqual(1);
+  expect(await status(fromOther.id)).toBe("cancelled"); expect(await status(keptCode.id)).toBe("pending");
+  expect(await redeemPairing(fromOther.code)).toBeNull(); expect(await redeemPairing(legacy.code)).not.toBeNull();
+ });
+ it("refuses a code whose creating session was revoked or expired without going through revokeSession", async () => {
+  await clean();
+  const creatorSid = await createServerSession(user, "browser", "operator", "Creator");
+  const pairing = await createPairing(pairingInput.parse({ label: "race" }), { ...user, sid: creatorSid });
+  await queryClient`UPDATE auth_sessions SET expires_at = NOW() - interval '1 second' WHERE id = ${creatorSid}`;
+  expect(await redeemPairing(pairing.code)).toBeNull();
+  await queryClient`UPDATE auth_sessions SET expires_at = NOW() + interval '1 day' WHERE id = ${creatorSid}`;
+  expect(await redeemPairing(pairing.code)).not.toBeNull();
+ });
  it("does not burn a code when session creation fails", async () => {
   await clean();
   const pairing = await createPairing(pairingInput.parse({ label: "retry" }), user);
