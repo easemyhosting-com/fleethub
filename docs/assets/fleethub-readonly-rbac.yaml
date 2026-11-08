@@ -1,0 +1,27 @@
+# Read-only access for FleetHub. No Secrets, no write verbs. Review before applying.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: fleethub-readonly, namespace: kube-system }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: fleethub-readonly }
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io", "helm.toolkit.fluxcd.io", "argoproj.io"]
+    resources: ["kustomizations", "helmreleases", "applications"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: fleethub-readonly }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: fleethub-readonly }
+subjects: [{ kind: ServiceAccount, name: fleethub-readonly, namespace: kube-system }]

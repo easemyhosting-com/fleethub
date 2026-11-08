@@ -1,0 +1,61 @@
+# Environment variables & secrets
+.env*
+*.env
+*.pem
+*.key
+*.cert
+*.id_rsa
+*.id_ed25519
+
+# Dependencies & Build artifacts
+node_modules/
+.next/
+out/
+build/
+coverage/
+
+# Scratch & Temporary
+user_inputs/
+.playwright-cli/
+*.log
+.DS_Store
+
+# Media & Screenshots (Prevent accidental repository bloating or leaks)
+*.png
+*.jpg
+*.jpeg
+*.webp
+docs/assets/screenshots/
+
+# Generated metadata, caches and local tooling
+*.tsbuildinfo
+next-env.d.ts
+.cache/
+.turbo/
+.vercel/
+.vscode/
+.idea/
+artifacts/
+reports/
+playwright-report/
+test-results/
+*.db
+*.db-*
+*.sqlite*
+*.bak
+*.tmp
+
+# One-time local setup output
+.local-setup/
+
+# Local CLIProxy config may hold management and API keys
+cliproxy/config.yaml
+
+# Local runtime mounts and agent tooling that may hold credentials or private state
+/auths/
+/logs/
+/plugins/
+.claude/
+
+# Private planning journal: owner-specific fleet and operations records, kept out of the public repository
+docs/archive/

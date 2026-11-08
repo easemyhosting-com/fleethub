@@ -1,0 +1,77 @@
+import { defineConfig } from "vitest/config";
+import path from "path";
+
+export default defineConfig({
+  test: {
+    environment: "node",
+    globals: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      include: [
+        "src/lib/quota/**/*.ts",
+        "src/lib/auth/**/*.ts",
+        "src/lib/onboarding/**/*.ts",
+        "src/lib/cliproxy/**/*.ts",
+        "src/app/api/onboarding/cliproxy-capabilities/route.ts",
+        "src/lib/enrollment/**/*.ts",
+        "src/lib/agent-context/**/*.ts",
+        "src/lib/inventory/**/*.ts",
+        "src/app/api/mcp/route.ts",
+        "src/lib/mcp/**/*.ts",
+        "src/lib/tour/**/*.ts",
+        "src/lib/pairing/**/*.ts",
+        "src/lib/config/**/*.ts",
+        "src/lib/rotation/**/*.ts",
+        "src/lib/vault/**/*.ts",
+        "src/lib/entitlements/**/*.ts",
+        "src/lib/fleet/**/*.ts",
+        "src/lib/fleetmap/**/*.ts",
+        "src/mcp/client.ts",
+        "src/mcp/server.ts",
+        "src/app/api/freellmapi/route.ts",
+        "src/app/api/inventory/refresh/route.ts",
+        "src/app/api/resources/route.ts",
+        "src/lib/observations/**/*.ts",
+        "src/app/api/observations/route.ts",
+        "src/app/api/agent-context/route.ts",
+        "src/app/api/agent-keys/route.ts",
+        "src/app/api/sessions/route.ts",
+        "src/app/api/devices/**/*.ts",
+        "src/app/api/host-enrollment/plan/route.ts",
+        "src/app/api/onboarding/route.ts",
+        "src/app/api/auth/**/*.ts",
+        "src/app/api/providers/route.ts",
+        "src/app/api/fleet/route.ts",
+        "src/proxy.ts",
+        "src/lib/plugins/**/*.ts",
+        "src/lib/catalog/**/*.ts",
+        "src/lib/providers/**/*.ts",
+        "src/lib/infisical/**/*.ts",
+        "src/lib/distribution/**/*.ts",
+        "src/lib/connectors/prometheus.ts",
+        "src/lib/connectors/diagnostics.ts",
+        "src/lib/connectors/hosts.ts",
+        "src/lib/projects/measurements.ts",
+        "src/lib/connectors/schedule.ts",
+        "src/lib/connectors/schedule-rules.ts",
+        "src/app/api/hooks/rescan/route.ts",
+      ],
+      exclude: [
+        "node_modules/**",
+        "src/lib/db/**", // Requires a disposable PostgreSQL instance.
+        ...(process.env.AUTH_DATABASE_INTEGRATION === "true" ? [] : ["src/lib/inventory/service.ts", "src/lib/rotation/service.ts", "src/lib/entitlements/service.ts", "src/lib/fleet/profiles.ts", "src/lib/fleet/accounts.ts"]), // Fenced SQL orchestration is covered by verify:inventory.
+      ],
+      thresholds: {
+        lines: 95,
+        functions: 95,
+        statements: 95,
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "./src"),
+    },
+  },
+});

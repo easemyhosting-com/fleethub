@@ -1,0 +1,123 @@
+name: CI
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 3 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check:hygiene
+      - run: npm run check:dependencies
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=moderate
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          languages: javascript-typescript
+      - name: Analyze
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          # Private repositories need GitHub Advanced Security before SARIF uploads are
+          # accepted. Set the CODEQL_UPLOAD repository variable to true once code
+          # scanning is enabled; analysis and the findings summary run either way.
+          upload: ${{ vars.CODEQL_UPLOAD == 'true' && 'always' || 'never' }}
+          output: ${{ runner.temp }}/codeql-results
+      - name: Summarize findings
+        env:
+          CODEQL_UPLOAD: ${{ vars.CODEQL_UPLOAD }}
+        run: node scripts/codeql-summary.mjs "$RUNNER_TEMP/codeql-results"
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build --tag fleethub:ci .
+      - name: Check production HTTP behavior
+        run: |
+          docker run -d --name fleethub-ci -p 127.0.0.1:3000:3000 fleethub:ci
+          trap 'docker rm -f fleethub-ci' EXIT
+          curl --fail --retry 15 --retry-all-errors --retry-delay 1 --retry-max-time 60 --max-time 5 http://127.0.0.1:3000/ > /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/fleet)" = "401"
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.1
+          image-ref: fleethub:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.1
+          scan-type: fs
+          scanners: secret
+          scan-ref: .
+          exit-code: '1'
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.15-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+        env:
+          POSTGRES_USER: review
+          POSTGRES_PASSWORD: ci-local
+          POSTGRES_DB: fleethub_security
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U review -d fleethub_security"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AUTH_DATABASE_INTEGRATION: 'true'
+      DATABASE_INTEGRATION: 'true'
+      FLEETHUB_SEED_DEMO_DATA: 'false'
+      DATABASE_URL: postgres://review:ci-local@127.0.0.1:5432/fleethub_security
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --coverage --reporter=dot --fileParallelism=false
+      - run: npm run build:worker
+      - run: npm run build:mcp

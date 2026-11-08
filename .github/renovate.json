@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "minimumReleaseAge": "2 days",
+  "internalChecksFilter": "strict",
+  "rangeStrategy": "pin",
+  "vulnerabilityAlerts": { "enabled": true, "automerge": false },
+  "packageRules": [{ "matchManagers": ["dockerfile", "docker-compose"], "pinDigests": true }]
+}

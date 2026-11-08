@@ -1,0 +1,16 @@
+# 01 — Scope and provider-account guardrails
+
+FleetHub is a self-hosted inventory and capacity advisor for cloud and AI resources you legitimately hold. It records accounts, resources, allowances, measured usage, resets, expiry and billing exposure, and tells you or your agents where capacity remains. Current product scope and milestones are in [product scope and onboarding tiers](44-product-scope-and-onboarding-tiers.md).
+
+These guardrails protect every account you own, and they bind contributions to this project.
+
+1. **Multiple accounts.** Using several accounts to multiply free quotas may violate provider terms. Several services allow one free tier per person or prohibit multi-accounting, and a ban can take down everything tied to that identity. **Design rule:** FleetHub treats accounts as plain data and works identically with one or ten. Use only accounts you legitimately own and use, such as personal, work, client and project organizations.
+2. **Notebook platforms** (Colab, Kaggle, Paperspace, Lightning) are meant for interactive and ML use. Run legitimate workloads only: no mining, no proxying, no scraping that breaks a target's terms. Expect termination at any time and never keep the only copy of anything there.
+3. **GitHub Actions** is for CI-type workloads. Using it as general-purpose compute is risky; keep dispatch to build, test and scheduled repository jobs.
+4. **Oracle:** the free tier is subject to idle reclamation and capacity limits. Staying inside the Always Free cap avoids billing on pay-as-you-go accounts. Set a budget alert at a low threshold.
+5. **Rate limits.** Respect each provider's per-user and per-project API quotas; never hammer an API.
+6. FleetHub must **never** auto-create accounts, solve CAPTCHAs or bypass verification. Onboarding is manual by design.
+7. **One-free-account rules.** GitHub, Kaggle, Oracle Free Tier and Upstash each permit one free account per person. Colab disallows using multiple accounts to work around limits. Supabase counts free projects across every organization you own or administer. Cloudflare prohibits circumventing usage limits. The catalog records these as `policy.multi_account` ([catalog schema](17-free-tier-catalog-schema.md)), and the Account view warns when one identity holds more than one account at such a provider. Verify current terms yourself; providers change them.
+8. **Positioning rule:** FleetHub tracks the accounts you *legitimately* have. It does not use, and will not accept contributions that add, "quota arbitrage", "multi-account multiplication" or "ban bypass" language or features.
+9. **Never build:** automated signup, IP rotation, fingerprint spoofing, traffic routing that disguises where requests originate, rotation across several personal accounts at the *same* provider to extend limits, or scraping of provider dashboards that have no API. Collectors use official APIs only, with an honest `User-Agent` and polite intervals.
+10. **AI agents:** run your own coding agent under your own account. For automation and fleets, use API keys or team plans; consumer plans generally prohibit automated access other than through an API key. LLM account routing, OAuth and token refresh belong to the gateway you run, such as CLIProxyAPI, under its users' own terms. FleetHub only observes usage and capacity.

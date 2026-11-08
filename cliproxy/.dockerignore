@@ -1,0 +1,3 @@
+# config.yaml may hold management and API keys; it is mounted at runtime, never built into the image.
+**
+!Dockerfile

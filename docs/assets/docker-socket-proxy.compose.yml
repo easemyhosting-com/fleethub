@@ -1,0 +1,28 @@
+# Read-only Docker API for FleetHub, reachable only over Tailscale. Run on the Docker host.
+# Run: TAILSCALE_IP=$(tailscale ip -4) docker compose -f docker-socket-proxy.compose.yml up -d
+# What this exposes: GET /containers/** only. Container inspect includes environment variables,
+# so keep it bound to the tailnet and restrict who can reach it with Tailscale ACLs.
+services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 0
+      INFO: 0
+      IMAGES: 0
+      NETWORKS: 0
+      VOLUMES: 0
+      SERVICES: 0
+      TASKS: 0
+      SECRETS: 0
+      EXEC: 0
+      AUTH: 0
+      SWARM: 0
+    ports:
+      - "${TAILSCALE_IP:?set TAILSCALE_IP to this host's tailscale address}:2375:2375"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs: [/run]
+    security_opt: [no-new-privileges:true]

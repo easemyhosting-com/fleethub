@@ -1,0 +1,185 @@
+x-logging: &logging
+  driver: local
+  options: {max-size: 10m, max-file: "2"}
+
+x-low-write-postgres: &low-write-postgres
+  - postgres
+  - -c
+  - checkpoint_timeout=15min
+  - -c
+  - wal_compression=on
+
+services:
+  fleetdeck-db:
+    image: postgres:16.15-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    restart: unless-stopped
+    command: *low-write-postgres
+    logging: *logging
+    environment:
+      POSTGRES_USER: fleethub
+      POSTGRES_PASSWORD: ${FLEETHUB_DB_PASSWORD:?Run the local setup helper or set a database password}
+      POSTGRES_DB: fleethub
+    volumes:
+      - fleetdeck_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fleethub -d fleethub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  fleetdeck:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging: *logging
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:3060:3000"
+    environment:
+      DATABASE_URL: postgres://fleethub:${FLEETHUB_DB_PASSWORD:?Set a database password}@fleetdeck-db:5432/fleethub
+      NODE_ENV: production
+      FLEETHUB_LOCAL_MODE: ${FLEETHUB_LOCAL_MODE:-true}
+      FLEETHUB_DEV_ALLOW_ANONYMOUS_WRITE: ${FLEETHUB_DEV_ALLOW_ANONYMOUS_WRITE:-false}
+      FLEETHUB_API_KEY: ${FLEETHUB_API_KEY:-}
+      FLEETHUB_OBSERVATION_KEY: ${FLEETHUB_OBSERVATION_KEY:-}
+      FLEETHUB_READONLY_KEY: ${FLEETHUB_READONLY_KEY:-}
+      FLEETHUB_AUTH_REQUIRED: ${FLEETHUB_AUTH_REQUIRED:-true}
+      FLEETHUB_AUTH_SECRET: ${FLEETHUB_AUTH_SECRET:?Run the local setup helper or set a session secret}
+      FLEETHUB_BOOTSTRAP_TOKEN: ${FLEETHUB_BOOTSTRAP_TOKEN:-}
+      FLEETHUB_SECRET_STORE_KEY: ${FLEETHUB_SECRET_STORE_KEY:-}
+      FLEETHUB_APP_URL: ${FLEETHUB_APP_URL:-http://localhost:3060}
+      FLEETHUB_GOOGLE_AUTH_ENABLED: ${FLEETHUB_GOOGLE_AUTH_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      FLEETHUB_ALLOWED_EMAILS: ${FLEETHUB_ALLOWED_EMAILS:-}
+      FLEETHUB_TRUST_PROXY_AUTH: ${FLEETHUB_TRUST_PROXY_AUTH:-false}
+      FLEETHUB_ALLOWED_ORIGINS: ${FLEETHUB_ALLOWED_ORIGINS:-}
+      FLEETHUB_DEVICE_PAIRING: ${FLEETHUB_DEVICE_PAIRING:-}
+      FLEETHUB_PAIRING_QR: ${FLEETHUB_PAIRING_QR:-}
+      FLEETHUB_PAIRING_MAX_SCOPE: ${FLEETHUB_PAIRING_MAX_SCOPE:-}
+      FLEETHUB_PROXY_AUTH_SECRET: ${FLEETHUB_PROXY_AUTH_SECRET:-}
+      INFISICAL_URL: ${INFISICAL_URL:-http://infisical:8080}
+      INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-}
+      INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:-}
+      TAILSCALE_API_TOKEN: ${TAILSCALE_API_TOKEN:-}
+      TAILSCALE_API_AUTH: ${TAILSCALE_API_AUTH:-basic}
+      TAILSCALE_DEVICE_ID: ${TAILSCALE_DEVICE_ID:-}
+      TAILSCALE_STATUS_FILE: /run/fleethub/tailscale-status.json
+      FLEETHUB_RUNTIME_ENV_FILE: /run/fleethub/runtime/runtime.env
+      CLIPROXY_API_KEY: ${CLIPROXY_API_KEY:-}
+      CLIPROXY_MANAGEMENT_KEY: ${CLIPROXY_MANAGEMENT_KEY:-}
+      FLEETHUB_ONBOARDING_ALLOWED_ORIGINS: ${FLEETHUB_ONBOARDING_ALLOWED_ORIGINS:-http://infisical:8080,http://cli-proxy-api:8317}
+    volumes:
+      - ${TAILSCALE_STATUS_PATH:-./scripts/tailscale-status.empty.json}:/run/fleethub/tailscale-status.json:ro
+      - ${FLEETHUB_RUNTIME_DIR:-./scripts/runtime-empty}:/run/fleethub/runtime:ro
+    depends_on:
+      fleetdeck-db:
+        condition: service_healthy
+    mem_limit: 512m
+
+  inventory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "inventory-worker.mjs"]
+    restart: unless-stopped
+    logging: *logging
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DATABASE_URL: postgres://fleethub:${FLEETHUB_DB_PASSWORD:?Set a database password}@fleetdeck-db:5432/fleethub
+      NODE_ENV: production
+      INFISICAL_UNIVERSAL_AUTH_CLIENT_ID: ${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-}
+      INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET: ${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:-}
+      FLEETHUB_ONBOARDING_ALLOWED_ORIGINS: ${FLEETHUB_ONBOARDING_ALLOWED_ORIGINS:-http://infisical:8080,http://cli-proxy-api:8317}
+      FLEETHUB_SECRET_STORE_KEY: ${FLEETHUB_SECRET_STORE_KEY:-}
+      FLEETHUB_RUNTIME_ENV_FILE: /run/fleethub/runtime/runtime.env
+    volumes:
+      - ${FLEETHUB_RUNTIME_DIR:-./scripts/runtime-empty}:/run/fleethub/runtime:ro
+    depends_on:
+      fleetdeck-db:
+        condition: service_healthy
+    mem_limit: 256m
+
+  cli-proxy-api:
+    # integrations is the explicit legacy option for starting both service stacks.
+    profiles: [cliproxy, integrations]
+    build:
+      context: ./cliproxy
+      dockerfile: Dockerfile
+      args:
+        CLIPROXY_IMAGE: ${CLIPROXY_IMAGE:-eceasy/cli-proxy-api:latest@sha256:3f74ca56cba8bea2a2a096a215bb774482d87d257da04c5047e6046493bfd644}
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "127.0.0.1:8317:8317"
+      - "127.0.0.1:8085:8085"
+    volumes:
+      - ${CLIPROXY_CONFIG_PATH:-./cliproxy/config.yaml}:/CLIProxyAPI/config.yaml
+      - cliproxy_auth:/root/.cli-proxy-api
+      - cliproxy_logs:/CLIProxyAPI/logs
+      - cliproxy_plugins:/CLIProxyAPI/plugins
+    mem_limit: 512m
+
+  infisical-db:
+    profiles: [infisical, integrations]
+    image: postgres:16.15-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    restart: unless-stopped
+    command: *low-write-postgres
+    logging: *logging
+    environment:
+      POSTGRES_USER: infisical
+      POSTGRES_PASSWORD: ${INFISICAL_DB_PASSWORD:-}
+      POSTGRES_DB: infisical
+    volumes:
+      - infisical_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infisical -d infisical"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  infisical-redis:
+    profiles: [infisical, integrations]
+    image: redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  infisical:
+    profiles: [infisical, integrations]
+    image: ${INFISICAL_IMAGE:-infisical/infisical:latest@sha256:cb971a75043b6fafdc738e9ca6d4f8a09b4f979a60b2b9ade39af5e095bcc5fb}
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "127.0.0.1:8088:8080"
+    environment:
+      ENCRYPTION_KEY: ${INFISICAL_ENCRYPTION_KEY:-}
+      AUTH_SECRET: ${INFISICAL_AUTH_SECRET:-}
+      SITE_URL: ${INFISICAL_SITE_URL:-http://localhost:8088}
+      DB_CONNECTION_URI: postgresql://infisical:${INFISICAL_DB_PASSWORD:-}@infisical-db:5432/infisical
+      REDIS_URL: redis://infisical-redis:6379
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_healthy
+    mem_limit: 1024m
+
+volumes:
+  fleetdeck_pg_data:
+  infisical_pg_data:
+  cliproxy_auth:
+  cliproxy_logs:
+  cliproxy_plugins:
