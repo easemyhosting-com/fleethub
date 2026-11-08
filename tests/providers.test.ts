@@ -89,7 +89,7 @@ describe("Cloud Providers Discovery & Live Telemetry", () => {
     process.env.CLOUDFLARE_API_TOKEN = "valid-cf-token";
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("api.cloudflare.com")) {
+      if (new URL(url).hostname === "api.cloudflare.com") {
         return Promise.resolve({
           ok: true,
           status: 200,

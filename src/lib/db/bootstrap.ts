@@ -636,6 +636,14 @@ export async function backfillProviderAccountIdentities(): Promise<{ backfilledC
   }
 }
 
+/** Fixed row IDs written by `seedInitialIdentitiesAndAccounts`, so a demo reset never touches real inventory. */
+export const demoSeedIds = {
+  identities: ["ident-primary-operator", "ident-alex-chen"],
+  accounts: ["acc-operator-main", "acc-oracle-secondary", "acc-cloudflare-main", "acc-cloudflare-sandbox", "acc-nvidia-inception", "acc-gcp-prod", "acc-upstash-main", "acc-freellm-main", "acc-oracle-partner", "acc-cf-partner"],
+  resources: ["atlas", "borealis", "polar-night-owl", "upstash-box", "github-runner", "r2-artifacts", "cf-ephemeral-worker", "oci-block", "global-redis", "nvidia-nim-llm", "turso-edge", "freellmapi-gateway", "alex-dev-vm"],
+  gateways: ["gw-office"],
+};
+
 /**
  * Seed initial identities, verified contacts, and accounts
  */

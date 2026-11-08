@@ -18,7 +18,7 @@ beforeEach(async () => {
     requests.push({ path: req.url ?? "", authorization: req.headers.authorization });
     const isModels = req.url === "/v1/models";
     res.writeHead(isModels ? modelsStatus : credentialsStatus, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(isModels ? models : credentials));
+    res.end(typeof (isModels ? models : credentials) === "string" ? (isModels ? models : credentials) as string : JSON.stringify(isModels ? models : credentials));
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -78,6 +78,29 @@ describe("CLIProxy v8 capability adapter over HTTP", () => {
     expect(result.management).toMatchObject({ state: "failed", reason: "invalid_response" });
     credentials = { unrelated: [] };
     expect((await inspect()).management.state).toBe("failed");
+  });
+  it("reports unknown authentication for 2xx responses with malformed or wrong-shape JSON", async () => {
+    models = "{not json";
+    credentials = { unrelated: [] };
+    const result = await inspect();
+    expect(result.inference).toMatchObject({ state: "failed", authentication: "unknown", reason: "invalid_response", modelCount: null });
+    expect(result.management).toEqual({ state: "failed", authentication: "unknown", reason: "invalid_response" });
+  });
+  it("reports 403 as access denied with unknown authentication", async () => {
+    credentialsStatus = 403;
+    expect((await inspect()).management).toEqual({ state: "failed", authentication: "unknown", reason: "access_denied" });
+  });
+  it("reports network failure as unavailable with unknown authentication", async () => {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    const result = await inspect();
+    expect(result.inference).toMatchObject({ state: "failed", authentication: "unknown", reason: "unavailable", modelCount: null });
+    expect(result.management).toEqual({ state: "failed", authentication: "unknown", reason: "unavailable" });
+    server = createServer();
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  });
+  it("reports a zero model count without treating it as unknown", async () => {
+    models = { data: [] };
+    expect((await inspect()).inference).toMatchObject({ state: "supported", authentication: "authenticated", modelCount: 0 });
   });
   it("accepts partial credential metadata as unknown states", async () => {
     credentials = { files: [{}] };

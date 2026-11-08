@@ -16,6 +16,12 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
   const secrets = new Map<string, string>();
   const realFetch = global.fetch;
   const credential = "fixture-provider-secret-not-for-postgres";
+  const accountIds: string[] = [];
+  const registerAccount = async (input: Parameters<typeof registerVaultedAccount>[0]) => {
+    const account = await registerVaultedAccount(input);
+    accountIds.push(account.id);
+    return account;
+  };
 
   beforeAll(async () => {
     const db = new URL(process.env.DATABASE_URL ?? "");
@@ -60,10 +66,23 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
     });
   });
   afterAll(async () => {
-    vi.unstubAllGlobals(); vi.unstubAllEnvs();
-    if (server) await new Promise<void>(resolve => server.close(() => resolve()));
-    if (directory) await rm(directory, { recursive: true, force: true });
-    await queryClient.end();
+    try {
+      if (accountIds.length) await queryClient.begin(async tx => {
+        const refs = await tx`SELECT s.id, s.keys, s.vault_url FROM secret_refs s JOIN provider_accounts a ON a.secret_ref_id = s.id WHERE a.id IN ${tx(accountIds)}`;
+        await tx`DELETE FROM provider_accounts WHERE id IN ${tx(accountIds)}`;
+        for (const ref of refs) {
+          await tx`DELETE FROM secret_refs WHERE id = ${ref.id}`;
+          if (ref.vault_url === "builtin:fleethub") {
+            for (const name of ref.keys) await tx`DELETE FROM secret_store WHERE name = ${name}`;
+          }
+        }
+      });
+    } finally {
+      vi.unstubAllGlobals(); vi.unstubAllEnvs();
+      if (server) await new Promise<void>(resolve => server.close(() => resolve()));
+      if (directory) await rm(directory, { recursive: true, force: true });
+      await queryClient.end();
+    }
   });
 
   it("persists readiness and vault references while provider credentials stay outside PostgreSQL", async () => {
@@ -75,7 +94,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
     expect(secrets.size).toBe(0); // Probe was removed after successful readback.
     await saveSetupStep("cliproxy", { apiUrl: origin, consoleUrl: `${origin}/management.html` });
     expect((await verifySetupStep("cliproxy")).ready).toBe(true);
-    const account = await registerVaultedAccount({ providerId: "cloudflare", label: "Fixture account", ownerEmail: "fixture@example.test", config: { apiToken: credential } });
+    const account = await registerAccount({ providerId: "cloudflare", label: "Fixture account", ownerEmail: "fixture@example.test", config: { apiToken: credential } });
     expect(account.onboardingStatus).toBe("credentials_vaulted");
     expect([...secrets.values()]).toEqual([JSON.stringify({ apiToken: credential })]);
     const rows = await queryClient`SELECT a.meta, a.health, a.enabled, s.vault_url, s.path, s.keys FROM provider_accounts a JOIN secret_refs s ON s.id = a.secret_ref_id WHERE a.id = ${account.id}`;
@@ -83,7 +102,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
     expect(JSON.stringify(rows)).not.toContain(credential);
     const resumed = await getSetupState();
     expect(resumed.ready).toBe(true);
-    const concurrent = await Promise.all(Array.from({ length: 12 }, (_, index) => registerVaultedAccount({ providerId: "cloudflare", label: `Concurrent ${index}`, config: { apiToken: credential } })));
+    const concurrent = await Promise.all(Array.from({ length: 12 }, (_, index) => registerAccount({ providerId: "cloudflare", label: `Concurrent ${index}`, config: { apiToken: credential } })));
     expect(new Set(concurrent.map(account => account.id)).size).toBe(12);
     await saveSetupStep("tailscale", { tailnet: "changed.ts.net", deviceId: "fixture-device" });
     expect((await getSetupState()).steps.map(step => step.status)).toEqual(["configured", "verified", "verified", "unconfigured"]);
@@ -94,7 +113,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
     vi.stubEnv("FLEETHUB_SECRET_STORE_KEY", "integration-master-key-at-least-32-chars");
     await saveSetupStep("builtin", {});
     expect((await verifySetupStep("builtin")).ready).toBe(true);
-    const local = await registerVaultedAccount({ providerId: "cloudflare", label: "Built-in", config: { apiToken: credential, accountId: "a1" } });
+    const local = await registerAccount({ providerId: "cloudflare", label: "Built-in", config: { apiToken: credential, accountId: "a1" } });
     const stored = (await queryClient`SELECT s.vault_url, s.keys FROM provider_accounts a JOIN secret_refs s ON s.id = a.secret_ref_id WHERE a.id = ${local.id}`)[0];
     expect(stored.vault_url).toBe("builtin:fleethub");
     const row = (await queryClient`SELECT ciphertext FROM secret_store WHERE name = ${stored.keys[0]}`)[0];

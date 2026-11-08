@@ -163,12 +163,20 @@ export async function configureRotation(accountId: string, options: { rotatorSec
     await storeSecret(context.vault, name, options.rotatorSecret);
   }
   if (!name) throw new RotationError("rotator_missing");
-  const days = options.scheduleDays === undefined ? null : options.scheduleDays;
-  await queryClient`
-    INSERT INTO credential_rotation (account_id, rotator_secret_name, schedule_days, next_rotation_at)
-    VALUES (${accountId}, ${name}, ${days}, ${days === null ? null : new Date(Date.now() + days * 86_400_000).toISOString()}::timestamptz)
-    ON CONFLICT (account_id) DO UPDATE SET rotator_secret_name = EXCLUDED.rotator_secret_name, schedule_days = EXCLUDED.schedule_days,
-      next_rotation_at = EXCLUDED.next_rotation_at`;
+  // An omitted schedule keeps the stored one; null explicitly turns scheduled rotation off.
+  const keepSchedule = options.scheduleDays === undefined;
+  const days = options.scheduleDays ?? null;
+  try {
+    await queryClient`
+      INSERT INTO credential_rotation (account_id, rotator_secret_name, schedule_days, next_rotation_at)
+      VALUES (${accountId}, ${name}, ${days}, ${days === null ? null : new Date(Date.now() + days * 86_400_000).toISOString()}::timestamptz)
+      ON CONFLICT (account_id) DO UPDATE SET rotator_secret_name = EXCLUDED.rotator_secret_name,
+        schedule_days = CASE WHEN ${keepSchedule} THEN credential_rotation.schedule_days ELSE EXCLUDED.schedule_days END,
+        next_rotation_at = CASE WHEN ${keepSchedule} THEN credential_rotation.next_rotation_at ELSE EXCLUDED.next_rotation_at END`;
+  } catch (error) {
+    if (name !== replaced) { try { await context.vault.remove(name); } catch { console.error("[Rotation] Could not remove an unused rotation secret; delete it in the vault"); } }
+    throw error;
+  }
   if (replaced && replaced !== name) { try { await context.vault.remove(replaced); } catch { console.error("[Rotation] Old rotation secret was not removed; delete it in the vault"); } }
   await record(accountId, "rotation_configured", "ok", actor);
 }

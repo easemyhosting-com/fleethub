@@ -149,6 +149,8 @@ export default function FleetDeckPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const editable = e.target instanceof Element && Boolean(e.target.closest("input, textarea, select, [contenteditable]:not([contenteditable=\"false\"]), [role=\"textbox\"]"));
       if (editable) return;
+      // An open modal owns the keyboard; the shortcut must not move focus behind it.
+      if (document.querySelector('[aria-modal="true"]')) return;
       if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || e.key === "/") {
         e.preventDefault();
         const searchInput = document.querySelector<HTMLInputElement>('[aria-label="Search resources"]');
@@ -296,12 +298,14 @@ export default function FleetDeckPage() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="min-w-0 flex-1 flex flex-col min-h-screen">
         {/* Top Header Bar */}
         <header className="sticky top-0 z-20 h-16 bg-[#090a0f]/90 backdrop-blur-md border-b border-zinc-800/80 px-4 sm:px-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {/* Mobile Menu Toggle */}
             <button
+              aria-label={isMobileNavOpen ? "Close navigation" : "Open navigation"}
+              aria-expanded={isMobileNavOpen}
               onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
               className="p-2 rounded-lg text-zinc-400 hover:text-white md:hidden cursor-pointer"
             >

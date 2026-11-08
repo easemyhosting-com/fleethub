@@ -22,18 +22,27 @@ export async function identityEmail(identityId: string): Promise<string | null> 
   return typeof row?.value === "string" ? row.value : null;
 }
 
-/** The stored spelling of this person's email, or null when the address is not one of theirs. */
-async function identityEmailOf(identityId: string, email: string): Promise<string | null> {
-  const row = (await queryClient`SELECT value FROM identity_contacts WHERE identity_id = ${identityId} AND kind = 'email' AND LOWER(TRIM(value)) = LOWER(TRIM(${email})) LIMIT 1`)[0];
-  return typeof row?.value === "string" ? row.value : null;
-}
-
 /** Links an account to a person and makes one of that person's emails (the primary one unless given) the account owner. */
 export async function setAccountIdentity(accountId: string, identityId: string, actor: string, chosenEmail?: string): Promise<void> {
-  const email = chosenEmail ? await identityEmailOf(identityId, chosenEmail) : await identityEmail(identityId);
-  if (!email) throw new AccountOwnerError();
-  await setAccountOwner(accountId, email, actor);
-  await queryClient`UPDATE provider_accounts SET identity_id = ${identityId} WHERE id = ${accountId}`;
+  await queryClient.begin(async tx => {
+    const account = (await tx`SELECT owner_email, login_email FROM provider_accounts WHERE id = ${accountId} FOR UPDATE`)[0];
+    if (!account) throw new AccountOwnerError();
+    const contact = (await tx`
+      SELECT id, value FROM identity_contacts
+      WHERE identity_id = ${identityId} AND kind = 'email'
+        AND (${chosenEmail ?? null}::text IS NULL OR LOWER(TRIM(value)) = LOWER(TRIM(${chosenEmail ?? null})))
+      ORDER BY is_primary DESC, created_at ASC, id ASC LIMIT 1 FOR SHARE
+    `)[0];
+    if (!contact) throw new AccountOwnerError();
+    await tx`
+      UPDATE provider_accounts SET identity_id = ${identityId}, contact_id = ${contact.id}, owner_email = ${contact.value},
+        login_email = CASE WHEN login_email IS NULL OR login_email = ${account.owner_email} THEN ${contact.value} ELSE login_email END,
+        updated_at = NOW()
+      WHERE id = ${accountId}
+    `;
+    await tx`UPDATE resources SET account_email = ${contact.value} WHERE account_id = ${accountId}`;
+    await tx`INSERT INTO capacity_events (subject, action, actor, detail) VALUES (${accountId}, 'owner_set', ${actor}, ${JSON.stringify({ from: account.owner_email, to: contact.value })}::jsonb)`;
+  });
 }
 
 const scopeKeys: Record<string, string> = { oracle: "tenancyId", cloudflare: "accountId", supabase: "organizationId", neon: "organizationId", upstash: "apiEmail" };

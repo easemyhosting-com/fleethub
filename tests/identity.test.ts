@@ -16,8 +16,10 @@ import { dispatchWorkload, STANDARD_DISPATCH_TARGETS, type DispatchTarget } from
 describe("Identity & Accounts Architecture", () => {
   describe("1. Multiple Contacts & PII Phone Masking", () => {
     it("masks phone numbers by default with international prefix preserved", () => {
-      expect(maskPhoneNumber("+1 (555) 010-0198")).toBe("+1 (555) •••-••0198");
+      expect(maskPhoneNumber("+1 (555) 010-0198")).toBe("+1 •••-••0198");
+      expect(maskPhoneNumber("+1(555) 010-0198")).toBe("+1 •••-••0198");
       expect(maskPhoneNumber("+91 98765 43210")).toBe("+91 •••-••3210");
+      expect(maskPhoneNumber("+15550100198")).toBe("+ •••-••0198");
       expect(maskPhoneNumber("")).toBe("");
     });
 

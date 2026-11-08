@@ -18,6 +18,7 @@
     "worker": "node build/inventory-worker.mjs",
     "verify:inventory": "node scripts/verify-inventory.mjs",
     "verify:setup-ui": "node scripts/verify-setup-ui.mjs",
+    "verify:fleet-ui": "node scripts/verify-fleet-ui.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",
     "mcp": "node build/mcp-stdio.mjs"
   },

@@ -14,12 +14,15 @@ export const ociConfigSchema = z.strictObject({
 export type OciConfig = z.infer<typeof ociConfigSchema>;
 
 const maxPages = 20;
-const maxCalls = 120;
 const maxBytes = 1024 * 1024;
 const maxCompartments = 50;
+/** Compute has its own budget: the compartment listing plus one instance listing per compartment fits within it at the compartment cap. */
+export const ociBudget = { compute: 80, optional: 220 };
 
 type Auth = OciConfig;
-type Call = { count: number };
+type Call = { count: number; max: number };
+/** Raised when a product would exceed its share of the call budget; the product is reported as not covered instead of failing the scan. */
+class BudgetExceeded extends Error {}
 
 /** Signs a GET with the account's API key (HTTP signature, rsa-sha256) as Oracle requires. */
 export function signGet(auth: Auth, host: string, target: string, date: string): string {
@@ -29,7 +32,7 @@ export function signGet(auth: Auth, host: string, target: string, date: string):
 }
 
 async function get(auth: Auth, service: string, path: string, params: Record<string, string>, signal: AbortSignal, calls: Call): Promise<{ body: unknown; next: string | null }> {
-  if (++calls.count > maxCalls) throw new CollectionError("scan_limit");
+  if (++calls.count > calls.max) throw new CollectionError("scan_limit");
   const host = `${service}.${auth.region}.oraclecloud.com`;
   const query = new URLSearchParams(params).toString();
   const target = query ? `${path}?${query}` : path;
@@ -107,14 +110,19 @@ const console_ = (path: string, region: string) => `https://cloud.oracle.com/${p
 /** Read-only listing of one OCI tenancy and region. Compute is required; storage, databases and buckets are reported as not covered if the key cannot read them. */
 export async function collectOci(config: unknown, signal: AbortSignal): Promise<{ scope: string; resources: ResourceFact[]; covered: string[]; plan: DetectedPlan }> {
   const auth = parsed(ociConfigSchema, config);
-  const calls: Call = { count: 0 };
+  const calls: Call = { count: 0, max: ociBudget.compute };
   const compartments = [auth.tenancyId];
   const children = await list(auth, "identity", "/20160918/compartments", { compartmentId: auth.tenancyId, compartmentIdInSubtree: "true", accessLevel: "ACCESSIBLE" }, compartmentSchema, signal, calls);
   for (const child of children) if (child.lifecycleState === undefined || child.lifecycleState === "ACTIVE") compartments.push(child.id);
   if (compartments.length > maxCompartments) throw new CollectionError("scan_limit");
+  // Fail before spending calls when even one page per compartment cannot fit the compute budget.
+  if (calls.count + compartments.length > calls.max) throw new CollectionError("scan_limit");
 
   const resources: ResourceFact[] = [];
   const covered = ["instance"];
+  const optionalCalls: Call = { count: 0, max: ociBudget.optional };
+  /** Skips a product up front when its minimum number of calls no longer fits the optional budget. */
+  const reserve = (needed: number) => { if (optionalCalls.count + needed > optionalCalls.max) throw new BudgetExceeded(); };
   const add = (fact: ResourceFact & { attributes?: Record<string, string | number | boolean | null> }) => { if (resources.length >= 1000) throw new CollectionError("scan_limit"); resources.push(fact); };
 
   for (const compartmentId of compartments) {
@@ -127,26 +135,31 @@ export async function collectOci(config: unknown, signal: AbortSignal): Promise<
 
   const optional: { key: string; run: () => Promise<void> }[] = [
     { key: "volume", run: async () => {
-      for (const compartmentId of compartments) for (const item of await list(auth, "iaas", "/20160918/volumes", { compartmentId }, volumeSchema, signal, calls)) {
+      reserve(compartments.length);
+      for (const compartmentId of compartments) for (const item of await list(auth, "iaas", "/20160918/volumes", { compartmentId }, volumeSchema, signal, optionalCalls)) {
         if (["TERMINATED", "TERMINATING"].includes(item.lifecycleState)) continue;
         add({ nativeId: `volume:${item.id}`, name: item.displayName, category: "storage", region: auth.region, state: volumeState(item.lifecycleState), providerState: item.lifecycleState, product: "volume", sourceUrl: console_(`block-storage/volumes/${encodeURIComponent(item.id)}`, auth.region), attributes: { sizeGb: item.sizeInGBs ?? null } });
       }
     } },
     { key: "bootvolume", run: async () => {
-      const domains = await list(auth, "identity", "/20160918/availabilityDomains", { compartmentId: auth.tenancyId }, adSchema, signal, calls);
-      for (const compartmentId of compartments) for (const domain of domains) for (const item of await list(auth, "iaas", "/20160918/bootVolumes", { compartmentId, availabilityDomain: domain.name }, volumeSchema, signal, calls)) {
+      reserve(1 + compartments.length);
+      const domains = await list(auth, "identity", "/20160918/availabilityDomains", { compartmentId: auth.tenancyId }, adSchema, signal, optionalCalls);
+      reserve(compartments.length * domains.length);
+      for (const compartmentId of compartments) for (const domain of domains) for (const item of await list(auth, "iaas", "/20160918/bootVolumes", { compartmentId, availabilityDomain: domain.name }, volumeSchema, signal, optionalCalls)) {
         if (["TERMINATED", "TERMINATING"].includes(item.lifecycleState)) continue;
         add({ nativeId: `bootvolume:${item.id}`, name: item.displayName, category: "storage", region: auth.region, state: volumeState(item.lifecycleState), providerState: item.lifecycleState, product: "bootvolume", sourceUrl: console_(`block-storage/boot-volumes/${encodeURIComponent(item.id)}`, auth.region), attributes: { sizeGb: item.sizeInGBs ?? null } });
       }
     } },
     { key: "bucket", run: async () => {
-      const namespace = parsed(z.string().min(1).max(256), (await get(auth, "objectstorage", "/n/", {}, signal, calls)).body);
-      for (const compartmentId of compartments) for (const item of await list(auth, "objectstorage", `/n/${encodeURIComponent(namespace)}/b`, { compartmentId }, bucketSchema, signal, calls)) {
+      reserve(1 + compartments.length);
+      const namespace = parsed(z.string().min(1).max(256), (await get(auth, "objectstorage", "/n/", {}, signal, optionalCalls)).body);
+      for (const compartmentId of compartments) for (const item of await list(auth, "objectstorage", `/n/${encodeURIComponent(namespace)}/b`, { compartmentId }, bucketSchema, signal, optionalCalls)) {
         add({ nativeId: `bucket:${namespace}/${item.name}`, name: item.name, category: "storage", region: auth.region, state: "online", providerState: "present", product: "bucket", sourceUrl: console_(`object-storage/buckets/${encodeURIComponent(namespace)}/${encodeURIComponent(item.name)}/objects`, auth.region) });
       }
     } },
     { key: "database", run: async () => {
-      for (const compartmentId of compartments) for (const item of await list(auth, "database", "/20160918/autonomousDatabases", { compartmentId }, adbSchema, signal, calls)) {
+      reserve(compartments.length);
+      for (const compartmentId of compartments) for (const item of await list(auth, "database", "/20160918/autonomousDatabases", { compartmentId }, adbSchema, signal, optionalCalls)) {
         if (["TERMINATED", "TERMINATING"].includes(item.lifecycleState)) continue;
         add({ nativeId: `database:${item.id}`, name: item.displayName, category: "database", region: auth.region, state: item.lifecycleState === "AVAILABLE" ? "online" : item.lifecycleState === "STOPPED" ? "offline" : "unknown", providerState: item.lifecycleState, product: "database", ...(item.isFreeTier === undefined ? {} : { billing: item.isFreeTier ? "free_tier" as const : "billable" as const }), sourceUrl: console_(`db/autonomous-databases/${encodeURIComponent(item.id)}`, auth.region), attributes: { cpuCoreCount: item.cpuCoreCount ?? null, storageTb: item.dataStorageSizeInTBs ?? null, freeTier: item.isFreeTier ?? null } });
       }
@@ -157,7 +170,9 @@ export async function collectOci(config: unknown, signal: AbortSignal): Promise<
     try { await product.run(); covered.push(product.key); }
     catch (error) {
       resources.length = before;
-      if (error instanceof CollectionError && error.code === "unauthorized") continue;
+      if (error instanceof BudgetExceeded) continue;
+      // Unreadable products, and products that run past their share of calls or rows while paging, are left not covered.
+      if (error instanceof CollectionError && (error.code === "unauthorized" || error.code === "scan_limit")) continue;
       throw error;
     }
   }

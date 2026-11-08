@@ -62,7 +62,9 @@ export async function recordUsage(projectId: string, key: string, input: UsageIn
     if (existing.payload_hash !== payloadHash) throw new ReportConflict();
     return { id: String(existing.id), duplicate: true, matched: existing.resource_id !== null };
   }
-  const [resource] = await queryClient`SELECT id FROM resources WHERE id = ${input.resource} OR native_id = ${input.resource} LIMIT 2`;
+  // An exact FleetHub id wins. Native ids are unique only within one account, so an ambiguous native id stays unmatched.
+  const candidates = await queryClient`SELECT id FROM resources WHERE id = ${input.resource} OR native_id = ${input.resource} ORDER BY (id = ${input.resource}) DESC LIMIT 2`;
+  const resource = candidates[0]?.id === input.resource || candidates.length === 1 ? candidates[0] : undefined;
   const id = `use-${randomUUID()}`;
   const inserted = await queryClient`
     INSERT INTO project_usage_reports (id, project_id, idempotency_key, payload_hash, resource_id, resource_ref, amount, unit, period_start, period_end, metrics)

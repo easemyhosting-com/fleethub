@@ -236,6 +236,8 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("inventory Pos
     expect(await retired()).toEqual([["worker:w", false], ["zone-p", false]]);
     await run({ ...complete([zone]), covered: ["zone"] });
     expect(await retired()).toEqual([["worker:w", false], ["zone-p", false]]);
+    const freshness = async () => Object.fromEntries((await readSnapshot({ accountId: ids[0] })).resources.filter(item => ["zone-p", "worker:w"].includes(item.nativeId ?? "")).map(item => [item.nativeId, item.freshness]));
+    expect(await freshness()).toEqual({ "zone-p": "current", "worker:w": "stale" });
     await run({ ...complete([zone]), covered: ["zone", "worker"] });
     expect(await retired()).toEqual([["worker:w", true], ["zone-p", false]]);
     expect((await queryClient`SELECT attributes FROM resources WHERE account_id = ${ids[0]} AND native_id = 'zone-p'`)[0].attributes).toEqual({ product: "zone" });

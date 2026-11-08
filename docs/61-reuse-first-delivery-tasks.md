@@ -38,6 +38,7 @@ Order approved by the owner on 2026-11-08 ([plan revisions](60-reuse-first-onboa
 - [x] **R5 Connector capability states.** Read-only v8 capability contract, separate authentication, credential enablement, reported upstream availability and quota lifecycle states. Server version and actual inference availability remain unknown. Provider quota readers are unsupported by this adapter. See [implementation and verification](verification/2026-11-08-capabilities-and-diagnostics.md).
 - [x] **R6 Redacted diagnostics.** Bounded category-based diagnostics and account-level repair guidance in collection and connector details, with source/time and keyboard disclosure. No raw proxy logs. See [verification](verification/2026-11-08-capabilities-and-diagnostics.md).
 - [ ] **R7 Map and details UX.**
+  - Partial follow-up: authenticated live reads/navigation are now covered; identity mobile overflow and Fleet Map drawer focus fixes are implemented and fixture-tested locally, not deployed. Shared details/filter/search work remains pending. See [security continuation](verification/2026-11-08-security-continuation.md).
   - Shared details, problem search and consistent filters across Resources, the identity mind map and Fleet Map. Preserve current view defaults.
   - Coordinate with the pending project filter below.
   - Use the `impeccable` skill for this existing UI; it owns critique and polish. Read its findings before calling the item done.
@@ -47,7 +48,7 @@ Order approved by the owner on 2026-11-08 ([plan revisions](60-reuse-first-onboa
   - Publish a deprecation note for the bundled `infisical` profile that preserves volumes. Keep the `cliproxy` profile. See [R8/R9 verification](verification/2026-11-08-r8-r9-verification.md).
 - [ ] **R10 Non-LLM authorization adapter.** One provider-specific adapter after capability research.
 
-Still pending from earlier project work: the project filter and outbound decision delivery.
+Still pending from earlier project work: the project filter and outbound decision delivery. The OCI scan call budget found in the [full-tree review](verification/2026-11-08-security-continuation.md#full-tree-privacy-review-and-history-audit) is resolved: compute has its own 80-call budget that covers the 50-compartment cap, optional products share 220 calls, and a product that would not fit is reported as not covered before any call is spent instead of failing the scan. This was verified with mocked responses only, not against a live tenancy.
 
 ## Public release
 
@@ -57,7 +58,7 @@ Still pending from earlier project work: the project filter and outbound decisio
 - [x] **P4 Choose a license.** Owner selected Apache-2.0. Full license and package metadata added.
 - [x] **P5 Publish with fresh history** under `easemyhosting-com`. Create the repository private, push one initial commit of the audited tree, and re-audit the pushed content. Switch it to public only after the license is chosen. Earlier development history stays private.
   - Published from a separate clean checkout after file-allowlisted export, gitleaks, identifier and private-artifact audits. One fresh initial commit contains the selected Apache-2.0 license; original development history remains private. A fresh remote clone matched the export. CodeRabbit follow-up returned zero findings, and the owner-requested LUNA audit completed with explicit coverage limits. CI status is a separate operational result; a transient scanner installation failure did not establish a secret finding.
-- [ ] **P6 After publishing.** Enable private vulnerability reporting, secret scanning push protection and branch protection. Install CodeRabbit and Greptile, and point development at the new repository.
+- [ ] **P6 After publishing.** Private vulnerability reporting, secret scanning, push protection, dependency alerts and branch protection are enabled. Future development uses the separate clean checkout. CodeRabbit and Greptile GitHub App installation remains pending owner authorization. See [release verification](verification/2026-11-08-public-release.md).
 
 ## Latest evidence
 

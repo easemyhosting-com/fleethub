@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { bootstrapDatabase } from "@/lib/db/bootstrap";
-import { createUnauthorizedResponse, readJsonWithLimit, verifyApiAccess } from "@/lib/auth/guard";
+import { createUnauthorizedResponse, isOperator, readJsonWithLimit, verifyApiAccess } from "@/lib/auth/guard";
 import { requestSchema, SetupError, SetupInputError } from "@/lib/onboarding/model";
-import { refreshStaleVaultSteps, saveSetupStep, skipSetupStep, verifySetupStep } from "@/lib/onboarding/service";
+import { getSetupState, refreshStaleVaultSteps, saveSetupStep, skipSetupStep, verifySetupStep } from "@/lib/onboarding/service";
 
 export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
@@ -10,7 +10,9 @@ export async function GET(req: Request) {
   if (!access.authorized) return createUnauthorizedResponse(access);
   try {
     if (!(await bootstrapDatabase()).success) return NextResponse.json({ error: "Setup database is unavailable" }, { status: 503 });
-    return NextResponse.json(await refreshStaleVaultSteps(), { headers: { "Cache-Control": "no-store" } });
+    // Re-verifying writes a probe secret to the vault, so only an operator's read may trigger it.
+    const state = isOperator(access) ? await refreshStaleVaultSteps() : await getSetupState();
+    return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Setup status is unavailable; check database and runtime configuration" }, { status: 503 });
   }

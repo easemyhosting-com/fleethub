@@ -75,7 +75,7 @@ describe("server-side sessions", () => {
   db.query.mockResolvedValueOnce([sessionRow(), sessionRow({ id: "ses-2", revoked_at: new Date() }), sessionRow({ id: "ses-3", expires_at: new Date(Date.now() - 1000), last_seen_at: new Date() })]);
   expect((await store.listSessions()).map(item => item.status)).toEqual(["active", "revoked", "expired"]);
   db.query.mockReset().mockResolvedValueOnce([{ id: sid }]).mockResolvedValueOnce([]); expect(await store.revokeSession(sid)).toBe(true); expect(await store.revokeSession("ses-none")).toBe(false);
-  db.query.mockReset().mockResolvedValue([{ id: "a" }, { id: "b" }]); expect(await store.revokeOtherSessions(sid)).toBe(2); expect(await store.revokeOtherSessions(undefined)).toBe(2);
+  db.query.mockReset().mockResolvedValue([{ id: "a" }, { id: "b" }]); expect(await store.revokeOtherSessions(sid)).toBe(2); await expect(store.revokeOtherSessions(undefined)).rejects.toThrow(); expect(db.query).toHaveBeenCalledTimes(1);
  });
 });
 
@@ -101,6 +101,13 @@ describe("pairing lifecycle", () => {
   expect((db.tx.mock.calls[0] as unknown[]).slice(1)).toEqual([store.hashPairingCode("ABCDEFGHJKLM")]);
   expect((await store.redeemPairing("abcd-efgh-jklm"))!.label).toBe("Phone");
   db.tx.mockReset().mockResolvedValue([]); expect(await store.redeemPairing("zzzz-zzzz-zzzz")).toBeNull();
+ });
+ it("downgrades an operator code to read-only when the server limit was lowered after it was created", async () => {
+  db.tx.mockReset().mockImplementation(async (...call: unknown[]) => sql(call as unknown[]).includes("UPDATE device_pairings") ? [pairingRow({ scope: "operator" })] : sql(call as unknown[]).includes("COUNT") ? [{ active: 0 }] : []);
+  expect((await store.redeemPairing("abcd-efgh-jklm", undefined, "read"))!.scope).toBe("read");
+  const inserted = db.tx.mock.calls.find(call => sql(call as unknown[]).includes("INSERT INTO auth_sessions"));
+  expect(inserted as unknown[]).toContain("read");
+  expect((await store.redeemPairing("abcd-efgh-jklm", undefined, "operator"))!.scope).toBe("operator");
  });
 });
 
@@ -128,5 +135,21 @@ describe("guard enforcement of server-side sessions", () => {
   const expired = createSessionToken({ ...user, sid, createdAt: Date.now() - 40 * 86_400_000, exp: Date.now() - 1000 });
   expect(createSessionCookie(expired, false, 99 * 86_400)).toContain(`Max-Age=${30 * 86_400}`);
   return expect(store.resolveSession(new Request("http://x", { headers: { cookie: `fleethub_session=${expired}` } }))).resolves.toEqual({ user: null, failure: "none" });
+ });
+});
+
+describe("DELETE /api/sessions?others=true", () => {
+ it("refuses without a caller sid instead of revoking every session", async () => {
+  vi.resetModules();
+  const revokeOtherSessions = vi.fn(async () => 99);
+  vi.doMock("@/lib/db/bootstrap", () => ({ bootstrapDatabase: vi.fn(async () => ({ success: true })) }));
+  vi.doMock("@/lib/auth/guard", () => ({ verifyApiAccess: vi.fn(async () => ({ authorized: true })), isOperator: () => true, createUnauthorizedResponse: () => new Response(null, { status: 401 }) }));
+  vi.doMock("@/lib/auth/session", () => ({ getSessionFromRequest: () => ({ id: "u", email: "op@example.com" }) }));
+  vi.doMock("@/lib/auth/sessions", () => ({ listSessions: vi.fn(), revokeSession: vi.fn(), revokeOtherSessions }));
+  const { DELETE } = await import("../src/app/api/sessions/route");
+  const res = await DELETE(new Request("http://localhost/api/sessions?others=true", { method: "DELETE" }));
+  expect(res.status).toBe(409);
+  expect(revokeOtherSessions).not.toHaveBeenCalled();
+  vi.doUnmock("@/lib/db/bootstrap"); vi.doUnmock("@/lib/auth/guard"); vi.doUnmock("@/lib/auth/session"); vi.doUnmock("@/lib/auth/sessions");
  });
 });

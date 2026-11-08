@@ -15,6 +15,8 @@ export interface SecretRows {
   get(name: string): Promise<{ nonce: Buffer; ciphertext: Buffer } | undefined>;
   put(name: string, nonce: Buffer, ciphertext: Buffer): Promise<void>;
   del(name: string): Promise<void>;
+  /** Names of stored secrets other than verification probes, in name order, after the given name. */
+  names?(limit: number, after?: string): Promise<string[]>;
 }
 
 export const databaseSecretRows: SecretRows = {
@@ -27,6 +29,9 @@ export const databaseSecretRows: SecretRows = {
       ON CONFLICT (name) DO UPDATE SET nonce = EXCLUDED.nonce, ciphertext = EXCLUDED.ciphertext`;
   },
   async del(name) { await queryClient`DELETE FROM secret_store WHERE name = ${name}`; },
+  async names(limit, after) {
+    return (await queryClient`SELECT name FROM secret_store WHERE name NOT LIKE 'FLEETHUB\\_PROBE\\_%' AND name > ${after ?? ""} ORDER BY name LIMIT ${limit}`).map(row => String(row.name));
+  },
 };
 
 /** The master key comes only from the environment and is never stored in the database, so a database leak alone reveals nothing. */
@@ -55,4 +60,20 @@ export function createBuiltinVault(rows: SecretRows = databaseSecretRows, env: R
     },
     async remove(name) { await rows.del(name); },
   };
+}
+
+/** Counts stored secrets the current key cannot decrypt, which means FLEETHUB_SECRET_STORE_KEY changed after they were written. */
+export async function countUnreadableSecrets(rows: SecretRows = databaseSecretRows, env: Record<string, string | undefined> = process.env, pageSize = 500): Promise<number> {
+  if (!rows.names) return 0;
+  const vault = createBuiltinVault(rows, env);
+  let unreadable = 0;
+  let after: string | undefined;
+  for (;;) {
+    const page = await rows.names(pageSize, after);
+    for (const name of page) {
+      try { await vault.read(name); } catch { unreadable++; }
+    }
+    if (page.length < pageSize) return unreadable;
+    after = page[page.length - 1];
+  }
 }

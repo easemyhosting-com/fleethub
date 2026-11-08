@@ -126,6 +126,33 @@ export function SetupWizard({ onClose, onReady, onConnectProvider, initialStep }
   const [state, setState] = useState<OnboardingState | null>(null);
   const [selected, setSelected] = useState<StepId>(initialStep ?? "infisical");
   const initializedSelection = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (!dialog) return;
+      if (event.key === "Escape") { event.preventDefault(); onCloseRef.current(); return; }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (focusable.length === 0) { event.preventDefault(); dialog.focus(); return; }
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === dialog || !dialog.contains(active))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (active === last || !dialog.contains(active))) { event.preventDefault(); first.focus(); }
+    }
+    function onFocusIn(event: FocusEvent) {
+      if (!dialog || !(event.target instanceof Node) || dialog.contains(event.target)) return;
+      const first = dialog.querySelector<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      (first ?? dialog).focus();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
+    return () => { document.removeEventListener("keydown", onKeyDown); document.removeEventListener("focusin", onFocusIn); opener?.focus(); };
+  }, []);
   const [mode, setMode] = useState<Mode>("existing");
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<"load" | "save" | "verify" | "skip" | null>("load");
@@ -241,7 +268,7 @@ export function SetupWizard({ onClose, onReady, onConnectProvider, initialStep }
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="setup-title" className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 sm:p-8">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="setup-title" className="outline-none fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 sm:p-8">
       <div className="mx-auto max-w-5xl rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
         <header className="flex items-start justify-between gap-4 border-b border-zinc-800 p-6">
           <div><h2 id="setup-title" className="text-2xl font-semibold">Connect your infrastructure</h2><p className="mt-2 text-sm text-zinc-400">Choose one secret backend to store provider credentials. Private access and the AI gateway are optional.</p></div>
@@ -281,7 +308,7 @@ export function SetupWizard({ onClose, onReady, onConnectProvider, initialStep }
                 </div>}
               </> : <p className="mb-5 text-sm leading-relaxed text-zinc-300">{selected === "builtin" ? "This backend uses FleetHub's database and requires no extra container. Set its encryption key on the server, then save and verify below." : "Private access is optional. Use an existing private network or install Tailscale on the host using its official guide. FleetHub does not install or enroll it for you."}{selected === "tailscale" ? <a href={definition.docs} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 text-cyan-300 hover:underline">Tailscale installation guide <ExternalLink size={13} /></a> : null}</p>}
               <div className="grid gap-4 sm:grid-cols-2">{definition.fields.map((field) => <label key={field.key} className="block text-sm text-zinc-300">{field.label}<input type="text" value={fieldValue(field.key)} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} placeholder={field.placeholder} autoComplete="off" disabled={busy !== null} className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-cyan-500 disabled:opacity-50" /></label>)}</div>
-              {selected === "builtin" ? <pre className="mt-4 overflow-x-auto rounded bg-black/50 p-3 text-xs"><code>{definition.command}</code></pre> : null}
+              {selected === "builtin" ? <pre className="mt-4 max-w-full overflow-x-auto rounded bg-black/50 p-3 text-xs"><code>{definition.command}</code></pre> : null}
               {definition.guide.length > 0 ? <ol className="mt-5 list-decimal space-y-1 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 pl-8 text-xs leading-relaxed text-zinc-400">{definition.guide.map((item) => <li key={item}>{item}</li>)}</ol> : null}
               {selected === "builtin" ? <p className="mt-5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-xs leading-relaxed text-zinc-400">Set <code className="text-zinc-200">FLEETHUB_SECRET_STORE_KEY</code> in your private setup .env and restart once (this key is deliberately not hot-reloaded). It is separate from <code className="text-zinc-200">FLEETHUB_AUTH_SECRET</code>. Never enter keys in this form.</p> : <p className="mt-5 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-xs leading-relaxed text-zinc-400">Credentials belong in the FleetHub server environment, never in this form. Set <code className="text-zinc-200">{definition.env}</code> in <code className="text-zinc-200">runtime/runtime.env</code> in your private setup folder; it is picked up within a second, no restart needed. The other settings (<code className="text-zinc-200">FLEETHUB_ONBOARDING_ALLOWED_ORIGINS</code>, <code className="text-zinc-200">FLEETHUB_AUTH_SECRET</code>) come from your setup .env.</p>}
               <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400"><span>Enter service URLs explicitly. Infisical defaults to dev and /accounts when those fields are empty. Docs:</span>{definition.docLinks.map((link) => <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-cyan-300 hover:underline">{link.label} <ExternalLink size={12} /></a>)}<span>· FleetHub docs/23-self-onboarding.md and docs/38-hot-reload-config.md</span></p>

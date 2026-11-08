@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { builtinKey, builtinVaultUrl, createBuiltinVault, type SecretRows } from "../src/lib/vault/builtin";
+import { builtinKey, builtinVaultUrl, countUnreadableSecrets, createBuiltinVault, type SecretRows } from "../src/lib/vault/builtin";
 import { openVaultForRef, refScope } from "../src/lib/onboarding/vault-ref";
 
 const env = { FLEETHUB_SECRET_STORE_KEY: "k".repeat(40) };
@@ -9,12 +9,27 @@ function memory() {
     get: async name => rows.get(name),
     put: async (name, nonce, ciphertext) => { rows.set(name, { nonce, ciphertext }); },
     del: async name => { rows.delete(name); },
+    names: async (limit: number, after?: string) => [...rows.keys()].filter(name => !name.startsWith("FLEETHUB_PROBE_") && name > (after ?? "")).sort().slice(0, limit),
   };
   return { rows, adapter };
 }
 afterEach(() => vi.unstubAllEnvs());
 
 describe("built-in encrypted secret store", () => {
+  it("counts secrets the current key cannot decrypt", async () => {
+    const { adapter } = memory();
+    await createBuiltinVault(adapter, env).write("A", "one");
+    await createBuiltinVault(adapter, env).write("B", "two");
+    expect(await countUnreadableSecrets(adapter, env)).toBe(0);
+    expect(await countUnreadableSecrets(adapter, { FLEETHUB_SECRET_STORE_KEY: "z".repeat(40) })).toBe(2);
+    expect(await countUnreadableSecrets({ ...adapter, names: undefined }, { FLEETHUB_SECRET_STORE_KEY: "z".repeat(40) })).toBe(0);
+    // A secret beyond the first page is still checked.
+    const other = { FLEETHUB_SECRET_STORE_KEY: "z".repeat(40) };
+    for (const name of ["C", "D", "E"]) await createBuiltinVault(adapter, env).write(name, name);
+    await createBuiltinVault(adapter, other).write("F", "written under another key");
+    expect(await countUnreadableSecrets(adapter, env, 2)).toBe(1);
+    expect(await countUnreadableSecrets(adapter, env, 3)).toBe(1);
+  });
   it("round-trips values and never stores plaintext", async () => {
     const { rows, adapter } = memory();
     const vault = createBuiltinVault(adapter, env);

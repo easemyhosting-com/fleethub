@@ -99,7 +99,8 @@ export async function revokeSession(id: string): Promise<boolean> {
   return (await queryClient`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id`).length > 0;
 }
 export async function revokeOtherSessions(keepId: string | undefined): Promise<number> {
-  return (await queryClient`UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId ?? ""} RETURNING id`).length;
+  if (!keepId) throw new Error("revokeOtherSessions requires the caller's session id");
+  return (await queryClient`UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id`).length;
 }
 
 export async function createPairing(input: z.infer<typeof pairingInput>, creator: SessionUser): Promise<PairingSummary & { code: string }> {
@@ -125,7 +126,8 @@ export async function cancelPairing(id: string): Promise<boolean> {
   return (await queryClient`UPDATE device_pairings SET cancelled_at = NOW() WHERE id = ${id} AND consumed_at IS NULL AND cancelled_at IS NULL RETURNING id`).length > 0;
 }
 
-export async function redeemPairing(code: string, deviceLabel?: string): Promise<{ user: SessionUser; sid: string; scope: SessionScope; label: string } | null> {
+/** maxScope is the server policy at redemption time, so lowering it also downgrades codes created before the change. */
+export async function redeemPairing(code: string, deviceLabel?: string, maxScope: SessionScope = "operator"): Promise<{ user: SessionUser; sid: string; scope: SessionScope; label: string } | null> {
   return queryClient.begin(async transaction => {
     const [pairing] = await transaction`
       UPDATE device_pairings SET consumed_at = NOW()
@@ -134,8 +136,9 @@ export async function redeemPairing(code: string, deviceLabel?: string): Promise
     if (!pairing) return null;
     const user: SessionUser = { id: pairing.created_by_id, email: pairing.created_by_email, name: pairing.created_by_name, provider: pairing.provider, createdAt: Date.now() };
     const label = deviceLabel ?? pairing.label;
-    const sid = await insertSession(transaction as unknown as Sql, user, "device", pairing.scope, label, deviceSessionDays);
-    return { user, sid, scope: pairing.scope as SessionScope, label };
+    const scope: SessionScope = maxScope === "read" ? "read" : pairing.scope as SessionScope;
+    const sid = await insertSession(transaction as unknown as Sql, user, "device", scope, label, deviceSessionDays);
+    return { user, sid, scope, label };
   });
 }
 

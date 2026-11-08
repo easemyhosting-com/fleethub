@@ -85,6 +85,12 @@ function TileButton({ tile, rect, selected, onSelect }: { tile: Tile; rect: { x:
 }
 
 function ResourceDrawer({ tile, usedBy, onClose, onSaved }: { tile: Tile; usedBy: Array<{ slug: string; name: string; source: string; status: string }>; onClose: () => void; onSaved: () => Promise<void> }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const trigger = document.activeElement;
+    closeRef.current?.focus();
+    return () => { if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus(); };
+  }, []);
   const resource = tile.resource;
   const [profile, setProfile] = useState({ role: resource.profile.role, lifecycle: resource.profile.lifecycle, backupClass: resource.profile.backupClass, criticality: resource.profile.criticality, autoStop: resource.profile.autoStop });
   const [labels, setLabels] = useState(Object.entries(resource.profile.labels).map(([key, value]) => `${key}=${value}`).join(", "));
@@ -105,8 +111,8 @@ function ResourceDrawer({ tile, usedBy, onClose, onSaved }: { tile: Tile; usedBy
     finally { setBusy(false); }
   }
   const field = "mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100";
-  return <aside aria-label={`Details for ${resource.name}`} className="fixed inset-y-0 right-0 z-40 w-full max-w-md overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
-    <div className="flex items-start justify-between gap-3"><div><h3 className="text-base font-semibold text-white">{resource.name}</h3><p className="text-xs text-zinc-400">{resource.provider} · {tile.account?.label ?? "no account"} · {resource.category}</p></div><button type="button" onClick={onClose} aria-label="Close details" className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300">Close</button></div>
+  return <aside onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }} aria-label={`Details for ${resource.name}`} className="fixed inset-y-0 right-0 z-40 w-full max-w-md overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0 break-words"><h3 className="text-base font-semibold text-white">{resource.name}</h3><p className="text-xs text-zinc-400">{resource.provider} · {tile.account?.label ?? "no account"} · {resource.category}</p></div><button ref={closeRef} type="button" onClick={onClose} aria-label="Close details" className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300">Close</button></div>
     <p className={`mt-3 inline-block rounded border px-2 py-1 text-xs ${style.className}`}><span aria-hidden="true">{style.symbol}</span> {style.label}{resource.isProtected ? " · protected" : ""}{tile.stale ? " · stale data" : ""}</p>
     <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs"><dt className="text-zinc-500">Provider state</dt><dd className="text-zinc-200">{resource.state}</dd><dt className="text-zinc-500">Region</dt><dd className="text-zinc-200">{resource.region ?? "-"}</dd><dt className="text-zinc-500">Last seen</dt><dd className="text-zinc-200">{resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : "Never"}</dd><dt className="text-zinc-500">Source</dt><dd className="text-zinc-200">{resource.inventorySource}</dd>{Object.entries(resource.specs).filter(([key]) => key !== "product").map(([key, value]) => <><dt key={`${key}-k`} className="text-zinc-500">{key}</dt><dd key={`${key}-v`} className="text-zinc-200">{String(value)}</dd></>)}</dl>
     {resource.sourceUrl && <a href={resource.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs text-cyan-300 hover:underline">Open in provider console</a>}

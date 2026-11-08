@@ -8,7 +8,7 @@ describe("host addresses", () => {
   });
   it("classifies IPv4 literals and ignores names", () => {
     expect(addressKind("100.101.50.7")).toBe("tailscale");
-    expect(addressKind("10.0.0.190")).toBe("private");
+    expect(addressKind("10.0.0.17")).toBe("private");
     expect(addressKind("172.20.1.1")).toBe("private");
     expect(addressKind("192.168.1.9")).toBe("private");
     expect(addressKind("203.0.113.25")).toBe("public");

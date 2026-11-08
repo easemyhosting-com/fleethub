@@ -197,7 +197,7 @@ export async function readJsonWithLimit<T = any>(
 
 export async function verifyApiAccess(
   req: Request,
-  options?: { requireWrite?: boolean; skipRateLimit?: boolean; allowObservationKey?: boolean }
+  options?: { requireWrite?: boolean; skipRateLimit?: boolean; allowObservationKey?: boolean; maxBytes?: number }
 ): Promise<AuthVerificationResult> {
   refreshRuntimeEnv();
   // Fail closed if request is undefined or malformed
@@ -215,11 +215,12 @@ export async function verifyApiAccess(
   const configuredReadOnlyKey = process.env.FLEETHUB_READONLY_KEY;
 
   // 1. Fast Content-Length pre-check
+  const maxBytes = options?.maxBytes ?? MAX_PAYLOAD_SIZE_BYTES;
   const contentLength = req.headers.get("content-length");
-  if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_SIZE_BYTES) {
+  if (contentLength && parseInt(contentLength, 10) > maxBytes) {
     return {
       authorized: false,
-      reason: `Payload too large. Maximum allowed request size is ${MAX_PAYLOAD_SIZE_BYTES / 1024} KB.`,
+      reason: `Payload too large. Maximum allowed request size is ${Math.floor(maxBytes / 1024)} KB.`,
       status: 413,
     };
   }
@@ -340,17 +341,14 @@ export async function verifyApiAccess(
     };
   }
 
-  // In development without configured key: mutations require local origin
+  // In development without configured key, anonymous mutations are refused unless explicitly allowed.
+  // The request carries no trustworthy peer address here, so there is no localhost exception.
   if (isWrite && process.env.FLEETHUB_DEV_ALLOW_ANONYMOUS_WRITE !== "true") {
-    const ident = getClientIdentifier(req);
-    const isLocal = ["ip:127.0.0.1", "ip:::1"].includes(ident);
-    if (!isLocal) {
-      return {
-        authorized: false,
-        reason: "Unauthorized: Remote write operations require FLEETHUB_API_KEY authentication.",
-        status: 401,
-      };
-    }
+    return {
+      authorized: false,
+      reason: "Unauthorized: Anonymous write operations require FLEETHUB_API_KEY authentication or FLEETHUB_DEV_ALLOW_ANONYMOUS_WRITE=true in development.",
+      status: 401,
+    };
   }
 
   return { authorized: true, status: 200 };

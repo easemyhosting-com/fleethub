@@ -13,7 +13,7 @@ FleetHub is a small stack, but idle databases still write. These measures reduce
 
 ## Habits that matter more
 
-- Stop the stack when you are not testing: `docker compose -p <project> --env-file <setup>/.env --profile integrations stop`, then `colima stop <profile>`.
+- Stop the stack when you are not testing: `docker compose -p <project> --env-file <setup>/.env --profile infisical --profile cliproxy stop` (naming a profile you never started is harmless), then `colima stop <profile>`.
 - Prune now and then: `docker builder prune` and `docker image prune`. Build cache is usually what fills a disk.
 
 ## Optional: a separate small Colima profile on the internal disk (not tested here)
@@ -32,7 +32,9 @@ Colima may switch your active Docker context to the new profile. Check with `doc
 ```bash
 export DOCKER_HOST="unix://$COLIMA_HOME/fleethub/docker.sock"
 node scripts/prepare-local-setup.mjs --directory "$HOME/fleethub-setup"
-docker compose -p fleethub-app --env-file "$HOME/fleethub-setup/.env" --profile integrations up -d --build
+docker compose -p fleethub-app --env-file "$HOME/fleethub-setup/.env" up -d --build
 ```
+
+This starts the core services only. Add `--profile cliproxy` or `--profile infisical` only when you choose to run that bundled service; the [self-onboarding guide](23-self-onboarding.md) explains why connecting an existing Infisical is preferred.
 
 Open a new terminal (or unset both variables) to return to your normal Colima profile. Stop the internal VM with `COLIMA_HOME="$HOME/.colima-fleethub" colima stop fleethub`. The bind-mounted setup files then live on the internal disk because that profile shares only that folder.
