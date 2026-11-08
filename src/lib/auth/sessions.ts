@@ -95,12 +95,19 @@ export async function resolveSession(req: Request): Promise<ResolvedSession> {
 export async function listSessions(): Promise<SessionSummary[]> {
   return (await queryClient`SELECT * FROM auth_sessions ORDER BY created_at DESC LIMIT 200`).map(summarizeSession);
 }
+/** Revoking a session also cancels the pairing codes it created, in the same statement, so a stolen session cannot leave a working code behind. */
 export async function revokeSession(id: string): Promise<boolean> {
-  return (await queryClient`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id`).length > 0;
+  return (await queryClient`
+    WITH revoked AS (UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id),
+    cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
+    SELECT id FROM revoked`).length > 0;
 }
 export async function revokeOtherSessions(keepId: string | undefined): Promise<number> {
   if (!keepId) throw new Error("revokeOtherSessions requires the caller's session id");
-  return (await queryClient`UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id`).length;
+  return (await queryClient`
+    WITH revoked AS (UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id),
+    cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
+    SELECT id FROM revoked`).length;
 }
 
 export async function createPairing(input: z.infer<typeof pairingInput>, creator: SessionUser): Promise<PairingSummary & { code: string }> {
@@ -112,8 +119,8 @@ export async function createPairing(input: z.infer<typeof pairingInput>, creator
     const [{ pending }] = await transaction`SELECT COUNT(*)::int AS pending FROM device_pairings WHERE consumed_at IS NULL AND cancelled_at IS NULL AND expires_at > NOW()`;
     if (pending >= maxPendingPairings) throw new PairingLimitReached();
     const [created] = await transaction`
-      INSERT INTO device_pairings (id, code_hash, label, scope, created_by_id, created_by_email, created_by_name, provider, expires_at)
-      VALUES (${id}, ${hashPairingCode(code)}, ${input.label}, ${input.scope}, ${creator.id}, ${creator.email}, ${creator.name}, ${creator.provider}, NOW() + make_interval(mins => ${input.expiresInMinutes}))
+      INSERT INTO device_pairings (id, code_hash, label, scope, created_by_id, created_by_email, created_by_name, provider, created_by_session, expires_at)
+      VALUES (${id}, ${hashPairingCode(code)}, ${input.label}, ${input.scope}, ${creator.id}, ${creator.email}, ${creator.name}, ${creator.provider}, ${creator.sid ?? null}, NOW() + make_interval(mins => ${input.expiresInMinutes}))
       RETURNING *`;
     return created;
   });
@@ -132,6 +139,8 @@ export async function redeemPairing(code: string, deviceLabel?: string, maxScope
     const [pairing] = await transaction`
       UPDATE device_pairings SET consumed_at = NOW()
       WHERE code_hash = ${hashPairingCode(code)} AND consumed_at IS NULL AND cancelled_at IS NULL AND expires_at > NOW()
+        AND (created_by_session IS NULL OR EXISTS (
+          SELECT 1 FROM auth_sessions creator WHERE creator.id = device_pairings.created_by_session AND creator.revoked_at IS NULL AND creator.expires_at > NOW()))
       RETURNING *`;
     if (!pairing) return null;
     const user: SessionUser = { id: pairing.created_by_id, email: pairing.created_by_email, name: pairing.created_by_name, provider: pairing.provider, createdAt: Date.now() };

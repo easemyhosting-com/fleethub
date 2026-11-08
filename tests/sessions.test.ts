@@ -76,6 +76,8 @@ describe("server-side sessions", () => {
   expect((await store.listSessions()).map(item => item.status)).toEqual(["active", "revoked", "expired"]);
   db.query.mockReset().mockResolvedValueOnce([{ id: sid }]).mockResolvedValueOnce([]); expect(await store.revokeSession(sid)).toBe(true); expect(await store.revokeSession("ses-none")).toBe(false);
   db.query.mockReset().mockResolvedValue([{ id: "a" }, { id: "b" }]); expect(await store.revokeOtherSessions(sid)).toBe(2); await expect(store.revokeOtherSessions(undefined)).rejects.toThrow(); expect(db.query).toHaveBeenCalledTimes(1);
+  for (const call of db.query.mock.calls) expect(sql(call as unknown[])).toMatch(/UPDATE device_pairings SET cancelled_at = NOW\(\) WHERE created_by_session IN \(SELECT id FROM revoked\)/);
+  db.query.mockReset().mockResolvedValueOnce([{ id: sid }]); await store.revokeSession(sid); expect(sql(db.query.mock.calls[0] as unknown[])).toContain("created_by_session IN (SELECT id FROM revoked)");
  });
 });
 
@@ -86,6 +88,9 @@ describe("pairing lifecycle", () => {
   const created = await store.createPairing(store.pairingInput.parse({ label: "Phone" }), user);
   const insert = db.tx.mock.calls.find(call => sql(call as unknown[]).includes("INSERT INTO device_pairings")) as unknown[];
   expect(insert.slice(1)).toContain(store.hashPairingCode(created.code)); expect(insert.slice(1)).not.toContain(created.code); expect(created.status).toBe("pending");
+  expect(insert.slice(1)).toContain(null);
+  db.tx.mockClear(); await store.createPairing(store.pairingInput.parse({ label: "Phone" }), { ...user, sid });
+  expect((db.tx.mock.calls.find(call => sql(call as unknown[]).includes("INSERT INTO device_pairings")) as unknown[]).slice(1)).toContain(sid);
   db.tx.mockImplementation(async (...call: unknown[]) => sql(call as unknown[]).includes("COUNT") ? [{ pending: store.maxPendingPairings }] : []);
   await expect(store.createPairing(store.pairingInput.parse({ label: "Phone" }), user)).rejects.toBeInstanceOf(store.PairingLimitReached);
  });
@@ -99,6 +104,7 @@ describe("pairing lifecycle", () => {
   const redeemed = await store.redeemPairing("abcd-efgh-jklm", "My iPhone");
   expect(redeemed).toMatchObject({ scope: "read", label: "My iPhone", user: { email: user.email } }); expect(redeemed!.sid).toMatch(/^ses-/);
   expect((db.tx.mock.calls[0] as unknown[]).slice(1)).toEqual([store.hashPairingCode("ABCDEFGHJKLM")]);
+  expect(sql(db.tx.mock.calls[0] as unknown[])).toMatch(/created_by_session IS NULL OR EXISTS[\s\S]*revoked_at IS NULL AND creator\.expires_at > NOW\(\)/);
   expect((await store.redeemPairing("abcd-efgh-jklm"))!.label).toBe("Phone");
   db.tx.mockReset().mockResolvedValue([]); expect(await store.redeemPairing("zzzz-zzzz-zzzz")).toBeNull();
  });

@@ -547,6 +547,7 @@ export async function bootstrapDatabase() {
         cancelled_at TIMESTAMPTZ
       )
     `;
+    await queryClient`ALTER TABLE device_pairings ADD COLUMN IF NOT EXISTS created_by_session TEXT`;
     // 2. Perform Migration & Backfill for any orphan provider_accounts
     await backfillProviderAccountIdentities();
 
