@@ -44,12 +44,14 @@ async function verifyFolder(config: VaultConfig): Promise<void> {
   const vault = await vaultSession(config);
   const name = `FLEETHUB_PROBE_${randomUUID().replaceAll("-", "")}`;
   const value = randomBytes(32).toString("hex");
-  let created = false;
+  await vault.write(name, value);
   try {
-    await vault.write(name, value);
-    created = true;
     if (await vault.read(name) !== value) throw new SetupError("Vault round-trip did not match");
-  } finally {
-    if (created) await vault.remove(name);
+  } catch (error) {
+    // Keep the original failure; a cleanup error must not replace it.
+    await vault.remove(name).catch(() => console.error("[Setup] Could not remove a vault verification probe; delete FLEETHUB_PROBE_* secrets in the vault"));
+    throw error;
   }
+  try { await vault.remove(name); }
+  catch { throw new SetupError("The vault accepted a write but refused to delete it; grant delete permission on the secret path"); }
 }

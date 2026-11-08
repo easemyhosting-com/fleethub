@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 @layer base {
+  /* Visible keyboard focus everywhere by default; components may replace it with their own ring. */
+  :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid #34d399;
+    outline-offset: 2px;
+  }
+
   :root {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;

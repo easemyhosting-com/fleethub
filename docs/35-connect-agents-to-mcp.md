@@ -1,6 +1,6 @@
 # Connect coding agents to FleetHub (stdio MCP)
 
-FleetHub ships a local, read-only MCP server. It lets a coding agent read the stored inventory, setup readiness and protection rules. It has no write, SSH, shell, secret or execution tools. See document 33 for its design and limits.
+FleetHub ships a local, read-only MCP server. It lets a coding agent read the stored inventory, setup readiness and protection rules. It has no write, SSH, shell, secret or execution tools. See the [agent context contract](26-agent-context-contract.md) for its design and limits.
 
 ## Before you start
 
@@ -42,6 +42,9 @@ T3 Code's own MCP server is a different thing: it lets outside agents drive T3 C
 - `get_fleet_capacity`: inventory counts. CPU, memory and storage capacity are `null` until measured.
 - `get_quotas`, `get_llm_endpoints`: quota is reported unavailable and the gateway endpoint as configured, never as measured usage.
 - `plan_host_enrollment`: a non-executable proposal. It does not connect to hosts.
+- `find_free_capacity`: ranks free-tier resources of a kind for new work. A recommendation only: nothing is reserved, and capacity fit is unverified.
+- `get_host_capacity`: declared project CPU and memory requests per compute host against its size. Actual load is not measured.
+- `get_project_footprint`: each project's links, needs, latest usage reports and reporting state, plus resources no project uses. Project-reported usage is unverified.
 
 A failed or unreachable FleetHub returns an error result, not an empty inventory. Oracle (OCI) resources are always protected and inventory-only.
 

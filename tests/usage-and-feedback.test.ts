@@ -4,8 +4,9 @@ import { describeProbe, describeScan } from "../src/lib/providers/scan-feedback"
 
 describe("usage per resource", () => {
   it("shows an A1 instance's share of the free compute pool", () => {
-    const usage = resourceUsage({ provider: "oracle", specs: { capacityKind: "shared_pool", ocpus: 2, memoryGb: 12 } });
+    const usage = resourceUsage({ provider: "oracle", specs: { capacityKind: "shared_pool", ocpus: 1, memoryGb: 6 } });
     expect(usage.map(item => [item.key, item.pct, item.band])).toEqual([["ocpus", 50, "half"], ["memory", 50, "half"]]);
+    expect(resourceUsage({ provider: "oracle", specs: { capacityKind: "shared_pool", ocpus: 2, memoryGb: 12 } }).map(item => item.band)).toEqual(["full", "full"]);
     expect(resourceUsage({ provider: "oracle", specs: { capacityKind: "shared_pool", ocpus: 4 } })).toHaveLength(1);
   });
   it("shows volumes against the shared block storage pool and ignores everything else", () => {

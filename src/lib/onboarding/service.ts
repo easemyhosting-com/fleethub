@@ -55,6 +55,8 @@ export async function saveSetupStep(id: StepId, input: Record<string, unknown>) 
       VALUES (${id}, ${JSON.stringify(config)}, 1, 'configured')
       ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config, revision = onboarding_steps.revision + 1,
       status = 'configured', verified_at = NULL, fingerprint = NULL, skipped = FALSE
+      -- Saving identical settings again keeps an existing verification.
+      WHERE onboarding_steps.config IS DISTINCT FROM EXCLUDED.config OR onboarding_steps.skipped OR onboarding_steps.status <> 'verified'
     `;
   });
   return getSetupState();

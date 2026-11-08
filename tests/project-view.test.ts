@@ -16,6 +16,15 @@ describe("projectAttentionReasons", () => {
     expect(reasons.join(" ")).toContain("stale");
   });
 
+  it("counts usage reported by native id as matching its declared resource", () => {
+    const reasons = projectAttentionReasons({
+      ...base,
+      links: [{ resourceId: "inv-1", source: "declared" } as never],
+      usage: [{ resourceRef: "bucket-name", resourceId: "inv-1", matched: true } as never],
+    });
+    expect(reasons).toEqual([]);
+  });
+
   it("returns no reasons when the footprint needs no attention", () => {
     expect(projectAttentionReasons(base)).toEqual([]);
   });

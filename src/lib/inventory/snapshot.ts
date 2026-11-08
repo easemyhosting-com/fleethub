@@ -24,7 +24,7 @@ export async function readSnapshot(filters: { accountId?: string; ownerEmail?: s
     SELECT r.id, r.account_id, r.account_email, r.provider, r.name, r.category, r.state,
       r.is_protected, a.is_protected AS account_protected, a.kind AS account_kind,
       r.tags, r.attributes, r.last_seen_at, r.native_id, r.region, r.source_url,
-      r.inventory_source, r.retired_at, c.last_success_at, c.state AS collection_state,
+      r.inventory_source, r.retired_at, r.scan_generation, c.generation AS collection_generation, c.last_success_at, c.state AS collection_state,
       p.role AS profile_role, p.lifecycle AS profile_lifecycle, p.backup_class AS profile_backup, p.criticality AS profile_criticality,
       p.auto_stop AS profile_auto_stop, p.labels AS profile_labels, p.notes AS profile_notes, (p.resource_id IS NOT NULL) AS profile_set
     FROM resources r LEFT JOIN provider_accounts a ON a.id = r.account_id
@@ -74,6 +74,8 @@ export async function readSnapshot(filters: { accountId?: string; ownerEmail?: s
     const lastSuccess = r.last_success_at ? new Date(r.last_success_at) : null;
     const freshness = r.inventory_source === "manual" ? "unverified" :
       lastSuccess && lastSuccess.getTime() + 15 * 60_000 > now.getTime() && !r.retired_at &&
+      // A partial scan (a product the token cannot read) leaves that product's rows on an older generation; they are kept but not current.
+      r.scan_generation === r.collection_generation &&
       r.collection_state !== "error" ? "current" : "stale";
     return {
       id: r.id, accountId: r.account_id, accountEmail: r.account_email, provider: r.provider,

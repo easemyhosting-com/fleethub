@@ -183,4 +183,18 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
     expect(await updateProject({ projectId: "prj-00000000-0000-0000-0000-000000000000", kind: "app" })).toBe(false);
     await queryClient`DELETE FROM projects WHERE slug IN ('kindtest','kindtwo')`;
   });
+  it("prefers an exact resource id and leaves an ambiguous native id unmatched", async () => {
+    const { id } = await createProject({ slug: "native-ref", name: "Native ref", environment: "prod", criticality: "normal" }, null);
+    await queryClient`INSERT INTO resources (id,name,category,provider,account_email,state,native_id) VALUES ('proj-nat-a','Bucket A','storage','cloudflare','a@x.test','online','shared-bucket'), ('proj-nat-b','Bucket B','storage','cloudflare','b@x.test','online','shared-bucket'), ('proj-nat-c','Bucket C','storage','cloudflare','c@x.test','online','proj-nat-a')`;
+    const period = { periodStart: new Date(Date.now() - 3600_000).toISOString(), periodEnd: new Date().toISOString(), metrics: {} };
+    try {
+      expect(await recordUsage(String(id), "amb-1", { resource: "shared-bucket", ...period })).toMatchObject({ matched: false });
+      expect(await recordUsage(String(id), "amb-2", { resource: "proj-nat-a", ...period })).toMatchObject({ matched: true });
+      const reports = await queryClient`SELECT resource_ref, resource_id FROM project_usage_reports WHERE project_id = ${id} ORDER BY resource_ref`;
+      expect(reports).toEqual([{ resource_ref: "proj-nat-a", resource_id: "proj-nat-a" }, { resource_ref: "shared-bucket", resource_id: null }]);
+    } finally {
+      await queryClient`DELETE FROM projects WHERE slug = 'native-ref'`;
+      await queryClient`DELETE FROM resources WHERE id IN ('proj-nat-a','proj-nat-b','proj-nat-c')`;
+    }
+  });
 });

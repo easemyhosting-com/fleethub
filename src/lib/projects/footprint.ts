@@ -8,7 +8,7 @@ export interface ProjectFootprint {
   id: string; slug: string; name: string; kind: string; kindManual: boolean; placements: Array<{ host: string; runtime: string; hostResourceId: string | null; evidence: string; status: string; declared: Record<string, number | null> }>; environment: string; criticality: string; repoUrl: string | null;
   links: Array<{ resourceId: string; name: string; provider: string; category: string; billing: string; source: string; confidence: number | null; status: string; purpose: string | null; evidence: string | null; lastSeen: string }>;
   needs: Array<{ id: string; kind: string; purpose: string; status: string; topCandidate: string | null; createdAt: string }>;
-  usage: Array<{ resourceRef: string; matched: boolean; amount: number | null; unit: string | null; periodEnd: string; receivedAt: string }>;
+  usage: Array<{ resourceRef: string; resourceId: string | null; matched: boolean; amount: number | null; unit: string | null; periodEnd: string; receivedAt: string }>;
   keys: Array<{ id: string; hint: string; expiresAt: string; status: "active" | "expired" | "revoked" }>;
   measuredUsage: ProjectMeasurement[];
   usageState: "reporting" | "stale" | "never";
@@ -41,7 +41,7 @@ export async function readFootprints(projectSlug?: string): Promise<ProjectFootp
       placements: own(placements).map(row => ({ host: String(row.host_name), runtime: String(row.runtime), hostResourceId: row.host_resource_id as string | null, evidence: String(row.evidence), status: String(row.status), declared: row.declared as Record<string, number | null> })), environment: String(project.environment), criticality: String(project.criticality), repoUrl: project.repo_url as string | null,
       links: projectLinks,
       needs: own(needs).slice(0, 10).map(row => ({ id: String(row.id), kind: String(row.kind), purpose: String(row.purpose), status: String(row.status), topCandidate: (row.recommendation as { candidates?: Array<{ name: string }> })?.candidates?.[0]?.name ?? null, createdAt: iso(row.created_at)! })),
-      usage: usageRows.slice(0, 20).map(row => ({ resourceRef: String(row.resource_ref), matched: row.resource_id !== null, amount: row.amount as number | null, unit: row.unit as string | null, periodEnd: iso(row.period_end)!, receivedAt: iso(row.received_at)! })),
+      usage: usageRows.slice(0, 20).map(row => ({ resourceRef: String(row.resource_ref), resourceId: row.resource_id as string | null, matched: row.resource_id !== null, amount: row.amount as number | null, unit: row.unit as string | null, periodEnd: iso(row.period_end)!, receivedAt: iso(row.received_at)! })),
       measuredUsage: measured.filter(row => row.projectId === String(project.id)),
       keys: own(keys).map(row => ({ id: String(row.id), hint: String(row.key_hint), expiresAt: iso(row.expires_at)!, status: row.revoked_at ? "revoked" as const : new Date(row.expires_at).getTime() <= Date.now() ? "expired" as const : "active" as const })),
       usageState: last === null ? "never" as const : Date.now() - new Date(last).getTime() > staleAfterMs ? "stale" as const : "reporting" as const,

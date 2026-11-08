@@ -37,7 +37,7 @@ export function projectAttentionReasons(project: Pick<ProjectFootprint, "unalloc
   const reasons: string[] = [];
   if (project.unallocatedUsage > 0) reasons.push(`${project.unallocatedUsage} usage report${project.unallocatedUsage === 1 ? "" : "s"} could not be matched to a FleetHub resource`);
   if (project.billableLinks > 0) reasons.push(`${project.billableLinks} billable linked resource${project.billableLinks === 1 ? "" : "s"} create cost exposure`);
-  if (project.links.some(link => link.source === "declared" && !project.usage.some(row => row.matched && row.resourceRef === link.resourceId))) reasons.push("A declared resource has no matched usage report");
+  if (project.links.some(link => link.source === "declared" && !project.usage.some(row => row.resourceId === link.resourceId))) reasons.push("A declared resource has no matched usage report");
   if (project.usageState === "stale") reasons.push("Usage reports are stale");
   return reasons;
 }

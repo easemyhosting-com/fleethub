@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Shield,
   Lock,
@@ -79,6 +79,55 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
     }
   }, [isOpen]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+    (focusable()[0] ?? dialogRef.current)?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      if (dialogRef.current && e.target instanceof Node && !dialogRef.current.contains(e.target)) (focusable()[0] ?? dialogRef.current).focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", onFocusIn);
+      previous?.focus?.();
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const redirectUri = authStatus.googleRedirectUri || "Configure FLEETHUB_APP_URL on the server";
@@ -144,7 +193,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-[#0b0f17] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden text-zinc-100 flex flex-col">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" tabIndex={-1} className="relative w-full max-w-xl bg-[#0b0f17] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden text-zinc-100 flex flex-col">
         {/* Modal Header */}
         <div className="p-5 border-b border-zinc-800/80 bg-zinc-900/40 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -152,7 +201,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
               <Shield className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <h3 id="auth-modal-title" className="text-base font-bold text-white flex items-center gap-2">
                 FleetHub Authentication & Access Gate
               </h3>
               <p className="text-xs text-zinc-400">
@@ -280,7 +329,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Jamie Lee"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400"
                     />
                   </div>
                 )}
@@ -295,7 +344,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="operator@fleethub.dev"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400"
                   />
                 </div>
 
@@ -312,7 +361,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
                     maxLength={1024}
                     autoComplete={isRegisterMode ? "new-password" : "current-password"}
                     placeholder={isRegisterMode ? "Choose a password (at least 12 characters)" : "Enter password"}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400"
                   />
                 </div>
 
@@ -328,7 +377,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
                       autoComplete="off"
                       value={bootstrapToken}
                       onChange={(event) => setBootstrapToken(event.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400"
                     />
                     <p className="mt-1 text-[11px] text-zinc-400">Use the FLEETHUB_BOOTSTRAP_TOKEN configured by the person installing FleetHub.</p>
                   </div>
@@ -419,7 +468,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
                       Select <strong>Web application</strong> as the application type, and paste this exact Redirect URI:
                     </p>
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-zinc-900 border border-zinc-800 font-mono text-[11px] text-emerald-300">
-                      <span className="truncate">{redirectUri}</span>
+                      <span className="truncate" title={redirectUri}>{redirectUri}</span>
                       <button
                         onClick={copyRedirectUri}
                         className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 cursor-pointer shrink-0 ml-auto"

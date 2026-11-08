@@ -76,9 +76,32 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("resource prof
     await queryClient`DELETE FROM capacity_events WHERE subject = ${accountId}`;
   });
 
+  it("rolls back ownership, resource email and audit when the identity update fails", async () => {
+    const identityId = `prof-rollback-${randomUUID()}`;
+    await queryClient`INSERT INTO identities (id, display_name) VALUES (${identityId}, 'Rollback fixture')`;
+    await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value) VALUES (${`ct-${identityId}`}, ${identityId}, 'email', 'rollback@example.test')`;
+    const [before] = await queryClient`SELECT identity_id, contact_id, owner_email, login_email FROM provider_accounts WHERE id = ${accountId}`;
+    const [resourceBefore] = await queryClient`SELECT account_email FROM resources WHERE id = ${plainId}`;
+    const [eventsBefore] = await queryClient`SELECT COUNT(*)::int AS count FROM capacity_events WHERE subject = ${accountId}`;
+    await queryClient`CREATE FUNCTION reject_profile_identity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.identity_id LIKE 'prof-rollback-%' THEN RAISE EXCEPTION 'synthetic identity write failure'; END IF; RETURN NEW; END $$`;
+    await queryClient`CREATE TRIGGER reject_profile_identity BEFORE UPDATE ON provider_accounts FOR EACH ROW EXECUTE FUNCTION reject_profile_identity()`;
+    try {
+      await expect(setAccountIdentity(accountId, identityId, "owner@example.test")).rejects.toThrow("synthetic identity write failure");
+      expect((await queryClient`SELECT identity_id, contact_id, owner_email, login_email FROM provider_accounts WHERE id = ${accountId}`)[0]).toEqual(before);
+      expect((await queryClient`SELECT account_email FROM resources WHERE id = ${plainId}`)[0]).toEqual(resourceBefore);
+      expect((await queryClient`SELECT COUNT(*)::int AS count FROM capacity_events WHERE subject = ${accountId}`)[0]).toEqual(eventsBefore);
+    } finally {
+      await queryClient`DROP TRIGGER reject_profile_identity ON provider_accounts`;
+      await queryClient`DROP FUNCTION reject_profile_identity()`;
+      await queryClient`DELETE FROM identities WHERE id = ${identityId}`;
+    }
+  });
+
   it("links an account to an identity and adopts that person's primary email", async () => {
     const identityId = `prof-ident-${randomUUID()}`;
-    await queryClient`INSERT INTO identities (id, display_name) VALUES (${identityId}, 'Test Person')`;
+    const otherIdentityId = `prof-other-${randomUUID()}`;
+    await queryClient`INSERT INTO identities (id, display_name) VALUES (${identityId}, 'Test Person'), (${otherIdentityId}, 'Same email, other person')`;
+    await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, created_at) VALUES (${`ct-other-${otherIdentityId}`}, ${otherIdentityId}, 'email', 'second@example.com', true, NOW() - interval '1 day')`;
     await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary) VALUES (${`ct-a-${identityId}`}, ${identityId}, 'email', 'second@example.com', false), (${`ct-b-${identityId}`}, ${identityId}, 'email', 'primary@example.com', true)`;
     try {
       expect(await identityEmail(identityId)).toBe("primary@example.com");
@@ -99,7 +122,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("resource prof
       expect((await readSnapshot({ person: identityId, provider: "oracle" })).resources).toEqual([]);
     } finally {
       await queryClient`UPDATE provider_accounts SET identity_id = NULL WHERE id = ${accountId}`;
-      await queryClient`DELETE FROM identities WHERE id = ${identityId}`;
+      await queryClient`DELETE FROM identities WHERE id IN (${identityId}, ${otherIdentityId})`;
       await queryClient`DELETE FROM capacity_events WHERE subject = ${accountId}`;
     }
   });

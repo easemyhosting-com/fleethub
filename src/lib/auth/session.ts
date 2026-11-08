@@ -111,7 +111,7 @@ export function verifySessionToken(token: string): SessionUser | null {
     const user = result.data;
     const now = Date.now();
     const lifetimeMs = user.exp === undefined ? SESSION_MAX_AGE_SEC * 1000 : Math.min(user.exp - user.createdAt, DEVICE_SESSION_MAX_AGE_SEC * 1000);
-    if (user.createdAt > now + CLOCK_SKEW_MS || lifetimeMs <= 0 || now - user.createdAt > lifetimeMs) return null;
+    if (user.createdAt > now + CLOCK_SKEW_MS || lifetimeMs <= 0 || now - user.createdAt >= lifetimeMs) return null;
     return user;
   } catch {
     return null;

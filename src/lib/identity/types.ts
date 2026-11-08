@@ -138,16 +138,15 @@ export interface IdentityGraphResponse {
 
 /**
  * Mask phone numbers by default for PII protection.
- * E.g. "+1 (555) 010-0198" -> "+1 (•••) •••-0198"
+ * E.g. "+1 (555) 010-0198" -> "+1 •••-••0198"
  */
 export function maskPhoneNumber(phone: string): string {
   if (!phone || phone.trim().length === 0) return "";
   const cleaned = phone.trim();
-  // Keep country code and last 4 digits
+  // Keep only the country code and last 4 digits; the area code is never shown
   if (cleaned.length <= 4) return "••••";
   const lastFour = cleaned.slice(-4);
-  const prefixMatch = cleaned.match(/^(\+\d{1,3}(?:\s*\(\d{1,4}\))?)/);
-  const prefix = prefixMatch ? prefixMatch[1] : "+";
+  const prefix = cleaned.match(/^\+\d{1,3}(?=[\s(-])/)?.[0] ?? "+";
   return `${prefix} •••-••${lastFour}`;
 }
 

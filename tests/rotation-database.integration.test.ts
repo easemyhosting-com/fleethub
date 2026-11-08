@@ -125,9 +125,36 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("credential re
     const status = await listRotation();
     expect(JSON.stringify(status)).not.toContain("rotator-secret-value");
     expect(status.accounts.find(account => account.accountId === id)).toMatchObject({ rotatorConfigured: true, scheduleDays: 30 });
+    await configureRotation(id, { rotatorSecret: "rotator-secret-value" }, "owner@example.test");
+    const replaced = (await queryClient`SELECT rotator_secret_name, schedule_days, next_rotation_at FROM credential_rotation WHERE account_id = ${id}`)[0];
+    expect(replaced.rotator_secret_name).not.toBe(row.rotator_secret_name);
+    expect(replaced).toMatchObject({ schedule_days: 30, next_rotation_at: row.next_rotation_at });
+    await configureRotation(id, { scheduleDays: null }, "owner@example.test");
+    expect((await queryClient`SELECT schedule_days, next_rotation_at FROM credential_rotation WHERE account_id = ${id}`)[0]).toEqual({ schedule_days: null, next_rotation_at: null });
     await configureRotation(id, { removeRotator: true }, "owner@example.test");
+    expect(vault.store.has(replaced.rotator_secret_name)).toBe(false);
     expect(vault.store.has(row.rotator_secret_name)).toBe(false);
     await expect(rotateNow(id, "rotate", "o")).rejects.toMatchObject({ code: "rotator_missing" });
+  });
+
+  it("removes the new rotation secret and keeps the old one when saving the settings fails", async () => {
+    cloudflareFetch();
+    await configureRotation(id, { rotatorSecret: "rotator-secret-value", scheduleDays: 30 }, "o");
+    const before = (await queryClient`SELECT rotator_secret_name FROM credential_rotation WHERE account_id = ${id}`)[0].rotator_secret_name;
+    await queryClient`ALTER TABLE credential_rotation ADD CONSTRAINT test_reject_schedule CHECK (schedule_days IS DISTINCT FROM 9999) NOT VALID`;
+    try {
+      vault.removed = [];
+      await expect(configureRotation(id, { rotatorSecret: "rotator-secret-value", scheduleDays: 9999 }, "o")).rejects.toThrow();
+    } finally {
+      await queryClient`ALTER TABLE credential_rotation DROP CONSTRAINT test_reject_schedule`;
+    }
+    expect(vault.removed).toHaveLength(1);
+    expect(vault.removed[0]).toMatch(/^FLEETHUB_ROTATOR_/);
+    expect(vault.removed[0]).not.toBe(before);
+    expect(vault.store.has(vault.removed[0])).toBe(false);
+    expect(vault.store.get(before)).toBe("rotator-secret-value");
+    expect((await queryClient`SELECT rotator_secret_name FROM credential_rotation WHERE account_id = ${id}`)[0].rotator_secret_name).toBe(before);
+    await configureRotation(id, { removeRotator: true }, "o");
   });
 
   it("rotates in one click: provider rolls the scan token, the new value is stored before the swap, and a rescan is queued", async () => {

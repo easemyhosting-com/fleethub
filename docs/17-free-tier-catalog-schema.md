@@ -2,7 +2,7 @@
 
 > **Status:** Spec v1 · 2026-10-24
 > **Purpose:** Define `fleethub-catalog`, a machine-readable, community-maintained dataset of provider free tiers: limits, reset windows, how usage can be observed, and the provider's multi-account policy. It is the single source of truth that FleetDeck's quota clock, alert rules and MCP server read from.
-> **Why it exists:** see `16-architecture-review-and-course-corrections.md` §2 and §6. Short version: limits and reset semantics are **data, not code**, and a good public catalog is the most shareable artifact this project can produce.
+> **Why it exists:** limits and reset semantics are **data, not code**, and a good public catalog is the most shareable artifact this project can produce.
 
 ---
 
@@ -10,7 +10,7 @@
 
 1. **One file per provider** (`providers/<id>.yaml`). A provider adds entries; it never needs TypeScript.
 2. **Every number has a source and a date.** `source_url` + `verified_at` are mandatory on every meter. CI rejects entries whose `verified_at` is older than 180 days (warning at 90).
-3. **Reset windows are declarative.** Four window kinds cover every provider we know (§3). No per-provider strategy classes.
+3. **Reset windows are declarative.** Six window kinds cover every provider we know (§3.1). No per-provider strategy classes.
 4. **Observability is explicit.** Each meter says *how* FleetHub can know current usage: `api`, `derived`, `manual`, or `none` (§4). The UI must show this.
 5. **Policy is first-class.** Each provider records its multi-account stance with a quoted clause and URL (§5). The UI warns on it; the catalog never advises how to get around it.
 6. **No credentials, no account data.** The catalog is public, static and safe to vendor into any project.
@@ -73,11 +73,14 @@ offerings:
 |---|---|---|---|
 | `daily` | `tz` (default `UTC`) | Cloudflare Workers requests | next 00:00 in `tz` |
 | `calendar_month` | `tz` | most monthly allowances | first instant of next month in `tz` |
-| `billing_cycle` | `anchor: account` | GitHub Actions minutes, Modal credits | read from provider API or user-entered anchor day |
+| `billing_cycle` | `anchor: account` | GitHub Actions minutes, Modal credits | account-specific anchor intended; current engine falls back to the first day of the next month at 00:00 UTC |
+| `session_duration` | `maxHours` | notebook session caps | per session; the cap bounds one continuous session, not a consumption total |
 | `rolling` | `days` | Kaggle weekly GPU hours | continuous, with no reset instant; "available" = limit − usage in the trailing `days` |
 | `none` | — | storage caps, instance-shape caps | never; it's a capacity ceiling, not a consumption window |
 
-The quota engine is four pure functions, `nextReset(window, anchor?, now)` and `projected(usage, window, now)`, each fully unit-tested. If a provider can't be described with one of these, add a window kind in a reviewed PR. Don't add an escape hatch.
+The quota engine provides two core pure functions, `getNextResetDate(window, now?)` and `evaluateQuota(limit, used, window, now?)`, each with unit tests. The latter returns `projectedOverage` with the current usage and reset details. If a provider can't be described with one of these, add a window kind in a reviewed PR. Don't add an escape hatch.
+
+Account-specific billing-cycle reset dates are not implemented. The engine accepts no account anchor date; `getNextResetDate` returns the next calendar month's first day at 00:00 UTC for `billing_cycle`, and `evaluateQuota` uses that fallback for valid inputs. Treat it as an estimate, not the account's verified billing reset.
 
 ### 3.2 Observability levels (displayed as a badge on every meter)
 
@@ -98,6 +101,7 @@ export const Window = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("calendar_month"), tz: z.string().default("UTC") }),
   z.object({ kind: z.literal("billing_cycle"), anchor: z.literal("account") }),
   z.object({ kind: z.literal("rolling"), days: z.number().int().positive() }),
+  z.object({ kind: z.literal("session_duration"), maxHours: z.number().positive() }),
   z.object({ kind: z.literal("none") }),
 ]);
 
@@ -139,7 +143,7 @@ export const Policy = z.object({
 
 **In:** the provider's own words (short quote), the URL, the date, and whether an org/team/project structure exists as the legitimate way to separate workloads.
 
-**Out:** any advice on avoiding detection, linking or not linking accounts, using separate cards, phones or IPs, or anything else that helps someone get around a provider's limits. PRs that add this content are closed. This is a hard project rule (see `01-scope-and-guardrails.md` §5).
+**Out:** any advice on avoiding detection, linking or not linking accounts, using separate cards, phones or IPs, or anything else that helps someone get around a provider's limits. PRs that add this content are closed. This is a hard project rule (see items 8 and 9 of `01-scope-and-guardrails.md`).
 
 ## 6. Launch scope
 

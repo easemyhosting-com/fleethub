@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return fail("Enter the pairing code shown on your signed-in device", 400);
   try {
     if (!(await bootstrapDatabase()).success) return fail("Pairing temporarily unavailable", 503);
-    const redeemed = await redeemPairing(parsed.data.code, parsed.data.label);
+    const redeemed = await redeemPairing(parsed.data.code, parsed.data.label, pairingPolicy().maxScope);
     if (!redeemed) return fail("Invalid, expired or already used pairing code", 401);
     const expiresAt = Date.now() + deviceSessionDays * 86_400_000;
     const token = createSessionToken({ ...redeemed.user, sid: redeemed.sid, exp: expiresAt });

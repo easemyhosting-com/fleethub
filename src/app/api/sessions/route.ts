@@ -28,7 +28,11 @@ export async function DELETE(req: Request) {
   const params = new URL(req.url).searchParams;
   try {
     if (!(await bootstrapDatabase()).success) return unavailable();
-    if (params.get("others") === "true") return NextResponse.json({ revoked: await revokeOtherSessions(getSessionFromRequest(req)?.sid) }, { headers });
+    if (params.get("others") === "true") {
+      const sid = getSessionFromRequest(req)?.sid;
+      if (!sid) return NextResponse.json({ error: "Revoking other sessions requires a server-backed session" }, { status: 409, headers });
+      return NextResponse.json({ revoked: await revokeOtherSessions(sid) }, { headers });
+    }
     const id = idSchema.safeParse(params.get("id"));
     if (!id.success) return NextResponse.json({ error: "A valid session id is required" }, { status: 400, headers });
     return (await revokeSession(id.data))

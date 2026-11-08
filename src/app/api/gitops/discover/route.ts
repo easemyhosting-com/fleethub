@@ -8,6 +8,7 @@ import { applyDiscovery, propose } from "@/lib/gitops/register";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "no-store" };
 const maxDiscoveryFiles = 600;
+const maxRequestBytes = 4 * maxTotalBytes;
 const input = z.strictObject({
   files: z.array(z.strictObject({ path: z.string().max(300), content: z.string().max(200 * 1024) })).min(1).max(maxDiscoveryFiles),
   apply: z.boolean().default(false),
@@ -18,10 +19,10 @@ const input = z.strictObject({
 
 /** Operator-only. Without `apply` this is a dry run that writes nothing. With `apply` it registers only the selected project slugs. */
 export async function POST(req: Request) {
-  const auth = await verifyApiAccess(req, { requireWrite: true });
+  const auth = await verifyApiAccess(req, { requireWrite: true, maxBytes: maxRequestBytes });
   if (!auth.authorized) return createUnauthorizedResponse(auth);
   if (!isOperator(auth)) return NextResponse.json({ error: "Forbidden: only an operator can register projects from GitOps." }, { status: 403, headers });
-  const raw = await readJsonWithLimit<unknown>(req, 4 * maxTotalBytes);
+  const raw = await readJsonWithLimit<unknown>(req, maxRequestBytes);
   if (!raw.ok) return NextResponse.json({ error: raw.error }, { status: raw.status, headers });
   const parsed = input.safeParse(raw.data);
   if (!parsed.success) return NextResponse.json({ error: "Send {files:[{path, content}], apply?, select?, sourceRef?}. YAML only, at most 600 files of 200 KB." }, { status: 400, headers });

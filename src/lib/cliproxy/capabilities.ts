@@ -45,12 +45,12 @@ async function probe<T>(url: string, key: string | undefined, schema: z.ZodType<
     const result = schema.safeParse(await requestJson(url, { headers: { Authorization: `Bearer ${key}` } }));
     return result.success
       ? { check: { state: "supported", authentication: "authenticated" }, data: result.data }
-      : { check: { state: "failed", authentication: "authenticated", reason: "invalid_response" }, data: null };
+      : { check: { state: "failed", authentication: "unknown", reason: "invalid_response" }, data: null };
   } catch (error) {
     const denied = error instanceof ServiceRequestError && [401, 403].includes(error.status);
     const rejected = error instanceof ServiceRequestError && error.status === 401;
     const malformed = error instanceof SyntaxError;
-    return { check: { state: "failed", authentication: rejected ? "rejected" : malformed ? "authenticated" : "unknown", reason: denied ? "access_denied" : malformed ? "invalid_response" : "unavailable" }, data: null };
+    return { check: { state: "failed", authentication: rejected ? "rejected" : "unknown", reason: denied ? "access_denied" : malformed ? "invalid_response" : "unavailable" }, data: null };
   }
 }
 

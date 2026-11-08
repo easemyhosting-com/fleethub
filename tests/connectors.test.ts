@@ -113,8 +113,8 @@ describe("Prometheus", () => {
   });
   it("names a machine from node_uname_info and ignores names for unknown instances", () => {
     const sample = (labels: Record<string, string>, value: number) => ({ labels, value });
-    const hosts = joinHosts({ cores: [sample({ instance: "10.0.0.190:9100" }, 4)], busy: [], total: [], used: [], names: [sample({ instance: "10.0.0.190:9100", nodename: "borealis" }, 1), sample({ instance: "10.9.9.9:9100", nodename: "ghost" }, 1), sample({ instance: "10.0.0.190:9100" }, 1)] });
-    expect(hosts).toEqual([expect.objectContaining({ instance: "10.0.0.190:9100", nodeName: "borealis", cpuCores: 4 })]);
+    const hosts = joinHosts({ cores: [sample({ instance: "10.0.0.17:9100" }, 4)], busy: [], total: [], used: [], names: [sample({ instance: "10.0.0.17:9100", nodename: "borealis" }, 1), sample({ instance: "10.9.9.9:9100", nodename: "ghost" }, 1), sample({ instance: "10.0.0.17:9100" }, 1)] });
+    expect(hosts).toEqual([expect.objectContaining({ instance: "10.0.0.17:9100", nodeName: "borealis", cpuCores: 4 })]);
   });
   it("joins plain Docker containers by machine and name, and matches them to project slugs by an exact rule", () => {
     const sample = (name: string, value: number, instance = "atlas") => ({ labels: { instance, name }, value });
@@ -126,8 +126,8 @@ describe("Prometheus", () => {
     expect(containerBelongs("my-kanban", "kanban")).toBe(false);
   });
   it("names a measured machine by its node name only when the instance is an address", () => {
-    expect(measuredHostName({ instance: "10.0.0.190:9100", nodeName: "borealis" })).toBe("borealis");
-    expect(measuredHostName({ instance: "10.0.0.190:9100", nodeName: null })).toBe("10.0.0.190");
+    expect(measuredHostName({ instance: "10.0.0.17:9100", nodeName: "borealis" })).toBe("borealis");
+    expect(measuredHostName({ instance: "10.0.0.17:9100", nodeName: null })).toBe("10.0.0.17");
     expect(measuredHostName({ instance: "atlas", nodeName: "3f2a9c1d0b7e" })).toBe("atlas");
     expect(measuredHostName({ instance: "atlas:9100", nodeName: null })).toBe("atlas");
   });
@@ -137,11 +137,11 @@ describe("Prometheus", () => {
       { projectId: "p1", hostName: "borealis", resourceId: "r-bore", slug: "kanban" },
       { projectId: "p2", hostName: "atlas", resourceId: "r-atlas", slug: "alloy" },
     ];
-    const hosts = [{ instance: "10.0.0.190:9100", nodeName: "borealis", cpuCores: 2, cpuBusyCores: 1, memTotalMi: 1, memUsedMi: 1 }];
+    const hosts = [{ instance: "10.0.0.17:9100", nodeName: "borealis", cpuCores: 2, cpuBusyCores: 1, memTotalMi: 1, memUsedMi: 1 }];
     const totals = attributeContainers([
       { instance: "atlas:9100", name: "kanban", cpuCores: 0.1, memMi: 10 },
       { instance: "atlas", name: "kanban-oauth2", cpuCores: 0.2, memMi: null },
-      { instance: "10.0.0.190:8080", name: "kanban", cpuCores: 0.5, memMi: 50 },
+      { instance: "10.0.0.17:8080", name: "kanban", cpuCores: 0.5, memMi: 50 },
       { instance: "elsewhere", name: "kanban", cpuCores: 9, memMi: 9 },
     ], placements, hosts);
     expect(totals).toEqual([

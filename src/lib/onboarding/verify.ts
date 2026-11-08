@@ -5,17 +5,25 @@ import { z } from "zod";
 import { configSchemas, type StepId } from "./model";
 import { approvedApiUrl, requestJson } from "./transport";
 import { verifyVault } from "./vault";
-import { createBuiltinVault } from "@/lib/vault/builtin";
+import { countUnreadableSecrets, createBuiltinVault } from "@/lib/vault/builtin";
 import { randomBytes, randomUUID } from "node:crypto";
 
 async function verifyBuiltin() {
   const vault = createBuiltinVault();
   const name = `FLEETHUB_PROBE_${randomUUID().replaceAll("-", "")}`;
   const value = randomBytes(32).toString("hex");
+  await vault.write(name, value);
   try {
-    await vault.write(name, value);
     if (await vault.read(name) !== value) throw new SetupError("Built-in store round-trip did not match");
-  } finally { await vault.remove(name); }
+  } catch (error) {
+    // Keep the original failure; a cleanup error must not replace it.
+    await vault.remove(name).catch(() => console.error("[Setup] Could not remove a built-in store verification probe"));
+    throw error;
+  }
+  try { await vault.remove(name); }
+  catch { throw new SetupError("The built-in store accepted a write but could not delete it"); }
+  const unreadable = await countUnreadableSecrets();
+  if (unreadable > 0) throw new SetupError(`${unreadable} stored secret${unreadable === 1 ? "" : "s"} cannot be decrypted with the current FLEETHUB_SECRET_STORE_KEY. Restore the key they were saved with; FleetHub stays not ready until then`);
 }
 
 async function verifyTailscale(config: z.infer<typeof configSchemas.tailscale>) {

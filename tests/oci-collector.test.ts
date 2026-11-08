@@ -1,6 +1,6 @@
 import { createPublicKey, createVerify, generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { collectOci, computeSpec, ociConfigSchema, signGet } from "../src/lib/inventory/oci";
+import { collectOci, computeSpec, ociBudget, ociConfigSchema, signGet } from "../src/lib/inventory/oci";
 import { collectInventory, validateInventoryConfig } from "../src/lib/inventory/collectors";
 import { CollectionError } from "../src/lib/inventory/model";
 
@@ -110,6 +110,29 @@ describe("OCI inventory", () => {
     await expect(collectOci(config, signal)).rejects.toMatchObject({ code: "invalid_response" });
     mockOci({ ...base, "/20160918/instances": [{ body: [], next: "same" }, { body: [], next: "same" }] });
     await expect(collectOci(config, signal)).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("keeps compute within its own budget and leaves optional products uncovered instead of failing a large tenancy", async () => {
+    const tenancyOf = (count: number, domains: number) => ({
+      "/20160918/compartments": { body: Array.from({ length: count - 1 }, (_, index) => ({ id: `ocid1.compartment.oc1..c${index}`, lifecycleState: "ACTIVE" })) },
+      "/20160918/availabilityDomains": { body: Array.from({ length: domains }, (_, index) => ({ name: `AD-${index + 1}` })) },
+      "/20160918/instances": { body: [] }, "/20160918/volumes": { body: [] }, "/20160918/bootVolumes": { body: [] }, "/n/ns/b": { body: [] }, "/n/": { body: "ns" }, "/20160918/autonomousDatabases": { body: [] },
+    });
+    // 24 compartments with 3 availability domains used to exceed the old shared 120-call budget and fail the whole scan.
+    let calls = mockOci(tenancyOf(24, 3));
+    expect((await collectOci(config, signal)).covered).toEqual(["instance", "volume", "bootvolume", "bucket", "database"]);
+    expect(calls.length).toBe(3 + 24 * (4 + 3));
+    // At the compartment cap, compute is still complete; products that no longer fit are skipped before any call is spent.
+    calls = mockOci(tenancyOf(50, 3));
+    const capped = await collectOci(config, signal);
+    expect(capped.covered).toEqual(["instance", "volume", "bootvolume"]);
+    expect(calls.filter(call => call.target.startsWith("/20160918/instances"))).toHaveLength(50);
+    expect(calls.some(call => call.target.startsWith("/n/") || call.target.startsWith("/20160918/autonomousDatabases"))).toBe(false);
+    expect(calls.length).toBeLessThanOrEqual(ociBudget.compute + ociBudget.optional);
+    // Over the compartment cap the scan stops after the first call.
+    calls = mockOci(tenancyOf(51, 1));
+    await expect(collectOci(config, signal)).rejects.toMatchObject({ code: "scan_limit" });
+    expect(calls).toHaveLength(1);
   });
 
   it("derives compute limits from the shape", () => {

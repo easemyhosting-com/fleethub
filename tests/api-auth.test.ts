@@ -260,6 +260,16 @@ describe("API Security, Authentication & Rate Limiting Guard", async () => {
     expect(decoded).not.toBeNull();
     expect(decoded?.email).toBe(user.email);
 
+    // A token stops working at the same instant as its database row (expires_at > NOW()).
+    const SESSION_MAX_AGE_SEC = 7 * 24 * 60 * 60;
+    const issued = Date.now();
+    const timed = createSessionToken({ ...user, createdAt: issued });
+    vi.spyOn(Date, "now").mockReturnValue(issued + SESSION_MAX_AGE_SEC * 1000 - 1);
+    expect(verifySessionToken(timed)).not.toBeNull();
+    vi.spyOn(Date, "now").mockReturnValue(issued + SESSION_MAX_AGE_SEC * 1000);
+    expect(verifySessionToken(timed)).toBeNull();
+    vi.restoreAllMocks();
+
     // Tampered token fails
     const tampered = token.replace("a", "b");
     expect(verifySessionToken(tampered)).toBeNull();

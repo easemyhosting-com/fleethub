@@ -386,7 +386,7 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
               <Network className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold tracking-tight text-white flex flex-wrap items-center gap-2">
                 Identity & Accounts Relationship Engine
                 <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   Authoritative Policy
@@ -480,7 +480,7 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
 
         {/* View Toggle Button: Graph vs Tree */}
         <div className="md:col-span-4 flex items-center justify-start md:justify-end gap-1.5">
-          <div className="inline-flex rounded-lg bg-zinc-950 border border-zinc-800 p-0.5">
+          <div className="inline-flex max-w-full flex-wrap rounded-lg bg-zinc-950 border border-zinc-800 p-0.5">
             {viewMode === "graph" && (
               <button onClick={() => setVertical(value => !value)} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-zinc-300 hover:text-white cursor-pointer" title="Rotate the graph between horizontal and vertical">
                 <RotateCcw className="h-3.5 w-3.5" />

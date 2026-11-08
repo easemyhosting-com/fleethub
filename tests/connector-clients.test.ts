@@ -15,8 +15,8 @@ beforeAll(async () => {
     if (url.pathname === "/apis/apps/v1/deployments") return url.searchParams.get("continue") ? send(200, { items: [{ metadata: { name: "b" } }] }) : send(200, { items: [{ metadata: { name: "a" } }], metadata: { continue: "tok" } });
     if (url.pathname === "/apis/apps/v1/statefulsets") return send(200, { items: [] });
     if (url.pathname === "/apis/apps/v1/daemonsets" || url.pathname === "/apis/networking.k8s.io/v1/ingresses" || url.pathname === "/api/v1/persistentvolumeclaims") return send(200, { items: [] });
-    if (url.pathname.includes("fluxcd.io")) return send(404, {});
-    if (url.pathname.includes("argoproj.io")) return send(403, {});
+    if (["/apis/kustomize.toolkit.fluxcd.io/v1/kustomizations", "/apis/helm.toolkit.fluxcd.io/v2/helmreleases"].includes(url.pathname)) return send(404, {});
+    if (url.pathname === "/apis/argoproj.io/v1alpha1/applications") return send(403, {});
     if (url.pathname === "/containers/json") return send(200, [{ Id: "abc", Names: ["/x"], Image: "i:1", State: "running", Labels: { l: "v" }, Env: ["SECRET=1"] }]);
     if (url.pathname === "/containers/abc/json") return send(200, { HostConfig: { Memory: 1048576, NanoCpus: 1e9, Binds: ["/secret:/x"] }, Config: { Env: ["TOKEN=leak"] } });
     if (url.pathname === "/api/v1/query" || url.pathname === "/api/prom/api/v1/query") return send(200, { data: { result: [{ metric: { namespace: "n" }, value: [1, "2"] }] } });

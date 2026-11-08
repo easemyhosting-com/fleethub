@@ -142,8 +142,17 @@ describe("Infisical vault probe", () => {
       if (init?.method === "DELETE") return json({}, 500);
       return json({ secret: { secretValue: value } });
     });
-    await expect(verifyVault(infisical)).rejects.toThrow("Service rejected");
+    await expect(verifyVault(infisical)).rejects.toThrow("grant delete permission");
     expect(fetchMock.mock.calls.at(-1)?.[1]?.method).toBe("DELETE");
+  });
+  it("keeps the round-trip error when cleanup also fails", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValueOnce(json({ accessToken: "access" })).mockResolvedValueOnce(json({})).mockResolvedValueOnce(json({ secret: { secretValue: "wrong" } })).mockResolvedValueOnce(json({}, 500));
+    await expect(verifyVault(infisical)).rejects.toThrow("round-trip did not match");
+    expect(fetchMock.mock.calls.at(-1)?.[1]?.method).toBe("DELETE");
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(String(logged.mock.calls[0][0])).not.toContain("wrong");
+    logged.mockRestore();
   });
   it("reports missing credentials and invalid login response", async () => {
     delete process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET;

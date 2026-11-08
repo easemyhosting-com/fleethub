@@ -33,4 +33,17 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("built-in secr
     await expect(verifyStep("builtin", {})).rejects.toThrow("FLEETHUB_SECRET_STORE_KEY");
     vi.stubEnv("FLEETHUB_SECRET_STORE_KEY", "integration-master-key-at-least-32-chars");
   });
+
+  it("refuses verification when stored secrets were written under a different key", async () => {
+    await createBuiltinVault().write("IT_KEYED", "kept-secret");
+    vi.stubEnv("FLEETHUB_SECRET_STORE_KEY", "a-different-master-key-of-32-chars-or-more");
+    try {
+      await expect(verifyStep("builtin", {})).rejects.toThrow("cannot be decrypted with the current FLEETHUB_SECRET_STORE_KEY");
+      expect((await queryClient`SELECT count(*)::int AS n FROM secret_store WHERE name LIKE 'FLEETHUB_PROBE_%'`)[0].n).toBe(0);
+    } finally {
+      vi.stubEnv("FLEETHUB_SECRET_STORE_KEY", "integration-master-key-at-least-32-chars");
+    }
+    await expect(verifyStep("builtin", {})).resolves.toBeUndefined();
+    await createBuiltinVault().remove("IT_KEYED");
+  });
 });

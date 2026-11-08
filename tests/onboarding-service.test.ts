@@ -7,7 +7,7 @@ const db = vi.hoisted(() => ({
   statements: [] as string[],
 }));
 const verification = vi.hoisted(() => ({ run: vi.fn<(...args: unknown[]) => Promise<void>>() }));
-const auth = vi.hoisted(() => ({ allowed: true, write: true }));
+const auth = vi.hoisted(() => ({ allowed: true, write: true, operator: true }));
 
 vi.mock("@/lib/db/client", () => {
   async function query(strings: TemplateStringsArray, ...values: unknown[]) {
@@ -25,6 +25,7 @@ vi.mock("@/lib/db/client", () => {
       }
       const [id, raw] = values as [string, string];
       const old = db.rows.get(id);
+      if (old && JSON.stringify(old.config) === JSON.stringify(JSON.parse(raw)) && !old.skipped && old.status === "verified") return [];
       db.rows.set(id, { id, config: JSON.parse(raw), revision: (old?.revision ?? 0) + 1, status: "configured", verifiedAt: null, fingerprint: null, verificationId: null });
       return [];
     }
@@ -61,6 +62,7 @@ vi.mock("@/lib/onboarding/verify", () => ({ verifyStep: verification.run }));
 vi.mock("@/lib/db/bootstrap", () => ({ bootstrapDatabase: vi.fn(async () => ({ success: db.boot })) }));
 vi.mock("@/lib/auth/guard", () => ({
   verifyApiAccess: vi.fn(async (_req: Request, options?: { requireWrite?: boolean }) => ({ authorized: auth.allowed && (!options?.requireWrite || auth.write), status: 403, reason: "denied" })),
+  isOperator: vi.fn(() => auth.operator),
   createUnauthorizedResponse: vi.fn(() => new Response(JSON.stringify({ error: "Denied" }), { status: 403 })),
   readJsonWithLimit: vi.fn(async (request: Request) => {
     try {
@@ -94,7 +96,7 @@ async function readyThrough(step: "tailscale" | "infisical" | "cliproxy") {
 
 beforeEach(() => {
   db.rows.clear(); db.statements.length = 0; db.fail = false; db.boot = true;
-  auth.allowed = true; auth.write = true;
+  auth.allowed = true; auth.write = true; auth.operator = true;
   verification.run.mockReset().mockResolvedValue(undefined);
   vi.spyOn(Date, "now").mockReturnValue(now);
   vi.stubEnv("FLEETHUB_AUTH_SECRET", "a".repeat(64));
@@ -277,7 +279,34 @@ describe("persisted setup state", () => {
   });
 });
 
+describe("saving settings", () => {
+  it("keeps a verified step when identical settings are saved again, and resets it when they change", async () => {
+    await readyThrough("infisical");
+    const before = (await getSetupState()).steps[1];
+    expect(before.status).toBe("verified");
+    await saveSetupStep("infisical", { ...configs.infisical });
+    expect((await getSetupState()).steps[1]).toMatchObject({ status: "verified", revision: before.revision });
+    await saveSetupStep("infisical", { ...configs.infisical, environment: "prod" });
+    expect((await getSetupState()).steps[1].status).toBe("configured");
+  });
+});
+
 describe("onboarding API boundary", () => {
+  it("re-verifies an aged-out secret store on GET only for an operator, so a reader never writes a vault probe", async () => {
+    await readyThrough("infisical");
+    vi.spyOn(Date, "now").mockReturnValue(now + freshnessMs + 1000);
+    verification.run.mockClear();
+    auth.operator = false;
+    const read = await GET(new Request(url));
+    expect(read.status).toBe(200);
+    expect((await read.json()).ready).toBe(false);
+    expect(verification.run).not.toHaveBeenCalled();
+    auth.operator = true;
+    verification.run.mockResolvedValue(undefined);
+    expect((await (await GET(new Request(url))).json()).ready).toBe(true);
+    expect(verification.run).toHaveBeenCalled();
+  });
+
   it("denies unauthorized reads and writes before touching the database", async () => {
     auth.allowed = false;
     expect((await GET(new Request(url))).status).toBe(403);
