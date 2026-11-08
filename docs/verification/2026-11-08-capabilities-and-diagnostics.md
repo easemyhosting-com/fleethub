@@ -2,7 +2,7 @@
 
 ## Implemented scope
 
-R5 adds an operator-only `GET /api/onboarding/cliproxy-capabilities` endpoint. The adapter uses the v8 management contract and the inference model-list route with distinct credentials. It reports a schema version, adapter contract, check time, inference and management authentication independently, credential enablement, reported upstream availability and quota support. Installed server version and actual inference availability remain unknown unless evidence exists.
+R5 adds an operator-only `GET /api/onboarding/cliproxy-capabilities` endpoint. The adapter uses the v8 management contract and the inference model-list route with distinct credentials. It reports a schema version, adapter contract, check time, inference and management authentication independently, credential enablement, reported upstream availability and quota support. Installed server version and actual inference availability remain unknown unless evidence exists. On 2026-11-09 the setup screen gained a read-only **Gateway capabilities** panel that calls this endpoint on request; `scripts/verify-setup-ui.mjs` covers it at 390px.
 
 Quota observations have separate not-loaded, loading, observed, stale, unsupported and failed variants. Only observations contain measured values. The initial adapter has no provider quota reader, so its unsupported status describes the adapter, not the server or an account's remaining allowance. Expired observations retain their source time and measurements.
 
