@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const fixture = vi.hoisted(() => ({ seed: vi.fn(), begin: vi.fn(), resolve: vi.fn() }));
+const fixture = vi.hoisted(() => ({ seed: vi.fn(), remove: vi.fn(), resolve: vi.fn() }));
 vi.mock("@/lib/db/bootstrap", () => ({
   bootstrapDatabase: vi.fn(async () => ({ success: true })),
   seedInitialIdentitiesAndAccounts: fixture.seed,
-  demoSeedIds: { accounts: ["a"], resources: ["r"], gateways: ["g"], identities: ["i"] },
+  removeDemoSeed: fixture.remove,
 }));
-vi.mock("@/lib/db/client", () => ({ queryClient: { begin: fixture.begin } }));
 vi.mock("@/lib/auth/rate-limit", () => ({ consumeSharedLimit: vi.fn(async () => ({ allowed: true })) }));
 vi.mock("@/lib/auth/sessions", async importOriginal => ({ ...(await importOriginal<typeof import("../src/lib/auth/sessions")>()), resolveSession: fixture.resolve }));
 import { createSessionToken } from "../src/lib/auth/session";
@@ -23,7 +22,7 @@ const asSession = (scope: "operator" | "read") => { fixture.resolve.mockResolved
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("FLEETHUB_AUTH_REQUIRED", "true"); vi.stubEnv("FLEETHUB_APP_URL", origin);
   vi.stubEnv("FLEETHUB_AUTH_SECRET", "demo-route-secret-at-least-32-bytes-long!!"); vi.stubEnv("FLEETHUB_API_KEY", "demo-admin-fixture"); vi.stubEnv("FLEETHUB_READONLY_KEY", "demo-reader-fixture");
-  fixture.seed.mockReset().mockResolvedValue(undefined); fixture.begin.mockReset().mockResolvedValue(undefined);
+  fixture.seed.mockReset().mockResolvedValue(undefined); fixture.remove.mockReset().mockResolvedValue(undefined);
   fixture.resolve.mockReset().mockResolvedValue({ user: null, failure: "none" });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -36,7 +35,7 @@ describe("/api/demo/seed", () => {
       expect((await call(handler, method, { authorization: "Bearer demo-reader-fixture" })).status).toBeLessThan(500);
       expect((await call(handler, method, asSession("read"))).status).toBeGreaterThanOrEqual(401);
       expect(fixture.seed).not.toHaveBeenCalled();
-      expect(fixture.begin).not.toHaveBeenCalled();
+      expect(fixture.remove).not.toHaveBeenCalled();
     });
   }
 
@@ -46,10 +45,10 @@ describe("/api/demo/seed", () => {
     expect(fixture.seed).toHaveBeenCalledTimes(2);
   });
 
-  it("resets in one transaction for an operator and reports failure without details", async () => {
+  it("resets through removeDemoSeed for an operator and reports failure without details", async () => {
     expect((await call(DELETE, "DELETE", asSession("operator"))).status).toBe(200);
-    expect(fixture.begin).toHaveBeenCalledTimes(1);
-    fixture.begin.mockRejectedValue(new Error("violates foreign key constraint on secret_table"));
+    expect(fixture.remove).toHaveBeenCalledTimes(1);
+    fixture.remove.mockRejectedValue(new Error("violates foreign key constraint on secret_table"));
     const failed = await call(DELETE, "DELETE", asSession("operator"));
     expect(failed.status).toBe(500);
     expect(JSON.stringify(await failed.json())).not.toContain("secret_table");

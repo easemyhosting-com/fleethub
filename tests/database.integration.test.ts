@@ -34,9 +34,9 @@ describe.skipIf(process.env.DATABASE_INTEGRATION !== "true")("PostgreSQL identit
   });
 
   it("preserves protection when linking and reports missing accounts", async () => {
-    const body = { action: "link_account", accountId: "acc-cloudflare-main", identityId: "ident-primary-operator", provider: "cloudflare", label: "Cloudflare" };
+    const body = { action: "link_account", accountId: "demo-acc-cloudflare-main", identityId: "demo-ident-primary-operator", provider: "cloudflare", label: "Cloudflare" };
     expect((await POST(request(body))).status).toBe(200);
-    const [account] = await queryClient`SELECT role, is_protected FROM provider_accounts WHERE id = 'acc-cloudflare-main'`;
+    const [account] = await queryClient`SELECT role, is_protected FROM provider_accounts WHERE id = 'demo-acc-cloudflare-main'`;
     expect(account).toMatchObject({ role: "dns_control", is_protected: true });
     expect((await POST(request({ ...body, accountId: "missing" }))).status).toBe(404);
     expect((await POST(request({ action: "update_protection", accountId: "missing", isProtected: true }))).status).toBe(404);
