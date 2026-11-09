@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { queryClient } from "@/lib/db/client";
-import { demoSeedIds, seedInitialIdentitiesAndAccounts } from "@/lib/db/bootstrap";
+import { removeDemoSeed, seedInitialIdentitiesAndAccounts } from "@/lib/db/bootstrap";
 import { verifyApiAccess, createUnauthorizedResponse, isOperator } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +24,7 @@ export async function POST(req: Request) {
   }
 }
 
-/** Removes only the fixed demo rows. Real inventory is never touched; if real data references a demo row, nothing is deleted. */
+/** Removes only the demo rows, including those an older install seeded without the `demo-` prefix. Real inventory is never touched; if real data references a demo row, nothing is deleted. */
 export async function DELETE(req: Request) {
   const auth = await verifyApiAccess(req, { requireWrite: true });
   if (!auth.authorized) {
@@ -34,13 +33,7 @@ export async function DELETE(req: Request) {
   if (!isOperator(auth)) return forbidden();
 
   try {
-    await queryClient.begin(async tx => {
-      await tx`DELETE FROM quota_meters WHERE account_id IN ${tx(demoSeedIds.accounts)}`;
-      await tx`DELETE FROM resources WHERE id IN ${tx(demoSeedIds.resources)}`;
-      await tx`DELETE FROM network_gateways WHERE id IN ${tx(demoSeedIds.gateways)}`;
-      await tx`DELETE FROM provider_accounts WHERE id IN ${tx(demoSeedIds.accounts)}`;
-      await tx`DELETE FROM identities WHERE id IN ${tx(demoSeedIds.identities)}`;
-    });
+    await removeDemoSeed();
 
     return NextResponse.json({
       success: true,

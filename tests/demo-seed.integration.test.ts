@@ -1,10 +1,26 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "../src/lib/db/client";
-import { bootstrapDatabase, demoSeedIds } from "../src/lib/db/bootstrap";
+import { bootstrapDatabase, demoSeedIds, legacyDemoSeedIds } from "../src/lib/db/bootstrap";
 import { DELETE, POST } from "../src/app/api/demo/seed/route";
 
 const origin = "http://localhost:3060";
 const call = (handler: typeof POST, token?: string) => handler(new Request(`${origin}/api/demo/seed`, { method: handler === POST ? "POST" : "DELETE", headers: token ? { authorization: `Bearer ${token}` } : {} }));
+
+const count = async (table: "identities" | "provider_accounts" | "resources" | "network_gateways", ids: string[]) =>
+  (await queryClient`SELECT COUNT(*)::int AS count FROM ${queryClient(table)} WHERE id IN ${queryClient(ids)}`)[0].count as number;
+/** Rows exactly as the seed wrote them before the `demo-` prefix (until 2026-11-09). */
+async function insertLegacySeedRows() {
+  await queryClient`INSERT INTO identities (id, display_name) VALUES ('ident-primary-operator', 'Fleet Operator')`;
+  await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, is_verified, label) VALUES ('ct-operator-email-1', 'ident-primary-operator', 'email', 'operator@fleethub.dev', true, true, 'Primary Infrastructure')`;
+  await queryClient`INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email) VALUES ('acc-operator-main', 'ident-primary-operator', 'oracle', 'Oracle Cloud Tenancy 1', 'operator@fleethub.dev')`;
+  await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state) VALUES ('borealis', 'borealis (K3s)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online')`;
+  await queryClient`INSERT INTO network_gateways (id, name, kind, tailscale_ip, port, state, latency_ms) VALUES ('gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '100.64.0.4', 8888, 'online', 8)`;
+}
+const legacyLeft = async () => ({
+  identities: await count("identities", legacyDemoSeedIds.identities), accounts: await count("provider_accounts", legacyDemoSeedIds.accounts),
+  resources: await count("resources", legacyDemoSeedIds.resources), gateways: await count("network_gateways", legacyDemoSeedIds.gateways),
+});
+const noLegacy = { identities: 0, accounts: 0, resources: 0, gateways: 0 };
 
 describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("demo seed reset", () => {
   beforeAll(async () => {
@@ -12,7 +28,12 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("demo seed res
     if (url.hostname !== "127.0.0.1" || url.pathname !== "/fleethub_security") throw new Error("Requires disposable local database");
     expect((await bootstrapDatabase()).success).toBe(true);
   });
-  beforeEach(() => {
+  beforeEach(async () => {
+    const old = legacyDemoSeedIds;
+    await queryClient`DELETE FROM resources WHERE id IN ${queryClient(old.resources)}`;
+    await queryClient`DELETE FROM network_gateways WHERE id IN ${queryClient(old.gateways)}`;
+    await queryClient`DELETE FROM provider_accounts WHERE id IN ${queryClient(old.accounts)}`;
+    await queryClient`DELETE FROM identities WHERE id IN ${queryClient(old.identities)}`;
     vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("FLEETHUB_API_KEY", "demo-admin-fixture"); vi.stubEnv("FLEETHUB_READONLY_KEY", "demo-reader-fixture");
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -58,5 +79,47 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("demo seed res
       await queryClient`DELETE FROM provider_accounts WHERE id = 'demo-linked-account'`;
     }
     expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+  });
+  it("removes rows an older install seeded without the demo- prefix, and keeps real rows that reuse those IDs", async () => {
+    await insertLegacySeedRows();
+    await queryClient`INSERT INTO identities (id, display_name) VALUES ('ident-alex-chen', 'Someone real')`;
+    await queryClient`INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email) VALUES ('acc-gcp-prod', 'ident-alex-chen', 'google', 'Real GCP', 'real@example.test')`;
+    await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state) VALUES ('atlas', 'Real atlas', 'compute', 'google', 'acc-gcp-prod', 'real@example.test', 'online')`;
+    try {
+      expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+      expect(await queryClient`SELECT id FROM identities WHERE id = 'ident-primary-operator'`).toHaveLength(0);
+      expect(await queryClient`SELECT id FROM identity_contacts WHERE id = 'ct-operator-email-1'`).toHaveLength(0);
+      expect(await queryClient`SELECT id FROM provider_accounts WHERE id = 'acc-operator-main'`).toHaveLength(0);
+      expect(await queryClient`SELECT id FROM resources WHERE id = 'borealis'`).toHaveLength(0);
+      expect(await queryClient`SELECT id FROM network_gateways WHERE id = 'gw-office'`).toHaveLength(0);
+      expect(await queryClient`SELECT id FROM resources WHERE id = 'atlas' AND account_id = 'acc-gcp-prod'`).toHaveLength(1);
+      expect(await queryClient`SELECT id FROM provider_accounts WHERE id = 'acc-gcp-prod'`).toHaveLength(1);
+      expect(await queryClient`SELECT id FROM identities WHERE id = 'ident-alex-chen'`).toHaveLength(1);
+    } finally {
+      await queryClient`DELETE FROM resources WHERE id = 'atlas'`;
+      await queryClient`DELETE FROM provider_accounts WHERE id = 'acc-gcp-prod'`;
+      await queryClient`DELETE FROM identities WHERE id = 'ident-alex-chen'`;
+    }
+  });
+
+  it("keeps a legacy-ID gateway that is not the seeded one", async () => {
+    await queryClient`INSERT INTO network_gateways (id, name, kind, tailscale_ip, port, state, latency_ms) VALUES ('gw-office', 'Real office node', 'tailscale_exit_node', '100.64.9.9', 8888, 'online', 8)`;
+    try {
+      expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+      expect(await queryClient`SELECT id FROM network_gateways WHERE id = 'gw-office'`).toHaveLength(1);
+    } finally {
+      await queryClient`DELETE FROM network_gateways WHERE id = 'gw-office'`;
+    }
+  });
+
+  it("replaces legacy rows when seeding again, so an upgraded install has no duplicates", async () => {
+    await insertLegacySeedRows();
+    expect((await call(POST, "demo-admin-fixture")).status).toBe(200);
+    expect(await legacyLeft()).toEqual(noLegacy);
+    expect(await count("resources", demoSeedIds.resources)).toBe(demoSeedIds.resources.length);
+    expect((await queryClient`SELECT COUNT(*)::int AS count FROM provider_accounts WHERE label = 'Oracle Cloud Tenancy 1'`)[0].count).toBe(1);
+    expect((await queryClient`SELECT COUNT(*)::int AS count FROM network_gateways WHERE tailscale_ip = '100.64.0.4'`)[0].count).toBe(1);
+    expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+    expect(await count("resources", demoSeedIds.resources)).toBe(0);
   });
 });

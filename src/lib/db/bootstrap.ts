@@ -639,18 +639,63 @@ export async function backfillProviderAccountIdentities(): Promise<{ backfilledC
 
 /** Fixed row IDs written by `seedInitialIdentitiesAndAccounts`, so a demo reset never touches real inventory. */
 export const demoSeedIds = {
+  identities: ["demo-ident-primary-operator", "demo-ident-alex-chen"],
+  accounts: ["demo-acc-operator-main", "demo-acc-oracle-secondary", "demo-acc-cloudflare-main", "demo-acc-cloudflare-sandbox", "demo-acc-nvidia-inception", "demo-acc-gcp-prod", "demo-acc-upstash-main", "demo-acc-freellm-main", "demo-acc-oracle-partner", "demo-acc-cf-partner"],
+  resources: ["demo-atlas", "demo-borealis", "demo-polar-night-owl", "demo-upstash-box", "demo-github-runner", "demo-r2-artifacts", "demo-cf-ephemeral-worker", "demo-oci-block", "demo-global-redis", "demo-nvidia-nim-llm", "demo-turso-edge", "demo-freellmapi-gateway", "demo-alex-dev-vm"],
+  gateways: ["demo-gw-office"],
+};
+
+/**
+ * Generic IDs the demo seed used before the `demo-` prefix (until 2026-11-09). An older install may still hold them.
+ * Names like `atlas` can also be real inventory, so legacy rows are removed only when they still carry the seed's own
+ * account emails, display names and gateway address.
+ */
+export const legacyDemoSeedIds = {
   identities: ["ident-primary-operator", "ident-alex-chen"],
   accounts: ["acc-operator-main", "acc-oracle-secondary", "acc-cloudflare-main", "acc-cloudflare-sandbox", "acc-nvidia-inception", "acc-gcp-prod", "acc-upstash-main", "acc-freellm-main", "acc-oracle-partner", "acc-cf-partner"],
   resources: ["atlas", "borealis", "polar-night-owl", "upstash-box", "github-runner", "r2-artifacts", "cf-ephemeral-worker", "oci-block", "global-redis", "nvidia-nim-llm", "turso-edge", "freellmapi-gateway", "alex-dev-vm"],
   gateways: ["gw-office"],
 };
+const demoEmails = ["operator@fleethub.dev", "alex.chen@example.org"];
+const demoDisplayNames = ["Fleet Operator", "Alex Chen"];
+
+type Sql = typeof queryClient;
+async function removeLegacyDemoRows(sql: Sql): Promise<void> {
+  const old = legacyDemoSeedIds;
+  const accounts = sql`SELECT id FROM provider_accounts WHERE id IN ${sql(old.accounts)} AND owner_email IN ${sql(demoEmails)}`;
+  await sql`DELETE FROM quota_meters WHERE account_id IN (${accounts})`;
+  await sql`DELETE FROM resources WHERE id IN ${sql(old.resources)} AND account_id IN (${accounts})`;
+  await sql`DELETE FROM network_gateways WHERE id IN ${sql(old.gateways)} AND name = 'Office Tailscale exit node' AND tailscale_ip = '100.64.0.4'`;
+  await sql`DELETE FROM provider_accounts WHERE id IN ${sql(old.accounts)} AND owner_email IN ${sql(demoEmails)}`;
+  await sql`DELETE FROM identities WHERE id IN ${sql(old.identities)} AND display_name IN ${sql(demoDisplayNames)}`;
+}
+
+/** Removes the demo rows, current and legacy, in one transaction. Throws, deleting nothing, if real data references them. */
+export async function removeDemoSeed(): Promise<void> {
+  await queryClient.begin(async transaction => {
+    const sql = transaction as unknown as Sql;
+    const ids = demoSeedIds;
+    await sql`DELETE FROM quota_meters WHERE account_id IN ${sql(ids.accounts)}`;
+    await sql`DELETE FROM resources WHERE id IN ${sql(ids.resources)}`;
+    await sql`DELETE FROM network_gateways WHERE id IN ${sql(ids.gateways)}`;
+    await sql`DELETE FROM provider_accounts WHERE id IN ${sql(ids.accounts)}`;
+    await sql`DELETE FROM identities WHERE id IN ${sql(ids.identities)}`;
+    await removeLegacyDemoRows(sql);
+  });
+}
 
 /**
  * Seed initial identities, verified contacts, and accounts
  */
 export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
+  // Upgrade an older install: replace legacy unprefixed demo rows instead of seeding duplicates beside them.
+  try {
+    await queryClient.begin(transaction => removeLegacyDemoRows(transaction as unknown as Sql));
+  } catch (err: any) {
+    console.warn("Legacy demo rows were kept because other records reference them:", err.message);
+  }
   // Identity 1: Primary Fleet Operator
-  const identOperator = "ident-primary-operator";
+  const identOperator = "demo-ident-primary-operator";
   await queryClient`
     INSERT INTO identities (id, display_name, notes)
     VALUES
@@ -662,14 +707,14 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   await queryClient`
     INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, is_verified, label)
     VALUES
-      ('ct-operator-email-1', ${identOperator}, 'email', 'operator@fleethub.dev', true, true, 'Primary Infrastructure'),
-      ('ct-operator-email-2', ${identOperator}, 'email', 'operator.backup@fleethub.dev', false, true, 'Secondary / Cloud Alerts'),
-      ('ct-operator-phone-1', ${identOperator}, 'phone', '+1 (555) 010-0198', true, true, 'Verified Mobile & Alert SMS')
+      ('demo-ct-operator-email-1', ${identOperator}, 'email', 'operator@fleethub.dev', true, true, 'Primary Infrastructure'),
+      ('demo-ct-operator-email-2', ${identOperator}, 'email', 'operator.backup@fleethub.dev', false, true, 'Secondary / Cloud Alerts'),
+      ('demo-ct-operator-phone-1', ${identOperator}, 'phone', '+1 (555) 010-0198', true, true, 'Verified Mobile & Alert SMS')
     ON CONFLICT (id) DO NOTHING;
   `;
 
   // Identity 2: Alex Chen (Operations Partner - demonstration of unverified contact and NO phone on file)
-  const identAlex = "ident-alex-chen";
+  const identAlex = "demo-ident-alex-chen";
   await queryClient`
     INSERT INTO identities (id, display_name, notes)
     VALUES
@@ -680,7 +725,7 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   await queryClient`
     INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, is_verified, label)
     VALUES
-      ('ct-alex-email-1', ${identAlex}, 'email', 'alex.chen@example.org', true, false, 'Partner Org Email (Pending Verification)')
+      ('demo-ct-alex-email-1', ${identAlex}, 'email', 'alex.chen@example.org', true, false, 'Partner Org Email (Pending Verification)')
     ON CONFLICT (id) DO NOTHING;
   `;
 
@@ -688,16 +733,16 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   await queryClient`
     INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email, login_email, role, is_protected, health, notes)
     VALUES
-      ('acc-operator-main', ${identOperator}, 'oracle', 'Oracle Cloud Tenancy 1', 'operator@fleethub.dev', 'operator@fleethub.dev', 'production_brain', true, 'ok', 'Primary personal OCI tenancy (A1 Always Free) - Strictly Protected'),
-      ('acc-oracle-secondary', ${identOperator}, 'oracle', 'Oracle Cloud Tenancy 2 (Secondary)', 'operator@fleethub.dev', 'partner@fleethub.dev', 'cluster_node', true, 'ok', 'Secondary tenancy running K3s Cluster 2 - Protected'),
-      ('acc-cloudflare-main', ${identOperator}, 'cloudflare', 'Cloudflare Primary DNS', 'operator@fleethub.dev', 'operator@fleethub.dev', 'dns_control', true, 'ok', 'Production DNS zone & Zero-Egress R2 storage - Protected'),
-      ('acc-cloudflare-sandbox', ${identOperator}, 'cloudflare', 'Cloudflare Worker Pool', 'operator@fleethub.dev', 'operator@fleethub.dev', 'worker_ephemeral', false, 'ok', 'Batch & ephemeral serverless worker execution sandbox'),
-      ('acc-nvidia-inception', ${identOperator}, 'nvidia', 'NVIDIA Inception AI Cluster', 'operator@fleethub.dev', 'operator@fleethub.dev', 'gpu_inference', true, 'ok', 'Accelerated H100 inference API credits & endpoints - Protected'),
-      ('acc-gcp-prod', ${identOperator}, 'google', 'Google Cloud Platform (Vertex & GCS)', 'operator@fleethub.dev', 'operator.backup@fleethub.dev', 'vertex_ai', false, 'ok', 'Vertex AI multimodal reasoning & persistent storage'),
-      ('acc-upstash-main', ${identOperator}, 'upstash', 'Upstash Edge', 'operator@fleethub.dev', 'operator@fleethub.dev', 'redis_cache', false, 'ok', '500K Redis cmds & QStash serverless'),
-      ('acc-freellm-main', ${identOperator}, 'freellmapi', 'FreeLLM Gateway Router', 'operator@fleethub.dev', 'operator@fleethub.dev', 'gateway_router', true, 'ok', 'LLM gateway with circuit breaker'),
-      ('acc-oracle-partner', ${identAlex}, 'oracle', 'Oracle Partner Sandbox', 'alex.chen@example.org', 'alex.chen@example.org', 'dev_sandbox', false, 'ok', 'Dev sandbox tenancy for collaborator experiments'),
-      ('acc-cf-partner', ${identAlex}, 'cloudflare', 'Partner Staging CDN', 'alex.chen@example.org', 'alex.chen@example.org', 'staging_proxy', false, 'ok', 'Staging CDN endpoints')
+      ('demo-acc-operator-main', ${identOperator}, 'oracle', 'Oracle Cloud Tenancy 1', 'operator@fleethub.dev', 'operator@fleethub.dev', 'production_brain', true, 'ok', 'Primary personal OCI tenancy (A1 Always Free) - Strictly Protected'),
+      ('demo-acc-oracle-secondary', ${identOperator}, 'oracle', 'Oracle Cloud Tenancy 2 (Secondary)', 'operator@fleethub.dev', 'partner@fleethub.dev', 'cluster_node', true, 'ok', 'Secondary tenancy running K3s Cluster 2 - Protected'),
+      ('demo-acc-cloudflare-main', ${identOperator}, 'cloudflare', 'Cloudflare Primary DNS', 'operator@fleethub.dev', 'operator@fleethub.dev', 'dns_control', true, 'ok', 'Production DNS zone & Zero-Egress R2 storage - Protected'),
+      ('demo-acc-cloudflare-sandbox', ${identOperator}, 'cloudflare', 'Cloudflare Worker Pool', 'operator@fleethub.dev', 'operator@fleethub.dev', 'worker_ephemeral', false, 'ok', 'Batch & ephemeral serverless worker execution sandbox'),
+      ('demo-acc-nvidia-inception', ${identOperator}, 'nvidia', 'NVIDIA Inception AI Cluster', 'operator@fleethub.dev', 'operator@fleethub.dev', 'gpu_inference', true, 'ok', 'Accelerated H100 inference API credits & endpoints - Protected'),
+      ('demo-acc-gcp-prod', ${identOperator}, 'google', 'Google Cloud Platform (Vertex & GCS)', 'operator@fleethub.dev', 'operator.backup@fleethub.dev', 'vertex_ai', false, 'ok', 'Vertex AI multimodal reasoning & persistent storage'),
+      ('demo-acc-upstash-main', ${identOperator}, 'upstash', 'Upstash Edge', 'operator@fleethub.dev', 'operator@fleethub.dev', 'redis_cache', false, 'ok', '500K Redis cmds & QStash serverless'),
+      ('demo-acc-freellm-main', ${identOperator}, 'freellmapi', 'FreeLLM Gateway Router', 'operator@fleethub.dev', 'operator@fleethub.dev', 'gateway_router', true, 'ok', 'LLM gateway with circuit breaker'),
+      ('demo-acc-oracle-partner', ${identAlex}, 'oracle', 'Oracle Partner Sandbox', 'alex.chen@example.org', 'alex.chen@example.org', 'dev_sandbox', false, 'ok', 'Dev sandbox tenancy for collaborator experiments'),
+      ('demo-acc-cf-partner', ${identAlex}, 'cloudflare', 'Partner Staging CDN', 'alex.chen@example.org', 'alex.chen@example.org', 'staging_proxy', false, 'ok', 'Staging CDN endpoints')
     ON CONFLICT (id) DO UPDATE SET
       identity_id = COALESCE(provider_accounts.identity_id, EXCLUDED.identity_id),
       role = EXCLUDED.role,
@@ -711,31 +756,31 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   await queryClient`
     INSERT INTO resources (id, name, category, provider, account_id, account_email, state, is_protected, tags, attributes)
     VALUES
-      ('atlas', 'atlas (Docker Brain)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online', true,
+      ('demo-atlas', 'atlas (Docker Brain)', 'compute', 'Oracle Cloud', 'demo-acc-operator-main', 'operator@fleethub.dev', 'online', true,
        '["arm64", "docker", "brain", "protected"]', '{"ip": "100.64.0.1", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 6, "services": ["llm-gateway", "metrics-agent"]}'),
-      ('borealis', 'borealis (K3s Cluster 1)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online', true,
+      ('demo-borealis', 'borealis (K3s Cluster 1)', 'compute', 'Oracle Cloud', 'demo-acc-operator-main', 'operator@fleethub.dev', 'online', true,
        '["arm64", "k3s", "protected"]', '{"ip": "100.64.0.2", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 4, "version": "v1.33.0+k3s1"}'),
-      ('polar-night-owl', 'polar-night-owl (K3s Cluster 2)', 'compute', 'Oracle Cloud', 'acc-oracle-secondary', 'operator@fleethub.dev', 'online', true,
+      ('demo-polar-night-owl', 'polar-night-owl (K3s Cluster 2)', 'compute', 'Oracle Cloud', 'demo-acc-oracle-secondary', 'operator@fleethub.dev', 'online', true,
        '["arm64", "k3s", "protected"]', '{"ip": "100.64.0.3", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 5, "version": "v1.33.0+k3s1"}'),
-      ('upstash-box', 'upstash-box-ephemeral', 'compute', 'Upstash', 'acc-upstash-main', 'operator@fleethub.dev', 'idle', false,
+      ('demo-upstash-box', 'upstash-box-ephemeral', 'compute', 'Upstash', 'demo-acc-upstash-main', 'operator@fleethub.dev', 'idle', false,
        '["amd64", "ephemeral", "burst"]', '{"ip": "Serverless", "vcpu": 2, "ram_gb": 4}'),
-      ('github-runner', 'github-hosted-runners', 'compute', 'GitHub', 'acc-operator-main', 'operator@fleethub.dev', 'online', false,
+      ('demo-github-runner', 'github-hosted-runners', 'compute', 'GitHub', 'demo-acc-operator-main', 'operator@fleethub.dev', 'online', false,
        '["ci-runner", "amd64"]', '{"ip": "Dynamic", "free_minutes_month": 2000}'),
-      ('r2-artifacts', 'fleet-artifacts', 'storage', 'Cloudflare R2', 'acc-cloudflare-main', 'operator@fleethub.dev', 'online', true,
+      ('demo-r2-artifacts', 'fleet-artifacts', 'storage', 'Cloudflare R2', 'demo-acc-cloudflare-main', 'operator@fleethub.dev', 'online', true,
        '["s3", "zero-egress", "crypt", "protected"]', '{"bucket": "fleet-artifacts", "cap_gb": 10, "used_gb": 4.2}'),
-      ('cf-ephemeral-worker', 'fleet-batch-worker', 'serverless', 'Cloudflare', 'acc-cloudflare-sandbox', 'operator@fleethub.dev', 'online', false,
+      ('demo-cf-ephemeral-worker', 'fleet-batch-worker', 'serverless', 'Cloudflare', 'demo-acc-cloudflare-sandbox', 'operator@fleethub.dev', 'online', false,
        '["worker", "ephemeral"]', '{"routes": ["batch.fleethub.internal/*"]}'),
-      ('oci-block', 'oracle-block-volumes', 'storage', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online', false,
+      ('demo-oci-block', 'oracle-block-volumes', 'storage', 'Oracle Cloud', 'demo-acc-operator-main', 'operator@fleethub.dev', 'online', false,
        '["boot-volume", "block"]', '{"total_gb": 200, "used_gb": 147}'),
-      ('global-redis', 'global-cache-db', 'database', 'Upstash', 'acc-upstash-main', 'operator@fleethub.dev', 'online', false,
+      ('demo-global-redis', 'global-cache-db', 'database', 'Upstash', 'demo-acc-upstash-main', 'operator@fleethub.dev', 'online', false,
        '["redis", "fast", "in-memory"]', '{"host": "cache.example.upstash.io", "monthly_cap": 500000, "used": 148900}'),
-      ('nvidia-nim-llm', 'nvidia-h100-nim', 'llm', 'NVIDIA Inception', 'acc-nvidia-inception', 'operator@fleethub.dev', 'online', true,
+      ('demo-nvidia-nim-llm', 'nvidia-h100-nim', 'llm', 'NVIDIA Inception', 'demo-acc-nvidia-inception', 'operator@fleethub.dev', 'online', true,
        '["h100", "nim", "protected", "cuda"]', '{"accelerator": "H100 PCIe", "creditsRemaining": "$2,450.00"}'),
-      ('turso-edge', 'fleethub-edge-db', 'database', 'Turso', 'acc-operator-main', 'operator@fleethub.dev', 'online', false,
+      ('demo-turso-edge', 'fleethub-edge-db', 'database', 'Turso', 'demo-acc-operator-main', 'operator@fleethub.dev', 'online', false,
        '["sqlite", "edge", "libsql"]', '{"storage_cap_gb": 5, "used_gb": 0.85}'),
-      ('freellmapi-gateway', 'freellmapi (Brain Router)', 'llm', 'FreeLLM API', 'acc-freellm-main', 'operator@fleethub.dev', 'online', true,
+      ('demo-freellmapi-gateway', 'freellmapi (Brain Router)', 'llm', 'FreeLLM API', 'demo-acc-freellm-main', 'operator@fleethub.dev', 'online', true,
        '["router", "tailnet-only", "mcp"]', '{"ip": "127.0.0.1:3001", "port": 3001, "pools": ["Gemini", "Groq", "Cerebras", "OpenRouter"]}'),
-      ('alex-dev-vm', 'alex-dev-node', 'compute', 'Oracle Cloud', 'acc-oracle-partner', 'alex.chen@example.org', 'idle', false,
+      ('demo-alex-dev-vm', 'alex-dev-node', 'compute', 'Oracle Cloud', 'demo-acc-oracle-partner', 'alex.chen@example.org', 'idle', false,
        '["amd64", "sandbox"]', '{"ip": "10.0.0.84", "ocpu": 1, "ram_gb": 1}')
     ON CONFLICT (id) DO NOTHING;
   `;
@@ -744,7 +789,7 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   await queryClient`
     INSERT INTO network_gateways (id, name, kind, tailscale_ip, port, state, latency_ms)
     VALUES
-      ('gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '100.64.0.4', 8888, 'online', 8)
+      ('demo-gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '100.64.0.4', 8888, 'online', 8)
     ON CONFLICT (id) DO NOTHING;
   `;
 }
