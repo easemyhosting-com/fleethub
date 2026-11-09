@@ -13,7 +13,7 @@ async function insertLegacySeedRows() {
   await queryClient`INSERT INTO identities (id, display_name) VALUES ('ident-primary-operator', 'Fleet Operator')`;
   await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, is_verified, label) VALUES ('ct-operator-email-1', 'ident-primary-operator', 'email', 'operator@fleethub.dev', true, true, 'Primary Infrastructure')`;
   await queryClient`INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email) VALUES ('acc-operator-main', 'ident-primary-operator', 'oracle', 'Oracle Cloud Tenancy 1', 'operator@fleethub.dev')`;
-  await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state) VALUES ('borealis', 'borealis (K3s)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online')`;
+  await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state) VALUES ('borealis', 'borealis (K3s Cluster 1)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online')`;
   await queryClient`INSERT INTO network_gateways (id, name, kind, tailscale_ip, port, state, latency_ms) VALUES ('gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '100.64.0.4', 8888, 'online', 8)`;
 }
 const legacyLeft = async () => ({
@@ -100,6 +100,38 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("demo seed res
       await queryClient`DELETE FROM provider_accounts WHERE id = 'acc-gcp-prod'`;
       await queryClient`DELETE FROM identities WHERE id = 'ident-alex-chen'`;
     }
+  });
+
+  it("keeps legacy accounts and identities that real data has touched, and still resets the rest", async () => {
+    await insertLegacySeedRows();
+    await queryClient`INSERT INTO identities (id, display_name) VALUES ('ident-alex-chen', 'Alex Chen')`;
+    await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, is_verified, label) VALUES ('ct-alex-email-1', 'ident-alex-chen', 'email', 'alex.chen@example.org', true, false, 'Partner Org Email (Pending Verification)'), ('demo-real-contact', 'ident-alex-chen', 'email', 'real@example.test', false, true, 'Added by the operator')`;
+    await queryClient`INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email) VALUES ('acc-cloudflare-main', 'ident-primary-operator', 'cloudflare', 'Cloudflare Primary DNS', 'operator@fleethub.dev')`;
+    await queryClient`INSERT INTO account_collections (account_id) VALUES ('acc-cloudflare-main')`;
+    await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state) VALUES ('r2-artifacts', 'fleet-artifacts', 'storage', 'Cloudflare R2', 'acc-cloudflare-main', 'operator@fleethub.dev', 'online')`;
+    await queryClient`INSERT INTO resource_profiles (resource_id, updated_by) VALUES ('borealis', 'operator')`;
+    expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+    expect(await queryClient`SELECT account_id FROM account_collections WHERE account_id = 'acc-cloudflare-main'`).toHaveLength(1);
+    expect(await queryClient`SELECT id FROM resources WHERE id IN ('r2-artifacts', 'borealis') ORDER BY id`).toEqual([{ id: "borealis" }, { id: "r2-artifacts" }]);
+    expect(await queryClient`SELECT id FROM provider_accounts WHERE id IN ('acc-cloudflare-main', 'acc-operator-main') ORDER BY id`).toEqual([{ id: "acc-cloudflare-main" }, { id: "acc-operator-main" }]);
+    expect(await queryClient`SELECT id FROM identities WHERE id IN ('ident-primary-operator', 'ident-alex-chen') ORDER BY id`).toEqual([{ id: "ident-alex-chen" }, { id: "ident-primary-operator" }]);
+    expect(await queryClient`SELECT id FROM identity_contacts WHERE id = 'demo-real-contact'`).toHaveLength(1);
+    expect(await queryClient`SELECT id FROM network_gateways WHERE id = 'gw-office'`).toHaveLength(0);
+    await queryClient`DELETE FROM identity_contacts WHERE id = 'demo-real-contact'`;
+    expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+    expect(await queryClient`SELECT id FROM identities WHERE id = 'ident-alex-chen'`).toHaveLength(0);
+  });
+
+  it("does not seed, and reports failure, when the legacy cleanup cannot run", async () => {
+    await insertLegacySeedRows();
+    await queryClient`ALTER TABLE account_collections RENAME TO account_collections_hidden`;
+    try {
+      expect((await call(POST, "demo-admin-fixture")).status).toBe(500);
+    } finally {
+      await queryClient`ALTER TABLE account_collections_hidden RENAME TO account_collections`;
+    }
+    expect(await count("resources", demoSeedIds.resources)).toBe(0);
+    expect(await queryClient`SELECT id FROM resources WHERE id = 'borealis'`).toHaveLength(1);
   });
 
   it("keeps a legacy-ID gateway that is not the seeded one", async () => {

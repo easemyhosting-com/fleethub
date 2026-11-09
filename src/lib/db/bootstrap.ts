@@ -553,7 +553,11 @@ export async function bootstrapDatabase() {
 
     // 3. Seed initial identities, provider accounts, and resources ONLY if explicitly requested
     if (process.env.FLEETHUB_SEED_DEMO_DATA === "true") {
-      await seedInitialIdentitiesAndAccounts();
+      try {
+        await seedInitialIdentitiesAndAccounts();
+      } catch (err: any) {
+        console.warn("Demo data was not seeded; the schema is ready:", err.message);
+      }
     }
     return { success: true, message: "Database schema and migrations ready" };
   } catch (err: any) {
@@ -646,31 +650,94 @@ export const demoSeedIds = {
 };
 
 /**
- * Generic IDs the demo seed used before the `demo-` prefix (until 2026-11-09). An older install may still hold them.
- * Names like `atlas` can also be real inventory, so legacy rows are removed only when they still carry the seed's own
- * account emails, display names and gateway address.
+ * Rows the demo seed wrote before the `demo-` prefix (until 2026-11-09), with the values that identify them. An older install
+ * may still hold them, and names like `atlas` can also be real inventory. A legacy row is removed only while it still matches
+ * the seed exactly and nothing real refers to it; anything an operator has touched is left in place.
  */
-export const legacyDemoSeedIds = {
-  identities: ["ident-primary-operator", "ident-alex-chen"],
-  accounts: ["acc-operator-main", "acc-oracle-secondary", "acc-cloudflare-main", "acc-cloudflare-sandbox", "acc-nvidia-inception", "acc-gcp-prod", "acc-upstash-main", "acc-freellm-main", "acc-oracle-partner", "acc-cf-partner"],
-  resources: ["atlas", "borealis", "polar-night-owl", "upstash-box", "github-runner", "r2-artifacts", "cf-ephemeral-worker", "oci-block", "global-redis", "nvidia-nim-llm", "turso-edge", "freellmapi-gateway", "alex-dev-vm"],
-  gateways: ["gw-office"],
+const legacyDemoSeed = {
+  identities: [{ id: "ident-primary-operator", display_name: "Fleet Operator" }, { id: "ident-alex-chen", display_name: "Alex Chen" }],
+  contacts: [
+    { id: "ct-operator-email-1", value: "operator@fleethub.dev" }, { id: "ct-operator-email-2", value: "operator.backup@fleethub.dev" },
+    { id: "ct-operator-phone-1", value: "+1 (555) 010-0198" }, { id: "ct-alex-email-1", value: "alex.chen@example.org" },
+  ],
+  accounts: [
+    { id: "acc-operator-main", kind: "oracle", label: "Oracle Cloud Tenancy 1", owner_email: "operator@fleethub.dev" },
+    { id: "acc-oracle-secondary", kind: "oracle", label: "Oracle Cloud Tenancy 2 (Secondary)", owner_email: "operator@fleethub.dev" },
+    { id: "acc-cloudflare-main", kind: "cloudflare", label: "Cloudflare Primary DNS", owner_email: "operator@fleethub.dev" },
+    { id: "acc-cloudflare-sandbox", kind: "cloudflare", label: "Cloudflare Worker Pool", owner_email: "operator@fleethub.dev" },
+    { id: "acc-nvidia-inception", kind: "nvidia", label: "NVIDIA Inception AI Cluster", owner_email: "operator@fleethub.dev" },
+    { id: "acc-gcp-prod", kind: "google", label: "Google Cloud Platform (Vertex & GCS)", owner_email: "operator@fleethub.dev" },
+    { id: "acc-upstash-main", kind: "upstash", label: "Upstash Edge", owner_email: "operator@fleethub.dev" },
+    { id: "acc-freellm-main", kind: "freellmapi", label: "FreeLLM Gateway Router", owner_email: "operator@fleethub.dev" },
+    { id: "acc-oracle-partner", kind: "oracle", label: "Oracle Partner Sandbox", owner_email: "alex.chen@example.org" },
+    { id: "acc-cf-partner", kind: "cloudflare", label: "Partner Staging CDN", owner_email: "alex.chen@example.org" },
+  ],
+  resources: [
+    { id: "atlas", name: "atlas (Docker Brain)", account_id: "acc-operator-main" },
+    { id: "borealis", name: "borealis (K3s Cluster 1)", account_id: "acc-operator-main" },
+    { id: "polar-night-owl", name: "polar-night-owl (K3s Cluster 2)", account_id: "acc-oracle-secondary" },
+    { id: "upstash-box", name: "upstash-box-ephemeral", account_id: "acc-upstash-main" },
+    { id: "github-runner", name: "github-hosted-runners", account_id: "acc-operator-main" },
+    { id: "r2-artifacts", name: "fleet-artifacts", account_id: "acc-cloudflare-main" },
+    { id: "cf-ephemeral-worker", name: "fleet-batch-worker", account_id: "acc-cloudflare-sandbox" },
+    { id: "oci-block", name: "oracle-block-volumes", account_id: "acc-operator-main" },
+    { id: "global-redis", name: "global-cache-db", account_id: "acc-upstash-main" },
+    { id: "nvidia-nim-llm", name: "nvidia-h100-nim", account_id: "acc-nvidia-inception" },
+    { id: "turso-edge", name: "fleethub-edge-db", account_id: "acc-operator-main" },
+    { id: "freellmapi-gateway", name: "freellmapi (Brain Router)", account_id: "acc-freellm-main" },
+    { id: "alex-dev-vm", name: "alex-dev-node", account_id: "acc-oracle-partner" },
+  ],
+  gateways: [{ id: "gw-office", name: "Office Tailscale exit node", tailscale_ip: "100.64.0.4" }],
 };
-const demoEmails = ["operator@fleethub.dev", "alex.chen@example.org"];
-const demoDisplayNames = ["Fleet Operator", "Alex Chen"];
+export const legacyDemoSeedIds = {
+  identities: legacyDemoSeed.identities.map(row => row.id),
+  accounts: legacyDemoSeed.accounts.map(row => row.id),
+  resources: legacyDemoSeed.resources.map(row => row.id),
+  gateways: legacyDemoSeed.gateways.map(row => row.id),
+};
 
 type Sql = typeof queryClient;
 async function removeLegacyDemoRows(sql: Sql): Promise<void> {
-  const old = legacyDemoSeedIds;
-  const accounts = sql`SELECT id FROM provider_accounts WHERE id IN ${sql(old.accounts)} AND owner_email IN ${sql(demoEmails)}`;
-  await sql`DELETE FROM quota_meters WHERE account_id IN (${accounts})`;
-  await sql`DELETE FROM resources WHERE id IN ${sql(old.resources)} AND account_id IN (${accounts})`;
-  await sql`DELETE FROM network_gateways WHERE id IN ${sql(old.gateways)} AND name = 'Office Tailscale exit node' AND tailscale_ip = '100.64.0.4'`;
-  await sql`DELETE FROM provider_accounts WHERE id IN ${sql(old.accounts)} AND owner_email IN ${sql(demoEmails)}`;
-  await sql`DELETE FROM identities WHERE id IN ${sql(old.identities)} AND display_name IN ${sql(demoDisplayNames)}`;
+  const seed = legacyDemoSeed;
+  // Accounts that still match the seed and carry no credentials, collection, rotation or quota data of their own.
+  const accounts = (await sql`
+    SELECT a.id FROM provider_accounts a
+    JOIN jsonb_to_recordset(${JSON.stringify(seed.accounts)}::jsonb) AS s(id TEXT, kind TEXT, label TEXT, owner_email TEXT)
+      ON s.id = a.id AND s.kind = a.kind AND s.label = a.label AND s.owner_email = a.owner_email
+    WHERE a.secret_ref_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM account_collections c WHERE c.account_id = a.id)
+      AND NOT EXISTS (SELECT 1 FROM credential_rotation r WHERE r.account_id = a.id)
+      AND NOT EXISTS (SELECT 1 FROM quota_meters q WHERE q.account_id = a.id)`).map(row => String(row.id));
+  if (accounts.length > 0) {
+    // Resources that still match the seed, on those accounts, with nothing real attached to them.
+    await sql`
+      DELETE FROM resources r
+      USING jsonb_to_recordset(${JSON.stringify(seed.resources)}::jsonb) AS s(id TEXT, name TEXT, account_id TEXT)
+      WHERE s.id = r.id AND s.name = r.name AND s.account_id = r.account_id AND r.account_id IN ${sql(accounts)}
+        AND NOT EXISTS (SELECT 1 FROM resource_profiles x WHERE x.resource_id = r.id)
+        AND NOT EXISTS (SELECT 1 FROM external_observations x WHERE x.resource_id = r.id)
+        AND NOT EXISTS (SELECT 1 FROM project_placements x WHERE x.host_resource_id = r.id)
+        AND NOT EXISTS (SELECT 1 FROM project_usage_reports x WHERE x.resource_id = r.id)
+        AND NOT EXISTS (SELECT 1 FROM project_resource_links x WHERE x.resource_id = r.id)
+        AND NOT EXISTS (SELECT 1 FROM project_link_decisions x WHERE x.resource_id = r.id)`;
+    await sql`DELETE FROM provider_accounts a WHERE a.id IN ${sql(accounts)} AND NOT EXISTS (SELECT 1 FROM resources r WHERE r.account_id = a.id)`;
+  }
+  await sql`
+    DELETE FROM network_gateways g
+    USING jsonb_to_recordset(${JSON.stringify(seed.gateways)}::jsonb) AS s(id TEXT, name TEXT, tailscale_ip TEXT)
+    WHERE s.id = g.id AND s.name = g.name AND s.tailscale_ip = g.tailscale_ip`;
+  // Identities that still match the seed, own no account, and hold only the seed's own contacts, so the cascade cannot take a real one.
+  await sql`
+    DELETE FROM identities i
+    USING jsonb_to_recordset(${JSON.stringify(seed.identities)}::jsonb) AS s(id TEXT, display_name TEXT)
+    WHERE s.id = i.id AND s.display_name = i.display_name
+      AND NOT EXISTS (SELECT 1 FROM provider_accounts a WHERE a.identity_id = i.id)
+      AND NOT EXISTS (
+        SELECT 1 FROM identity_contacts c WHERE c.identity_id = i.id
+          AND NOT EXISTS (SELECT 1 FROM jsonb_to_recordset(${JSON.stringify(seed.contacts)}::jsonb) AS d(id TEXT, value TEXT) WHERE d.id = c.id AND d.value = c.value))`;
 }
 
-/** Removes the demo rows, current and legacy, in one transaction. Throws, deleting nothing, if real data references them. */
+/** Removes the demo rows, current and legacy, in one transaction. Legacy rows real data has touched are kept; throws, deleting nothing, if real data references a current demo row. */
 export async function removeDemoSeed(): Promise<void> {
   await queryClient.begin(async transaction => {
     const sql = transaction as unknown as Sql;
@@ -689,11 +756,8 @@ export async function removeDemoSeed(): Promise<void> {
  */
 export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   // Upgrade an older install: replace legacy unprefixed demo rows instead of seeding duplicates beside them.
-  try {
-    await queryClient.begin(transaction => removeLegacyDemoRows(transaction as unknown as Sql));
-  } catch (err: any) {
-    console.warn("Legacy demo rows were kept because other records reference them:", err.message);
-  }
+  // Rows real data refers to are skipped, not failed on, so an error here is a database fault and seeding stops.
+  await queryClient.begin(transaction => removeLegacyDemoRows(transaction as unknown as Sql));
   // Identity 1: Primary Fleet Operator
   const identOperator = "demo-ident-primary-operator";
   await queryClient`
