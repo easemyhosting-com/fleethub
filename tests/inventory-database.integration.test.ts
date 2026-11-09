@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "../src/lib/db/client";
 import { bootstrapDatabase } from "../src/lib/db/bootstrap";
-import { credentialDigest, enqueueInventory, resourceId, runNextInventoryJob } from "../src/lib/inventory/service";
+import { confirmEmptyInventory, credentialDigest, enqueueInventory, resourceId, runNextInventoryJob } from "../src/lib/inventory/service";
 import { readSnapshot } from "../src/lib/inventory/snapshot";
 import { CollectionError } from "../src/lib/inventory/model";
 
@@ -116,15 +116,44 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("inventory Pos
     await enqueueInventory(ids[1]);
     fixture.collect.mockResolvedValueOnce(complete([]));
     await runNextInventoryJob();
+    const preserved = await readSnapshot({ accountId: ids[1] });
+    expect(preserved.accounts[0].collection).toMatchObject({ resourceCount: 2, errorCode: "unexpected_empty" });
+    await enqueueInventory(ids[1]);
+    fixture.collect.mockResolvedValueOnce(complete([fact("zone-a")]));
+    await runNextInventoryJob();
     const rows = await queryClient`SELECT native_id,inventory_source,retired_at,is_protected FROM resources WHERE account_id = ${ids[1]}`;
-    expect(rows.filter(row => row.inventory_source === "provider" && row.retired_at)).toHaveLength(2);
+    expect(rows.filter(row => row.inventory_source === "provider" && row.retired_at).map(row => row.native_id)).toEqual(["zone-b"]);
     expect(rows.find(row => row.native_id === "manual-one")).toMatchObject({ inventory_source: "manual", retired_at: null, is_protected: true });
     const snapshot = await readSnapshot({ accountId: ids[1] });
-    expect(snapshot.accounts[0].collection.resourceCount).toBe(0);
+    expect(snapshot.accounts[0].collection.resourceCount).toBe(1);
     expect(JSON.stringify(snapshot)).not.toContain("fixture-secret");
     expect(JSON.stringify(snapshot)).not.toContain("opaque");
     const oracle = await readSnapshot({ accountId: oracleId });
     expect(oracle.accounts[0].isProtected).toBe(true);
+  });
+
+  it("consumes empty confirmation once and still preserves inventory if the confirmed scan fails", async () => {
+    const accountId = ids[1];
+    const scan = async () => {
+      fixture.collect.mockResolvedValueOnce(complete([]));
+      await runNextInventoryJob();
+    };
+    const collection = async () => (await readSnapshot({ accountId })).accounts[0].collection;
+    expect(await confirmEmptyInventory(accountId)).toBe(false);
+    await enqueueInventory(accountId);
+    await scan();
+    expect(await collection()).toMatchObject({ errorCode: "unexpected_empty", resourceCount: 1 });
+    expect(await confirmEmptyInventory(accountId)).toBe(true);
+    expect(await confirmEmptyInventory(accountId)).toBe(false);
+    fixture.collect.mockRejectedValueOnce(new CollectionError("invalid_response"));
+    await runNextInventoryJob();
+    expect(await collection()).toMatchObject({ errorCode: "invalid_response", resourceCount: 1 });
+    await due(accountId);
+    await scan();
+    expect(await collection()).toMatchObject({ errorCode: "unexpected_empty", resourceCount: 1 });
+    expect(await confirmEmptyInventory(accountId)).toBe(true);
+    await scan();
+    expect(await collection()).toMatchObject({ state: "ready", errorCode: null, resourceCount: 0 });
   });
 
   it("stores a detected plan and per-resource billing, but never overrides the owner's choice", async () => {

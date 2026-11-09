@@ -139,6 +139,7 @@ export async function bootstrapDatabase() {
         error_code TEXT
       )`;
     await queryClient`ALTER TABLE account_collections ADD COLUMN IF NOT EXISTS credential_hash TEXT`;
+    await queryClient`ALTER TABLE account_collections ADD COLUMN IF NOT EXISTS confirm_empty BOOLEAN NOT NULL DEFAULT false`;
     await queryClient`CREATE INDEX IF NOT EXISTS account_collections_due ON account_collections (next_attempt_at) WHERE state IN ('queued', 'ready', 'running')`;
     await queryClient`
       CREATE TABLE IF NOT EXISTS resource_profiles (

@@ -76,7 +76,7 @@ export async function replaceCredentials(accountId: string, config: unknown, tri
         SELECT ${newRef}, label, vault_url, infisical_project, environment, path, ${JSON.stringify([newName])}::jsonb, 'verified', NOW() FROM secret_refs WHERE id = ${context.refId}`;
       await tx`UPDATE provider_accounts SET secret_ref_id = ${newRef}, updated_at = NOW() WHERE id = ${accountId}`;
       await tx`INSERT INTO account_collections (account_id, state, next_attempt_at, credential_hash) VALUES (${accountId}, 'queued', NOW(), ${credentialDigest(next)})
-        ON CONFLICT (account_id) DO UPDATE SET state = 'queued', attempts = 0, next_attempt_at = NOW(), lease_token = NULL, lease_until = NULL, error_code = NULL, credential_hash = EXCLUDED.credential_hash`;
+        ON CONFLICT (account_id) DO UPDATE SET state = 'queued', attempts = 0, next_attempt_at = NOW(), lease_token = NULL, lease_until = NULL, error_code = NULL, confirm_empty = false, credential_hash = EXCLUDED.credential_hash`;
     });
   } catch (error) {
     try { await context.vault.remove(newName); } catch { console.error("[Rotation] Could not remove an unused credential secret"); }

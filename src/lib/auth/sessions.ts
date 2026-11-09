@@ -57,7 +57,7 @@ async function insertSession(sql: Sql, user: SessionUser, kind: SessionKind, sco
   const id = `ses-${randomUUID()}`;
   await sql`SELECT pg_advisory_xact_lock(hashtext('fleethub-sessions'))`;
   await sql`DELETE FROM auth_sessions WHERE expires_at < NOW() - interval '30 days' OR revoked_at < NOW() - interval '30 days'`;
-  const [{ active }] = await sql`SELECT COUNT(*)::int AS active FROM auth_sessions WHERE revoked_at IS NULL AND expires_at > NOW()`;
+  const [{ active }] = await sql`SELECT COUNT(*)::int AS active FROM auth_sessions WHERE user_id = ${user.id} AND revoked_at IS NULL AND expires_at > NOW()`;
   if (active >= maxActiveSessions) throw new SessionLimitReached();
   await sql`
     INSERT INTO auth_sessions (id, user_id, user_email, user_name, provider, kind, scope, label, expires_at)
@@ -92,27 +92,29 @@ export async function resolveSession(req: Request): Promise<ResolvedSession> {
   return { user: null, failure: check.status };
 }
 
-export async function listSessions(): Promise<SessionSummary[]> {
-  return (await queryClient`SELECT * FROM auth_sessions ORDER BY created_at DESC LIMIT 200`).map(summarizeSession);
+export async function listSessions(userId?: string): Promise<SessionSummary[]> {
+  return (await queryClient`SELECT * FROM auth_sessions WHERE user_id = COALESCE(${userId ?? null}, user_id) ORDER BY created_at DESC LIMIT 200`).map(summarizeSession);
 }
 /** Revoking a session also cancels the pairing codes it created, in the same statement, so a stolen session cannot leave a working code behind. */
-export async function revokeSession(id: string): Promise<boolean> {
+export async function revokeSession(id: string, userId?: string): Promise<boolean> {
   return (await withoutPairingLink(
     () => queryClient`
-      WITH revoked AS (UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id),
+      WITH revoked AS (UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} AND user_id = COALESCE(${userId ?? null}, user_id) RETURNING id),
       cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
       SELECT id FROM revoked`,
-    () => queryClient`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id`)).length > 0;
+    () => queryClient`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} AND user_id = COALESCE(${userId ?? null}, user_id) RETURNING id`)).length > 0;
 }
-/** Revokes every active session except the caller's, cancelling their pending pairing codes the same way. */
+/** Revokes the caller's other active sessions, cancelling their pending pairing codes the same way. */
 export async function revokeOtherSessions(keepId: string | undefined): Promise<number> {
   if (!keepId) throw new Error("revokeOtherSessions requires the caller's session id");
   return (await withoutPairingLink(
     () => queryClient`
-      WITH revoked AS (UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id),
+      WITH revoked AS (UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId}
+        AND user_id = (SELECT user_id FROM auth_sessions WHERE id = ${keepId}) RETURNING id),
       cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
       SELECT id FROM revoked`,
-    () => queryClient`UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id`)).length;
+    () => queryClient`UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId}
+        AND user_id = (SELECT user_id FROM auth_sessions WHERE id = ${keepId}) RETURNING id`)).length;
 }
 /** Logout revokes without running the schema bootstrap. Before the created_by_session column exists no code can be linked to a session, so a plain revoke is complete. */
 async function withoutPairingLink<T>(linked: () => Promise<T>, plain: () => Promise<T>): Promise<T> {

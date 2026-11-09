@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { bootstrapDatabase } from "@/lib/db/bootstrap";
 import { createUnauthorizedResponse, isOperator, verifyApiAccess } from "@/lib/auth/guard";
-import { getSessionFromRequest } from "@/lib/auth/session";
 import { listSessions, revokeOtherSessions, revokeSession } from "@/lib/auth/sessions";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +16,7 @@ export async function GET(req: Request) {
   if (!isOperator(auth)) return forbidden();
   try {
     if (!(await bootstrapDatabase()).success) return unavailable();
-    return NextResponse.json({ sessions: await listSessions(), currentId: getSessionFromRequest(req)?.sid ?? null }, { headers });
+    return NextResponse.json({ sessions: await listSessions(auth.user?.id), currentId: auth.user?.sid ?? null }, { headers });
   } catch { return unavailable(); }
 }
 
@@ -29,13 +28,13 @@ export async function DELETE(req: Request) {
   try {
     if (!(await bootstrapDatabase()).success) return unavailable();
     if (params.get("others") === "true") {
-      const sid = getSessionFromRequest(req)?.sid;
+      const sid = auth.user?.sid;
       if (!sid) return NextResponse.json({ error: "Revoking other sessions requires a server-backed session" }, { status: 409, headers });
       return NextResponse.json({ revoked: await revokeOtherSessions(sid) }, { headers });
     }
     const id = idSchema.safeParse(params.get("id"));
     if (!id.success) return NextResponse.json({ error: "A valid session id is required" }, { status: 400, headers });
-    return (await revokeSession(id.data))
+    return (await revokeSession(id.data, auth.user?.id))
       ? NextResponse.json({ success: true }, { headers })
       : NextResponse.json({ error: "Session not found" }, { status: 404, headers });
   } catch { return unavailable(); }
