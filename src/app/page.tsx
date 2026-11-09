@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, useState, useEffect, useMemo } from "react";
+import { Activity, useState, useEffect, useMemo, useRef } from "react";
 import { Smartphone, Server, Clock, Shield, Search, ExternalLink, Bot, Zap, Plus, Wifi, RefreshCw, Lock, Menu, X, Compass } from "lucide-react";
 import { FleetOverviewHub } from "@/components/FleetOverviewHub";
 import { IdentityAccountsView } from "@/components/IdentityAccountsView";
@@ -55,6 +55,7 @@ export default function FleetDeckPage() {
   };
   const [showPaid, setShowPaid] = useState(true);
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [attention, setAttention] = useState(false);
   const scoped = useMemo(() => fleetData ? filterSnapshot(fleetData, filter) : null, [fleetData, filter]);
   const billed = useMemo(() => scoped ? applyBilling(scoped, showPaid) : null, [scoped, showPaid]);
@@ -64,7 +65,7 @@ export default function FleetDeckPage() {
     accounts: new Set(shown.accounts.map(account => account.id)),
     resources: new Set(shown.resources.map(resource => resource.id)),
   } : undefined, [shown, isSearching, billed, scoped]);
-  const filterBar = isFleetView && fleetData ? <FleetFilterBar search={search} onSearch={setSearch} attention={attention} onAttention={setAttention} filter={filter} onChange={setFilter} paid={hasPaidResources(fleetData) ? { show: showPaid, onChange: setShowPaid } : undefined} identities={people} resultCount={shown?.accounts.length} providers={[...new Set(fleetData.accounts.map(account => account.kind))].sort()} /> : null;
+  const filterBar = isFleetView && fleetData ? <FleetFilterBar searchInputRef={searchInputRef} search={search} onSearch={setSearch} attention={attention} onAttention={setAttention} filter={filter} onChange={setFilter} paid={hasPaidResources(fleetData) ? { show: showPaid, onChange: setShowPaid } : undefined} identities={people} resultCount={shown?.accounts.length} providers={[...new Set(fleetData.accounts.map(account => account.kind))].sort()} /> : null;
 
   // Modals & Drawers state
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -171,9 +172,10 @@ export default function FleetDeckPage() {
       // An open modal owns the keyboard; the shortcut must not move focus behind it.
       if (document.querySelector('[aria-modal="true"]')) return;
       if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || e.key === "/") {
+        const searchInput = searchInputRef.current;
+        if (!searchInput) return;
         e.preventDefault();
-        const searchInput = document.querySelector<HTMLInputElement>('[aria-label="Search resources"]');
-        searchInput?.focus();
+        searchInput.focus();
       }
     };
     window.addEventListener("keydown", handleKeyDown);

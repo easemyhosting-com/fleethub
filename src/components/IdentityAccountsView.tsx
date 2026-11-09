@@ -54,6 +54,9 @@ import type {
 import { maskPhoneNumber } from "@/lib/identity/types";
 import { IdentityTiersView } from "./IdentityTiersView";
 
+const minZoom = 0.02;
+const maxZoom = 2.2;
+
 interface IdentityAccountsViewProps {
   onRefreshParent?: () => void;
   filter?: FleetFilter;
@@ -97,6 +100,7 @@ export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAc
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
+  const zoomFloorRef = useRef(minZoom);
 
   // Modal states for adding contact & linking account
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
@@ -168,9 +172,14 @@ export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAc
   };
 
   // Pan & Zoom handlers
-  const handleZoomIn = () => setZoom((z) => Math.min(2.0, Number((z + 0.15).toFixed(2))));
-  const handleZoomOut = () => setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))));
+  const zoomBy = useCallback((factor: number) => {
+    const floor = zoomFloorRef.current;
+    setZoom(value => Math.min(maxZoom, Math.max(floor, value * factor)));
+  }, []);
+  const handleZoomIn = () => zoomBy(1.15);
+  const handleZoomOut = () => zoomBy(0.85);
   const handleResetZoom = () => {
+    zoomFloorRef.current = minZoom;
     setZoom(1);
     setPan({ x: 40, y: 40 });
   };
@@ -187,6 +196,7 @@ export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAc
       bottom = Math.max(bottom, node.y + 160);
     }
     const scale = Math.min(1, (viewport.clientWidth - 40) / (right - left), (viewport.clientHeight - 80) / (bottom - top));
+    zoomFloorRef.current = Math.min(minZoom, scale);
     setZoom(scale);
     setPan({ x: 20 - left * scale, y: 60 - top * scale });
   };
@@ -214,11 +224,11 @@ export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAc
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
       const factor = event.deltaY < 0 ? 1.08 : 0.92;
-      setZoom(value => Math.min(2.2, Math.max(0.35, Number((value * factor).toFixed(2)))));
+      zoomBy(factor);
     };
     canvas.addEventListener("wheel", handleWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", handleWheel);
-  }, [viewMode, isLoading, graphData]);
+  }, [viewMode, isLoading, graphData, zoomBy]);
 
   // Node selection for detail drawer
   const handleSelectNode = (node: GraphNode) => {
@@ -591,7 +601,7 @@ export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAc
             >
               <RotateCcw className="h-4 w-4" />
             </button>
-            <span className="text-[11px] font-mono text-zinc-400 px-2 py-0.5">
+            <span aria-label="Graph zoom level" data-zoom={zoom} className="text-[11px] font-mono text-zinc-400 px-2 py-0.5">
               {Math.round(zoom * 100)}%
             </span>
           </div>

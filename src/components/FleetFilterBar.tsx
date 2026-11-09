@@ -2,14 +2,15 @@
 
 import { hasFilter, type FleetFilter } from "@/lib/fleet/filters";
 import type { PickerIdentity } from "@/lib/identity/picker";
+import type { RefObject } from "react";
 
-interface Props { search: string; onSearch: (value: string) => void; attention: boolean; onAttention: (value: boolean) => void; filter: FleetFilter; onChange: (filter: FleetFilter) => void; identities: PickerIdentity[] | null; providers: string[]; resultCount?: number; paid?: { show: boolean; onChange: (show: boolean) => void } }
+interface Props { searchInputRef?: RefObject<HTMLInputElement | null>; search: string; onSearch: (value: string) => void; attention: boolean; onAttention: (value: boolean) => void; filter: FleetFilter; onChange: (filter: FleetFilter) => void; identities: PickerIdentity[] | null; providers: string[]; resultCount?: number; paid?: { show: boolean; onChange: (show: boolean) => void } }
 
 const select = "min-h-11 w-full min-w-0 max-w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-base text-zinc-100 sm:min-h-0 sm:w-auto sm:max-w-48 sm:text-sm";
 const field = "flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-1";
 
 /** Person, Email, Provider and Plan: one bar above every fleet view. Picking a person narrows the email list to theirs. */
-export function FleetFilterBar({ search, onSearch, attention, onAttention, filter, onChange, identities, providers, resultCount, paid }: Props) {
+export function FleetFilterBar({ searchInputRef, search, onSearch, attention, onAttention, filter, onChange, identities, providers, resultCount, paid }: Props) {
   const people = identities ?? [];
   const person = people.find(item => item.id === filter.person);
   const emails = person ? person.emails : [...new Set(people.flatMap(item => item.emails))].sort();
@@ -17,7 +18,7 @@ export function FleetFilterBar({ search, onSearch, attention, onAttention, filte
   const count = resultCount ?? 0;
   return <div role="search" aria-label="Fleet filters" className="mb-4 grid grid-cols-2 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs text-zinc-400 sm:flex sm:flex-wrap">
     <label className={`col-span-2 ${field}`}>Search fleet
-      <input type="search" value={search} maxLength={256} onChange={event => onSearch(event.target.value)} placeholder="Name, provider or problem" className={select} />
+      <input ref={searchInputRef} type="search" value={search} maxLength={256} onChange={event => onSearch(event.target.value)} placeholder="Name, provider or problem" className={select} />
     </label>
     <label className="col-span-2 flex min-h-11 items-center gap-2 sm:col-auto sm:min-h-0">
       <input type="checkbox" checked={attention} onChange={event => onAttention(event.target.checked)} className="h-4 w-4" /> Needs attention

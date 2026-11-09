@@ -42,6 +42,12 @@ try{for(const width of [1280,390,320]){await page.setViewportSize({width,height:
   await page.setViewportSize({ width: 1280, height: 844 });
   await page.goto('http://fleet.fixture/');
   const search = page.getByRole('searchbox', { name: 'Search fleet' });
+  await search.waitFor();
+  await page.keyboard.press('/');
+  assert.equal(await search.evaluate(element => element === document.activeElement), true);
+  await page.locator('body').click({ position: { x: 1270, y: 10 } });
+  await page.keyboard.press('Control+k');
+  assert.equal(await search.evaluate(element => element === document.activeElement), true);
   await search.fill('rate limited');
   const resourceButton = page.getByRole('button', { name: resource.name, exact: true });
   await resourceButton.click();
@@ -65,7 +71,7 @@ try{for(const width of [1280,390,320]){await page.setViewportSize({width,height:
   await page.getByRole('checkbox', { name: 'Needs attention' }).check();
   await page.getByRole('button', { name: 'Fleet Resources', exact: false }).click();
   assert.equal(await page.getByText('Healthy unlinked resource').count(), 0);
-  checks.push({ sharedSearch: true, retainedOwnershipPath: true, sharedDetails: true, attention: true });
+  checks.push({ searchShortcuts: true, sharedSearch: true, retainedOwnershipPath: true, sharedDetails: true, attention: true });
   const extraResources = Array.from({ length: 200 }, (_, index) => ({
     ...resource, id: `large-${index}`, name: `Fixture resource ${index}`, nativeId: `large-${index}`,
   }));
@@ -83,8 +89,13 @@ try{for(const width of [1280,390,320]){await page.setViewportSize({width,height:
   const canvas = page.getByRole('region', { name: 'Identity graph. Use arrow keys to pan.' });
   await canvas.getByRole('button', { name: 'Fixture resource 199', exact: true }).waitFor({ state: 'attached' });
   await page.getByRole('button', { name: 'Fit graph to view' }).click();
+  const zoomLevel = page.getByLabel('Graph zoom level');
+  const zoomBeforeOut = Number(await zoomLevel.getAttribute('data-zoom'));
+  await page.getByTitle('Zoom Out').click();
+  const zoomAfterOut = Number(await zoomLevel.getAttribute('data-zoom'));
+  assert.ok(zoomAfterOut < zoomBeforeOut, `Zoom out did not decrease fitted zoom from ${zoomBeforeOut} to ${zoomAfterOut}`);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.getByRole('searchbox', { name: 'Search fleet' }).fill('Fixture resource 199');
   assert.equal(await canvas.getByRole('button', { name: /^Fixture resource / }).count(), 1);
-  checks.push({ largeGraphResources: linkedAccount.resources.length, fitAndSearch: true });
+  checks.push({ largeGraphResources: linkedAccount.resources.length, fitAndSearch: true, zoomOutAfterFit: true });
   assert.deepEqual(errors,[]);await writeFile(join(output, 'verification.json'),JSON.stringify({checks,errors}));console.log(JSON.stringify({checks,errors}));}finally{await browser.close()}
