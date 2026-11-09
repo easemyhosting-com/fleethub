@@ -78,6 +78,11 @@ describe("server-side sessions", () => {
   db.query.mockReset().mockResolvedValue([{ id: "a" }, { id: "b" }]); expect(await store.revokeOtherSessions(sid)).toBe(2); await expect(store.revokeOtherSessions(undefined)).rejects.toThrow(); expect(db.query).toHaveBeenCalledTimes(1);
   for (const call of db.query.mock.calls) expect(sql(call as unknown[])).toMatch(/UPDATE device_pairings SET cancelled_at = NOW\(\) WHERE created_by_session IN \(SELECT id FROM revoked\)/);
   db.query.mockReset().mockResolvedValueOnce([{ id: sid }]); await store.revokeSession(sid); expect(sql(db.query.mock.calls[0] as unknown[])).toContain("created_by_session IN (SELECT id FROM revoked)");
+  const missingColumn = Object.assign(new Error('column "created_by_session" does not exist'), { code: "42703" });
+  db.query.mockReset().mockRejectedValueOnce(missingColumn).mockResolvedValueOnce([{ id: sid }]); expect(await store.revokeSession(sid)).toBe(true);
+  db.query.mockRejectedValueOnce(missingColumn).mockResolvedValueOnce([{ id: "a" }, { id: "b" }]); expect(await store.revokeOtherSessions(sid)).toBe(2);
+  expect(db.query).toHaveBeenCalledTimes(4); for (const call of [db.query.mock.calls[1], db.query.mock.calls[3]]) expect(sql(call as unknown[])).toMatch(/^UPDATE auth_sessions SET revoked_at[\s\S]*RETURNING id$/);
+  db.query.mockReset().mockRejectedValueOnce(Object.assign(new Error("down"), { code: "57P01" })); await expect(store.revokeSession(sid)).rejects.toThrow("down"); expect(db.query).toHaveBeenCalledTimes(1);
  });
 });
 
