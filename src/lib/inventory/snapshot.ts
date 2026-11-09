@@ -1,11 +1,15 @@
 import { queryClient } from "@/lib/db/client";
 import { resourceBilling, publicResourceAttributes, publicResourceSpecs, publicResourceTags } from "@/lib/providers/config-security";
 import type { FleetFilter } from "@/lib/fleet/filters";
+import { readProjectFleetMatches } from "@/lib/projects/fleet-scope";
 import { defaultProfile } from "@/lib/fleet/vocabulary";
 import { fleetSnapshotSchema, supportedInventoryProviders, CollectionError, type FleetSnapshot } from "./model";
 
 export async function readSnapshot(filters: { accountId?: string; ownerEmail?: string } & FleetFilter = {}): Promise<FleetSnapshot> {
   const now = new Date();
+  const project = filters.project ? await readProjectFleetMatches(filters.project) : null;
+  const projectAccounts = project ? [...project.accounts] : null;
+  const projectResources = project ? [...project.resources] : null;
   const accounts = await queryClient`
     SELECT a.id, a.kind, a.label, a.identity_id, a.owner_email, a.login_email, a.health, a.enabled, a.archived_at, a.plan,
       a.is_protected, a.secret_ref_id, a.credential_expires_at, c.state AS collection_state, c.last_attempt_at,
@@ -18,6 +22,7 @@ export async function readSnapshot(filters: { accountId?: string; ownerEmail?: s
       AND (${filters.email ?? null}::text IS NULL OR LOWER(TRIM(a.owner_email)) = LOWER(TRIM(${filters.email ?? null})))
       AND (${filters.provider ?? null}::text IS NULL OR a.kind = ${filters.provider ?? null})
       AND (${filters.plan ?? null}::text IS NULL OR COALESCE(a.plan, 'unknown') = ${filters.plan ?? null})
+      AND (${projectAccounts}::text[] IS NULL OR a.id = ANY(${projectAccounts}::text[]))
     ORDER BY a.label, a.id
   `;
   const resources = await queryClient`
@@ -36,13 +41,22 @@ export async function readSnapshot(filters: { accountId?: string; ownerEmail?: s
       AND (${filters.email ?? null}::text IS NULL OR LOWER(TRIM(a.owner_email)) = LOWER(TRIM(${filters.email ?? null})))
       AND (${filters.provider ?? null}::text IS NULL OR a.kind = ${filters.provider ?? null})
       AND (${filters.plan ?? null}::text IS NULL OR COALESCE(a.plan, 'unknown') = ${filters.plan ?? null})
+      AND (${projectResources}::text[] IS NULL OR r.id = ANY(${projectResources}::text[]))
     ORDER BY r.is_protected DESC, r.name, r.id
   `;
-  const gateways = await queryClient`
+  const gateways = project ? [] : await queryClient`
     SELECT id, name, kind, tailscale_ip AS "tailscaleIp", port, state, latency_ms AS "latencyMs"
     FROM network_gateways ORDER BY name
   `;
   const worker = await queryClient`SELECT last_seen_at FROM inventory_worker WHERE id = 1`;
+  const projectCounts = new Map<string, number>();
+  if (project) {
+    for (const resource of resources) {
+      if (resource.account_id && resource.inventory_source === "provider") {
+        projectCounts.set(resource.account_id, (projectCounts.get(resource.account_id) ?? 0) + 1);
+      }
+    }
+  }
   const mappedAccounts = accounts.map(a => {
     const success = a.last_success_at ? new Date(a.last_success_at) : null;
     const freshUntil = success ? new Date(success.getTime() + 15 * 60_000) : null;
@@ -66,7 +80,7 @@ export async function readSnapshot(filters: { accountId?: string; ownerEmail?: s
           state === "needs_credentials" ? "Add management API credentials to collect inventory" :
           state === "stale" ? "Inventory needs refresh" :
           state === "error" ? "Collection failed; previous snapshot retained" : "Automatic collection unavailable",
-        resourceCount: a.resource_count,
+        resourceCount: project ? projectCounts.get(a.id) ?? 0 : a.resource_count,
       },
     };
   });

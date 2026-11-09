@@ -34,8 +34,14 @@ const graph = { nodes: graphNodes, edges: graphNodes.slice(1).map(node => ({
   id: `edge-${node.id}`, source: node.parentId, target: node.id,
 })), summary: { totalIdentities: 1, totalProviders: 1, totalAccounts: 1, protectedAccounts: 0, totalResources: 1, totalQuotaMeters: 0 } };
 const browser=await chromium.launch({ ...(process.env.FLEETHUB_BROWSER_CHANNEL ? { channel: process.env.FLEETHUB_BROWSER_CHANNEL } : {}), headless: true });const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.route('http://fleet.fixture/**',async route=>{const p=new URL(route.request().url()).pathname;
-if(p.startsWith('/api/')){let body={};if(p==='/api/auth')body={authenticated:true,user:{email:'operator@example.test',name:'Operator',provider:'local'}};else if(p==='/api/fleet')body=snapshot;else if(p==='/api/onboarding')body={ready:true,steps:[]};else if(p==='/api/identities')body={identities,graph};else if(p==='/api/projects/footprint')body={usedBy:{}};else if(p==='/api/rotation')body={accounts:[],rotators:[]};return route.fulfill({json:body});}
+await page.route('http://fleet.fixture/**',async route=>{const url = new URL(route.request().url());
+const p = url.pathname;
+const project = url.searchParams.get('project');
+if(p.startsWith('/api/')){let body={};if(p==='/api/auth')body={authenticated:true,user:{email:'operator@example.test',name:'Operator',provider:'local'}};else if(p==='/api/fleet')body=project ? { ...snapshot, resources: project === 'fixture-app' ? [resource] : [] } : snapshot;else if(p==='/api/projects')body={projects:[{slug:'fixture-app',name:'Fixture project'}]};else if(p==='/api/onboarding')body={ready:true,steps:[]};else if(p==='/api/identities')body={identities,graph};else if(p==='/api/projects/footprint')body={usedBy:{},orphans:[],projects:[{
+  id:'prj-fixture',slug:'fixture-app',name:'Fixture project',kind:'app',kindManual:false,placements:[],
+  environment:'prod',criticality:'normal',repoUrl:null,links:[],needs:[],usage:[],keys:[],measuredUsage:[],
+  usageState:'never',lastUsageAt:null,unallocatedUsage:0,billableLinks:0,
+}]};else if(p==='/api/rotation')body={accounts:[],rotators:[]};return route.fulfill({json:body});}
 return route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script>${bundle.outputFiles[0].text.replaceAll('</script','<\\/script')}</script></body></html>`});});
 const checks=[];
 try{for(const width of [1280,390,320]){await page.setViewportSize({width,height:844});await page.goto('http://fleet.fixture/');await page.getByRole('heading',{name:'Fleet inventory',exact:true}).waitFor();await page.waitForTimeout(400);const skip=page.getByRole('button',{name:'Skip tour',exact:true});if(await skip.count())await skip.click();if(width<768)await page.getByRole('button',{name:'Open navigation',exact:true}).click();await page.getByRole('button',{name:/^Identities & Accounts/}).click();await page.getByRole('button',{name:'Tree View',exact:true}).waitFor();for(const view of ['Graph','Tree View','Tiers']){await page.getByRole('button',{name:view,exact:true}).click();await page.waitForTimeout(300);const size=await page.evaluate(()=>({width:innerWidth,documentWidth:document.documentElement.scrollWidth}));checks.push({width,view,...size});if(size.documentWidth>width)console.log(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth).slice(0,15).map(e=>({tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width}))));assert.equal(size.documentWidth<=width,true,JSON.stringify(checks.at(-1)));}if(width<768)await page.getByRole('button',{name:'Open navigation',exact:true}).click();await page.getByRole('button',{name:'Fleet Map',exact:true}).click();await page.getByRole('button',{name:'Table',exact:true}).click();const trigger=page.locator('tbody tr button').first();await trigger.click();const close=page.getByRole('button',{name:'Close details',exact:true});await close.waitFor();assert.equal(await close.evaluate(e=>e===document.activeElement),true);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);if(width===390)await page.screenshot({path:join(output,'fleet-details-mobile.png'),fullPage:true});await page.keyboard.press('Escape');assert.equal(await close.count(),0);assert.equal(await trigger.evaluate(e=>e===document.activeElement),true);checks.push({width,drawerFocus:true,escapeAndReturn:true});if(width===390)await page.screenshot({path:join(output, 'fleet-mobile.png'),fullPage:true});}
@@ -72,6 +78,32 @@ try{for(const width of [1280,390,320]){await page.setViewportSize({width,height:
   await page.getByRole('button', { name: 'Fleet Resources', exact: false }).click();
   assert.equal(await page.getByText('Healthy unlinked resource').count(), 0);
   checks.push({ searchShortcuts: true, sharedSearch: true, retainedOwnershipPath: true, sharedDetails: true, attention: true });
+  const fleetProject = page.getByRole('combobox', { name: 'Filter by project' });
+  await fleetProject.selectOption('fixture-app');
+  await page.waitForURL(url => url.searchParams.get('project') === 'fixture-app');
+  await page.getByRole('button', { name: 'Fleet Map', exact: true }).click();
+  await page.waitForURL(url => url.searchParams.get('project') === 'fixture-app' && url.searchParams.get('view') === 'map');
+  await page.reload();
+  await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await page.locator('tbody').getByRole('button', { name: resource.name, exact: true }).waitFor();
+  assert.equal(await fleetProject.inputValue(), 'fixture-app');
+  assert.equal(await page.getByText('Healthy unlinked resource').count(), 0);
+  await page.getByRole('button', { name: /^Identities & Accounts/ }).click();
+  await page.waitForURL(url => url.searchParams.get('view') === 'identity');
+  await page.goBack();
+  await page.getByRole('button', { name: 'Table', exact: true }).waitFor();
+  await fleetProject.selectOption('');
+  await page.waitForURL(url => !url.searchParams.has('project') && url.searchParams.get('view') === 'map');
+  await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await page.getByText('Healthy unlinked resource', { exact: true }).waitFor();
+  await page.goto('http://fleet.fixture/?project=unknown-project&view=map');
+  await page.getByText('No resources match these filters.', { exact: true }).waitFor();
+  await page.goto('http://fleet.fixture/?project=fixture-app&view=projects');
+  await page.getByRole('note').getByText('Showing confirmed, active links.', { exact: false }).waitFor();
+  await page.getByText('No confirmed active links.', { exact: true }).waitFor();
+  await fleetProject.selectOption('');
+  await page.getByText('No linked resources yet.', { exact: true }).waitFor();
+  checks.push({ projectFilter: true, viewRestored: true, historyRestored: true, scopedEmptyState: true });
   const extraResources = Array.from({ length: 200 }, (_, index) => ({
     ...resource, id: `large-${index}`, name: `Fixture resource ${index}`, nativeId: `large-${index}`,
   }));

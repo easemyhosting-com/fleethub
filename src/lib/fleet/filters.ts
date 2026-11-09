@@ -1,10 +1,12 @@
+import { projectSlug } from "@/lib/projects/schemas";
+
 export const filterPlans = ["free", "paid", "unknown"] as const;
-export interface FleetFilter { person?: string; email?: string; provider?: string; plan?: string }
+export interface FleetFilter { person?: string; email?: string; provider?: string; plan?: string; project?: string }
 export interface FilterableAccount { identityId?: string | null; ownerEmail: string; kind?: string; provider?: string; plan?: string }
 
 const keys = ["person", "email", "provider", "plan"] as const;
 
-/** Reads the four filters from query parameters; empty and "all" values mean no filter. */
+/** Reads account filters and a validated project slug from the URL. */
 export function parseFilter(params: URLSearchParams): FleetFilter {
   const filter: FleetFilter = {};
   for (const key of keys) {
@@ -12,15 +14,18 @@ export function parseFilter(params: URLSearchParams): FleetFilter {
     if (value && value.toLowerCase() !== "all" && value.length <= 256) filter[key] = value;
   }
   if (filter.plan && !(filterPlans as readonly string[]).includes(filter.plan)) delete filter.plan;
+  const project = projectSlug.safeParse(params.get("project"));
+  if (project.success) filter.project = project.data;
   return filter;
 }
 
 export function filterToParams(filter: FleetFilter, into = new URLSearchParams()): URLSearchParams {
-  for (const key of keys) { const value = filter[key]; if (value) into.set(key, value); else into.delete(key); }
+  for (const key of [...keys, "project"] as const) { const value = filter[key]; if (value) into.set(key, value); else into.delete(key); }
   return into;
 }
 
-export const hasFilter = (filter: FleetFilter) => keys.some(key => Boolean(filter[key]));
+export const hasFilter = (filter: FleetFilter) => Boolean(filter.project) || hasAccountFilter(filter);
+const hasAccountFilter = (filter: FleetFilter) => keys.some(key => Boolean(filter[key]));
 
 export function accountMatches(account: FilterableAccount, filter: FleetFilter): boolean {
   if (filter.person && account.identityId !== filter.person) return false;
@@ -32,7 +37,7 @@ export function accountMatches(account: FilterableAccount, filter: FleetFilter):
 
 /** Keeps the matching accounts and only the resources that belong to them. */
 export function filterSnapshot<S extends { accounts: Array<FilterableAccount & { id: string }>; resources: Array<{ accountId: string | null }> }>(snapshot: S, filter: FleetFilter): S {
-  if (!hasFilter(filter)) return snapshot;
+  if (!hasAccountFilter(filter)) return snapshot;
   const accounts = snapshot.accounts.filter(account => accountMatches(account, filter));
   const ids = new Set(accounts.map(account => account.id));
   return { ...snapshot, accounts, resources: snapshot.resources.filter(resource => resource.accountId !== null && ids.has(resource.accountId)) };
@@ -40,7 +45,7 @@ export function filterSnapshot<S extends { accounts: Array<FilterableAccount & {
 
 /** Applies the filter to people and their accounts. An account-level filter drops people who have no matching account left. */
 export function filterIdentities<I extends { id: string; accounts: FilterableAccount[] }>(identities: I[], filter: FleetFilter): I[] {
-  if (!hasFilter(filter)) return identities;
+  if (!hasAccountFilter(filter)) return identities;
   const accountLevel = Boolean(filter.email || filter.provider || filter.plan);
   return identities
     .filter(identity => !filter.person || identity.id === filter.person)

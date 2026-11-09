@@ -33,6 +33,9 @@ describe("stored-inventory JSON-RPC bridge", () => {
   expect(await value(await call("list_resources",{accountId:"account-1",category:"compute"}))).toEqual([resource]);
   expect(fixture.snapshot).toHaveBeenCalledWith({accountId:"account-1"});
   expect(await value(await call("list_resources",{includeMissing:true}))).toHaveLength(3);
+  await call("list_resources",{project:"scope-app"});
+  expect(fixture.snapshot).toHaveBeenLastCalledWith({project:"scope-app"});
+  expect((await call("list_resources",{project:"INVALID"})).status).toBe(400);
   expect((await call("list_resources",{category:"credentials"})).status).toBe(400);
   expect((await call("list_resources",{url:"http://untrusted"})).status).toBe(400);
  });

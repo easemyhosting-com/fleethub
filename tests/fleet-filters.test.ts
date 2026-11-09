@@ -18,6 +18,9 @@ describe("fleet filters", () => {
     expect(parseFilter(new URLSearchParams("plan=gold&person=%20"))).toEqual({});
     const params = filterToParams({ person: "p1", plan: "paid" }, new URLSearchParams("email=old@x.co&keep=1"));
     expect(params.toString()).toBe("keep=1&person=p1&plan=paid");
+    expect(parseFilter(new URLSearchParams("project=all"))).toEqual({ project: "all" });
+    expect(parseFilter(new URLSearchParams("project=INVALID"))).toEqual({});
+    expect(filterToParams({ project: "scope-app" }).toString()).toBe("project=scope-app");
     expect(hasFilter({})).toBe(false);
     expect(hasFilter({ plan: "free" })).toBe(true);
   });

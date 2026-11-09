@@ -88,6 +88,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("stored fleet route", () => {
   it("enforces auth, returns no-store filtered snapshots, and removes private resource fields", async () => {
     expect((await fleetGET(new Request(`${base}/api/fleet`))).status).toBe(401);
+    expect((await fleetGET(request("/api/fleet?project=NOT-A-SLUG", "GET", undefined, "reader-fixture"))).status).toBe(400);
     const response = await fleetGET(request("/api/fleet?accountId=acc-a&ownerEmail=owner%40example.test", "GET", undefined, "reader-fixture"));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");

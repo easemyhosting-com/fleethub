@@ -4,13 +4,30 @@ import { hasFilter, type FleetFilter } from "@/lib/fleet/filters";
 import type { PickerIdentity } from "@/lib/identity/picker";
 import type { RefObject } from "react";
 
-interface Props { searchInputRef?: RefObject<HTMLInputElement | null>; search: string; onSearch: (value: string) => void; attention: boolean; onAttention: (value: boolean) => void; filter: FleetFilter; onChange: (filter: FleetFilter) => void; identities: PickerIdentity[] | null; providers: string[]; resultCount?: number; paid?: { show: boolean; onChange: (show: boolean) => void } }
+export interface FleetProjectOption { slug: string; name: string }
+
+export function FleetProjectSelect({ projects, project, onChange }: {
+  projects: FleetProjectOption[];
+  project?: string;
+  onChange: (value?: string) => void;
+}) {
+  if (!projects.length && !project) return null;
+  return <label className={field}>Project
+    <select aria-label="Filter by project" value={project ?? ""} onChange={event => onChange(event.target.value || undefined)} className={select}>
+      <option value="">All projects</option>
+      {project && !projects.some(item => item.slug === project) && <option value={project}>{project}</option>}
+      {projects.map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+    </select>
+  </label>;
+}
+
+interface Props { projects: FleetProjectOption[]; searchInputRef?: RefObject<HTMLInputElement | null>; search: string; onSearch: (value: string) => void; attention: boolean; onAttention: (value: boolean) => void; filter: FleetFilter; onChange: (filter: FleetFilter) => void; identities: PickerIdentity[] | null; providers: string[]; resultCount?: number; paid?: { show: boolean; onChange: (show: boolean) => void } }
 
 const select = "min-h-11 w-full min-w-0 max-w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-base text-zinc-100 sm:min-h-0 sm:w-auto sm:max-w-48 sm:text-sm";
 const field = "flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-1";
 
 /** Person, Email, Provider and Plan: one bar above every fleet view. Picking a person narrows the email list to theirs. */
-export function FleetFilterBar({ searchInputRef, search, onSearch, attention, onAttention, filter, onChange, identities, providers, resultCount, paid }: Props) {
+export function FleetFilterBar({ projects, searchInputRef, search, onSearch, attention, onAttention, filter, onChange, identities, providers, resultCount, paid }: Props) {
   const people = identities ?? [];
   const person = people.find(item => item.id === filter.person);
   const emails = person ? person.emails : [...new Set(people.flatMap(item => item.emails))].sort();
@@ -23,6 +40,7 @@ export function FleetFilterBar({ searchInputRef, search, onSearch, attention, on
     <label className="col-span-2 flex min-h-11 items-center gap-2 sm:col-auto sm:min-h-0">
       <input type="checkbox" checked={attention} onChange={event => onAttention(event.target.checked)} className="h-4 w-4" /> Needs attention
     </label>
+    <FleetProjectSelect projects={projects} project={filter.project} onChange={project => set({ project })} />
     <label className={field}>Person
       <select aria-label="Filter by person" value={filter.person ?? ""} onChange={event => set({ person: event.target.value || undefined, email: undefined })} className={select}>
         <option value="">All people</option>{people.map(item => <option key={item.id} value={item.id}>{item.displayName}</option>)}
