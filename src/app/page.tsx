@@ -559,7 +559,7 @@ export default function FleetDeckPage() {
           {activeTab === "agents" && <AgentAccessPanel />}
           {activeTab === "devices" && <DevicesPanel />}
           {activeTab === "limits" && <CapacityLimitsPanel />}
-          {activeTab === "map" && (shown ? <FleetMapPanel fleet={shown} selectedId={selectedResourceId} onSelectResource={selectResource} /> : <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">{fleetStatus === "loading" ? "Loading stored inventory…" : "Inventory is unavailable."}</div>)}
+          {activeTab === "map" && (shown ? <FleetMapPanel filtered={hasFilter(filter) || isSearching} fleet={shown} selectedId={selectedResourceId} onSelectResource={selectResource} /> : <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">{fleetStatus === "loading" ? "Loading stored inventory…" : "Inventory is unavailable."}</div>)}
           {activeTab === "projects" && <div className="space-y-4">
             <FleetProjectSelect projects={projects} project={project} onChange={value => setFilter({ ...filter, project: value })} />
             <ProjectsView key={project ?? ""} project={project} />

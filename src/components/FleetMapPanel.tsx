@@ -6,7 +6,7 @@ import { layoutGroups } from "@/lib/fleetmap/layout";
 import { buildTiles, groupTiles, noFilters, stateStyle, summarize, type Filters, type GroupBy, type SizeBy, type Tile, type TileState } from "@/lib/fleetmap/model";
 import { lifecycleLabels, roleLabels, roles } from "@/lib/fleet/vocabulary";
 
-interface Props { fleet: FleetSnapshot; selectedId: string | null; onSelectResource: (id: string) => void }
+interface Props { fleet: FleetSnapshot; selectedId: string | null; onSelectResource: (id: string) => void; filtered?: boolean }
 
 const groupOptions: { value: GroupBy; label: string }[] = [{ value: "provider", label: "Provider" }, { value: "account", label: "Account" }, { value: "role", label: "Role" }, { value: "category", label: "Kind" }, { value: "region", label: "Region" }];
 const select = "rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200";
@@ -25,7 +25,7 @@ function useWidth() {
   return { ref: setElement, width };
 }
 
-export function FleetMapPanel({ fleet, selectedId, onSelectResource }: Props) {
+export function FleetMapPanel({ fleet, selectedId, onSelectResource, filtered }: Props) {
   const [groupBy, setGroupBy] = useState<GroupBy>("provider");
   const [sizeBy, setSizeBy] = useState<SizeBy>("capacity");
   const [view, setView] = useState<"map" | "table">("map");
@@ -52,7 +52,7 @@ export function FleetMapPanel({ fleet, selectedId, onSelectResource }: Props) {
     </div>
     <ul className="flex flex-wrap gap-3 text-xs" aria-label="Legend and counts">{(Object.keys(stateStyle) as TileState[]).map(state => <li key={state} className={`rounded border px-2 py-1 ${stateStyle[state].className}`}><span aria-hidden="true">{stateStyle[state].symbol}</span> {stateStyle[state].label}: <strong>{counts[state]}</strong></li>)}<li className="px-2 py-1 text-zinc-500">Faded = data is stale · lock = protected</li></ul>
 
-    {tiles.length === 0 ? <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-400">{fleet.resources.length === 0 ? "No resources yet. Connect a provider account to see its resources here." : "No resources match these filters."}</p>
+    {tiles.length === 0 ? <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-400">{!filtered && fleet.resources.length === 0 ? "No resources yet. Connect a provider account to see its resources here." : "No resources match these filters."}</p>
     : view === "map" ? <div ref={ref} className="relative w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950" style={{ height }}>
       {placed.map(group => <div key={group.key}>
         <div className="absolute truncate bg-zinc-800/80 px-2 text-[11px] font-semibold uppercase leading-[22px] tracking-wide text-zinc-200" style={{ left: group.rect.x + 1, top: group.rect.y + 1, width: Math.max(0, group.rect.w - 2) }}>{group.label}</div>
