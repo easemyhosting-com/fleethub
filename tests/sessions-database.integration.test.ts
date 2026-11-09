@@ -3,6 +3,7 @@ import { queryClient } from "../src/lib/db/client";
 import { bootstrapDatabase } from "../src/lib/db/bootstrap";
 import { cancelPairing, checkSession, createPairing, createServerSession, listPairings, listSessions, maxActiveSessions, maxPendingPairings, pairingInput, PairingLimitReached, redeemPairing, revokeOtherSessions, revokeSession, SessionLimitReached } from "../src/lib/auth/sessions";
 const user = { id: "usr-fixture", email: "fixture@example.test", name: "Fixture", provider: "local" as const, createdAt: Date.now() };
+const otherUser = { ...user, id: "usr-other", email: "other@example.test" };
 describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("session and pairing PostgreSQL storage", () => {
  beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL ?? "");
@@ -14,6 +15,9 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("session and p
  it("creates, checks, expires and revokes sessions with immediate effect", async () => {
   await clean();
   const sid = await createServerSession(user, "device", "read", "Phone");
+  const otherSid = await createServerSession(otherUser, "browser", "operator", "Other user");
+  expect((await listSessions(user.id)).map(item => item.id)).toEqual([sid]);
+  expect(await revokeSession(otherSid, user.id)).toBe(false);
   expect(await checkSession(sid)).toEqual({ status: "active", scope: "read" });
   const [row] = await queryClient`SELECT * FROM auth_sessions WHERE id = ${sid}`; expect(row.last_seen_at).not.toBeNull();
   await checkSession(sid); const [again] = await queryClient`SELECT last_seen_at FROM auth_sessions WHERE id = ${sid}`; expect(again.last_seen_at).toEqual(row.last_seen_at);
@@ -23,12 +27,15 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("session and p
   await queryClient`UPDATE auth_sessions SET expires_at = NOW() - interval '1 second' WHERE id = ${second}`; expect(await checkSession(second)).toEqual({ status: "inactive" });
   expect(await revokeOtherSessions(third)).toBe(0); const fourth = await createServerSession(user, "browser", "operator", "Firefox");
   expect(await revokeOtherSessions(third)).toBe(1); expect(await checkSession(fourth)).toEqual({ status: "inactive" }); expect(await checkSession(third)).toMatchObject({ status: "active" });
+  expect(await checkSession(otherSid)).toEqual({ status: "active", scope: "operator" });
   expect(await checkSession("ses-missing")).toEqual({ status: "inactive" });
  });
  it("enforces the active session cap under concurrent sign-ins", async () => {
   await clean();
   const results = await Promise.allSettled(Array.from({ length: maxActiveSessions + 5 }, (_, index) => createServerSession(user, "browser", "operator", `b${index}`)));
   expect(results.filter(result => result.status === "fulfilled")).toHaveLength(maxActiveSessions);
+  const otherSid = await createServerSession(otherUser, "browser", "operator", "Other user");
+  expect(await checkSession(otherSid)).toEqual({ status: "active", scope: "operator" });
   for (const result of results.filter(result => result.status === "rejected")) expect((result as PromiseRejectedResult).reason).toBeInstanceOf(SessionLimitReached);
  });
  it("redeems a pairing code exactly once, even when attempted concurrently, with the granted scope", async () => {

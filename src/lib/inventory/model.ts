@@ -32,7 +32,7 @@ export const completeInventorySchema = z.strictObject({
   plan: z.enum(["free", "paid"]).optional(),
 });
 export type CompleteInventory = z.infer<typeof completeInventorySchema>;
-export const collectionErrorCodes = ["invalid_config", "credentials_unavailable", "scope_changed", "unauthorized", "rate_limited", "provider_unavailable", "invalid_response", "scan_limit", "scan_timeout", "lease_lost", "unsupported"] as const;
+export const collectionErrorCodes = ["invalid_config", "credentials_unavailable", "scope_changed", "unauthorized", "rate_limited", "provider_unavailable", "invalid_response", "unexpected_empty", "scan_limit", "scan_timeout", "lease_lost", "unsupported"] as const;
 export type CollectionErrorCode = typeof collectionErrorCodes[number];
 const messages: Record<CollectionErrorCode, string> = {
   invalid_config: "Management API credentials or account scope are incomplete. Register a new account with the documented fields.",
@@ -42,6 +42,7 @@ const messages: Record<CollectionErrorCode, string> = {
   rate_limited: "The provider rate limited inventory requests. Collection will retry with backoff.",
   provider_unavailable: "The provider could not be reached. The previous snapshot is retained.",
   invalid_response: "The provider returned an unexpected or incomplete response. The previous snapshot is retained.",
+  unexpected_empty: "The scan returned no resources for a scope with existing inventory. The previous snapshot is retained.",
   scan_limit: "The listing exceeded the scan budget. No partial snapshot was published.",
   scan_timeout: "The collection deadline expired. The previous snapshot is retained.",
   lease_lost: "This collection no longer holds its worker lease.",

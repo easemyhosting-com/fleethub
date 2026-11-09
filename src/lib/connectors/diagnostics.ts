@@ -43,7 +43,7 @@ export function accountDiagnostics(collection: FleetAccount["collection"]): Diag
   if (error) {
     const code = error === "credentials_unavailable" ? "credentials" : error === "unauthorized" ? "permissions" :
       ["invalid_config", "scope_changed"].includes(error) ? "configuration" : error === "rate_limited" ? "rate_limit" :
-      error === "provider_unavailable" ? "availability" : error === "invalid_response" ? "response" :
+      error === "provider_unavailable" ? "availability" : ["invalid_response", "unexpected_empty"].includes(error) ? "response" :
       ["scan_limit", "scan_timeout"].includes(error) ? "budget" : error === "lease_lost" ? "worker" : "unsupported";
     return [diagnostic(code, "inventory_collection", collection.lastAttemptAt)];
   }

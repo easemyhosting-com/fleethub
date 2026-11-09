@@ -41,21 +41,33 @@ export async function enqueueInventory(accountId: string, tx: Sql | TransactionS
     VALUES (${accountId}, 'queued', NOW(), ${credentialHash ?? null})
     ON CONFLICT(account_id) DO UPDATE SET
       state = 'queued', attempts = 0, next_attempt_at = NOW(),
-      lease_token = NULL, lease_until = NULL, error_code = NULL
+      lease_token = NULL, lease_until = NULL, error_code = NULL, confirm_empty = false
     WHERE account_collections.state <> 'running' OR account_collections.lease_until <= NOW()
   `;
 }
 
+/** Queue one confirmation scan after an unexpected empty result. The worker consumes confirmation when it claims the job. */
+export async function confirmEmptyInventory(accountId: string): Promise<boolean> {
+  const updated = await queryClient`
+    UPDATE account_collections c
+    SET state = 'queued', attempts = 0, next_attempt_at = NOW(), error_code = NULL, confirm_empty = true
+    FROM provider_accounts a
+    WHERE c.account_id = ${accountId} AND a.id = c.account_id AND a.archived_at IS NULL
+      AND c.state = 'error' AND c.error_code = 'unexpected_empty'
+  `;
+  return updated.count === 1;
+}
+
 const claimedSchema = z.object({
   account_id: z.string(), lease_token: z.string().uuid(), kind: z.string(), secret_ref_id: z.string(),
-  credential_hash: z.string().nullable(),
+  credential_hash: z.string().nullable(), confirm_empty: z.boolean(),
 });
 type Claimed = z.infer<typeof claimedSchema>;
 
 async function claim(): Promise<Claimed | null> {
   return queryClient.begin(async tx => {
     const rows = await tx`
-      SELECT c.account_id, c.credential_hash, c.state, c.attempts, a.kind, a.secret_ref_id
+      SELECT c.account_id, c.credential_hash, c.confirm_empty, c.state, c.attempts, a.kind, a.secret_ref_id
       FROM account_collections c JOIN provider_accounts a ON a.id = c.account_id
       WHERE a.archived_at IS NULL AND ((c.state IN ('queued', 'ready') AND c.next_attempt_at <= NOW())
          OR (c.state = 'running' AND c.lease_until < NOW()))
@@ -74,7 +86,7 @@ async function claim(): Promise<Claimed | null> {
     }
     const token = randomUUID();
     await tx`
-      UPDATE account_collections SET state = 'running', lease_token = ${token},
+      UPDATE account_collections SET state = 'running', lease_token = ${token}, confirm_empty = false,
         lease_until = NOW() + INTERVAL '120 seconds', last_attempt_at = NOW(),
         attempts = attempts + CASE WHEN state = 'running' THEN 1 ELSE 0 END
       WHERE account_id = ${rows[0].account_id}
@@ -163,13 +175,18 @@ async function publish(job: Claimed, result: unknown, credentialHash: string, si
       `;
     }
     const covered = inventory.covered;
-    await tx`
-      UPDATE resources SET retired_at = NOW()
+    const absentResources = tx`
       WHERE account_id = ${job.account_id} AND inventory_source = 'provider'
         AND provider = ${job.kind} AND scan_generation IS DISTINCT FROM ${generation}
         AND retired_at IS NULL
         ${covered ? tx`AND COALESCE(attributes->>'product', 'zone') IN ${tx(covered)}` : tx``}
     `;
+    if (inventory.resources.length === 0 && !job.confirm_empty) {
+      const [existing] = await tx`SELECT 1 FROM resources ${absentResources} LIMIT 1`;
+      if (existing) throw new CollectionError("unexpected_empty");
+    } else {
+      await tx`UPDATE resources SET retired_at = NOW() ${absentResources}`;
+    }
     if (signal.aborted) throw new CollectionError("scan_timeout");
     const updated = await tx`
       UPDATE account_collections SET state = 'ready', scope_hash = COALESCE(scope_hash, ${scopeHash}),
@@ -205,9 +222,9 @@ async function fail(job: Claimed, error: unknown) {
     const failed = await tx`
     UPDATE account_collections SET
       attempts = attempts + 1,
-      state = CASE WHEN attempts + 1 >= 3 OR ${code} IN ('scope_changed', 'unsupported', 'invalid_config', 'credentials_unavailable')
+      state = CASE WHEN attempts + 1 >= 3 OR ${code} IN ('scope_changed', 'unsupported', 'invalid_config', 'credentials_unavailable', 'unexpected_empty')
         THEN 'error' ELSE 'queued' END,
-      next_attempt_at = CASE WHEN attempts + 1 >= 3 OR ${code} IN ('scope_changed', 'unsupported', 'invalid_config', 'credentials_unavailable')
+      next_attempt_at = CASE WHEN attempts + 1 >= 3 OR ${code} IN ('scope_changed', 'unsupported', 'invalid_config', 'credentials_unavailable', 'unexpected_empty')
         THEN NULL ELSE NOW() + (INTERVAL '1 minute' * POWER(2, attempts)) END,
       lease_token = NULL, lease_until = NULL, error_code = ${code}
     WHERE account_id = ${job.account_id} AND lease_token = ${job.lease_token}

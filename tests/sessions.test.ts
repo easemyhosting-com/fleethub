@@ -154,13 +154,12 @@ describe("DELETE /api/sessions?others=true", () => {
   vi.resetModules();
   const revokeOtherSessions = vi.fn(async () => 99);
   vi.doMock("@/lib/db/bootstrap", () => ({ bootstrapDatabase: vi.fn(async () => ({ success: true })) }));
-  vi.doMock("@/lib/auth/guard", () => ({ verifyApiAccess: vi.fn(async () => ({ authorized: true })), isOperator: () => true, createUnauthorizedResponse: () => new Response(null, { status: 401 }) }));
-  vi.doMock("@/lib/auth/session", () => ({ getSessionFromRequest: () => ({ id: "u", email: "op@example.com" }) }));
+  vi.doMock("@/lib/auth/guard", () => ({ verifyApiAccess: vi.fn(async () => ({ authorized: true, user: { id: "u", email: "op@example.com" } })), isOperator: () => true, createUnauthorizedResponse: () => new Response(null, { status: 401 }) }));
   vi.doMock("@/lib/auth/sessions", () => ({ listSessions: vi.fn(), revokeSession: vi.fn(), revokeOtherSessions }));
   const { DELETE } = await import("../src/app/api/sessions/route");
   const res = await DELETE(new Request("http://localhost/api/sessions?others=true", { method: "DELETE" }));
   expect(res.status).toBe(409);
   expect(revokeOtherSessions).not.toHaveBeenCalled();
-  vi.doUnmock("@/lib/db/bootstrap"); vi.doUnmock("@/lib/auth/guard"); vi.doUnmock("@/lib/auth/session"); vi.doUnmock("@/lib/auth/sessions");
+  vi.doUnmock("@/lib/db/bootstrap"); vi.doUnmock("@/lib/auth/guard"); vi.doUnmock("@/lib/auth/sessions");
  });
 });

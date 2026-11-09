@@ -26,6 +26,7 @@ vi.mock("@/lib/db/client", () => ({
       const a = fixture.accounts.find(account => account.id === values[0]);
       return a ? [{ kind: a.kind, secret_ref_id: a.secret_ref_id }] : [];
     }
+    if (sql.startsWith("UPDATE account_collections c SET state")) return { count: fixture.collectionState === "error" ? 1 : 0 };
     if (sql.startsWith("INSERT INTO account_collections")) {
       if (fixture.collectionState !== "running") fixture.collectionState = "queued";
       return Object.assign([], { count: 1 });
@@ -174,6 +175,15 @@ describe("inventory refresh route", () => {
     const unavailable = await refreshPOST(request("/api/inventory/refresh", "POST", { accountId: "acc-a" }));
     expect(unavailable.status).toBe(503);
     expect(await unavailable.text()).not.toContain("private database password");
+  });
+
+  it("accepts an explicit empty-scan confirmation only when one is pending", async () => {
+    const path = "/api/inventory/refresh";
+    const body = { accountId: "acc-a", confirmEmpty: true };
+    expect((await refreshPOST(request(path, "POST", body, "reader-fixture"))).status).toBe(403);
+    expect((await refreshPOST(request(path, "POST", body))).status).toBe(409);
+    fixture.collectionState = "error";
+    expect((await refreshPOST(request(path, "POST", body))).status).toBe(202);
   });
 
   it("queues credentialed accounts and reports accepted for a coalesced running job", async () => {
