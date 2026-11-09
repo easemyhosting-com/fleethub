@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CollectionDiagnostics } from "./CollectionDiagnostics";
-import { accountDiagnostics } from "@/lib/connectors/diagnostics";
+import { FleetAccountFacts } from "./FleetAccountFacts";
 import { AccountCredentialControls, type RotationInfo, type RotatorInfo } from "./AccountCredentialControls";
 import { z } from "zod";
 import { manualResourceInput, resourceCategorySchema, supportedInventoryProviders, type FleetAccount, type FleetSnapshot } from "@/lib/inventory/model";
@@ -71,11 +70,8 @@ export function InventoryAccountsPanel({ accounts, worker, onReload, onSelectAcc
       const supported = supportedInventoryProviders.some(provider => provider === account.kind);
       const canCollect = supported && !account.archived && !["needs_credentials", "unsupported", "queued", "running"].includes(account.collection.state);
       return <article key={account.id} className={`min-w-0 break-words rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 space-y-3 ${account.archived ? "opacity-60" : ""}`}>
-        <div className="flex justify-between gap-2"><div className="min-w-0"><h3 className="font-medium text-white">{account.label}</h3><p className="text-xs text-zinc-400">{account.kind} · {account.ownerEmail}{account.plan && account.plan !== "unknown" ? ` · ${account.plan} plan` : ""}{account.isProtected ? " · protected" : ""}</p></div><span className="shrink-0 text-xs text-zinc-300">{account.archived ? "archived" : account.collection.state.replaceAll("_", " ")}</span></div>
-        <p className="text-xs text-zinc-400">{account.collection.resourceCount} collected resources · Last success {time(account.collection.lastSuccessAt)} · Last attempt {time(account.collection.lastAttemptAt)}</p>
-        {account.collection.message && <p className="text-xs text-amber-300">{account.collection.message}</p>}
-        {account.collection.errorCode && <p className="text-xs text-rose-300">{account.collection.errorCode.replaceAll("_", " ")}</p>}
-        <CollectionDiagnostics items={accountDiagnostics(account.collection)} />
+        <div className="min-w-0"><h3 className="font-medium text-white">{account.label}</h3><p className="text-xs text-zinc-400">{account.kind}{account.isProtected ? " · protected" : ""}</p></div>
+        <FleetAccountFacts account={account} />
         <div className="flex flex-wrap gap-2"><button type="button" onClick={() => onSelectAccount(selectedAccountId === account.id ? null : account.id)} className="rounded border border-zinc-700 inline-flex min-h-11 items-center px-3 text-xs text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">{selectedAccountId === account.id ? "Show all resources" : "View resources"}</button>
         {supported && account.collection.state === "needs_credentials" && onConnectCredentials && <button type="button" onClick={() => onConnectCredentials(account)} className="rounded border border-cyan-700 inline-flex min-h-11 items-center px-3 text-xs text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Connect credentials</button>}
         {canCollect && <button type="button" disabled={busyId !== null} onClick={() => submit("/api/inventory/refresh", { accountId: account.id }, account.id, "Collection queued. The worker will update this account.")} className="rounded border border-cyan-700 inline-flex min-h-11 items-center px-3 text-xs text-cyan-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">{busyId === account.id ? "Queuing…" : "Collect inventory"}</button>}

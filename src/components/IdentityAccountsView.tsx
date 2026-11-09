@@ -1,5 +1,8 @@
 "use client";
 
+import { FleetAccountFacts } from "./FleetAccountFacts";
+import type { FleetAccount } from "@/lib/inventory/model";
+import { selectIdentityAccounts, selectIdentityGraph, type FleetMatches } from "@/lib/identity/fleet-selection";
 import { filterToParams, type FleetFilter } from "@/lib/fleet/filters";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
@@ -54,13 +57,18 @@ import { IdentityTiersView } from "./IdentityTiersView";
 interface IdentityAccountsViewProps {
   onRefreshParent?: () => void;
   filter?: FleetFilter;
+  matches?: FleetMatches;
+  fleetAccounts?: FleetAccount[];
+  onSelectResource?: (id: string) => boolean;
 }
 
-export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccountsViewProps) {
+export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAccounts, onSelectResource }: IdentityAccountsViewProps) {
   const filterQuery = filterToParams(filter ?? {}).toString();
   // Data state
-  const [identities, setIdentities] = useState<IdentityWithAccounts[]>([]);
-  const [graphData, setGraphData] = useState<IdentityGraphResponse | null>(null);
+  const [loadedIdentities, setIdentities] = useState<IdentityWithAccounts[]>([]);
+  const [loadedGraph, setGraphData] = useState<IdentityGraphResponse | null>(null);
+  const identities = useMemo(() => matches ? selectIdentityAccounts(loadedIdentities, matches) : loadedIdentities, [loadedIdentities, matches]);
+  const graphData = useMemo(() => matches && loadedGraph ? selectIdentityGraph(loadedGraph, matches) : loadedGraph, [loadedGraph, matches]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [revealedPhones, setRevealedPhones] = useState<Set<string>>(new Set());
@@ -78,6 +86,7 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
   // Selection state for Drawer
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<ProviderAccountDetail | null>(null);
+  const fleetAccount = fleetAccounts?.find(account => account.id === selectedAccount?.id);
 
   // Expand / Collapse state for tree branches
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
@@ -165,9 +174,21 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
     setZoom(1);
     setPan({ x: 40, y: 40 });
   };
-  const handleFitToView = () => {
-    setZoom(0.85);
-    setPan({ x: 20, y: 20 });
+  const fitGraph = (selection?: string) => {
+    const viewport = canvasRef.current;
+    if (!viewport) return;
+    const nodes = layout.nodesWithPos.filter(node => node.visible && (!selection || node.id === selection));
+    if (!nodes.length) return;
+    let left = Infinity, top = Infinity, right = 0, bottom = 0;
+    for (const node of nodes) {
+      left = Math.min(left, node.x);
+      top = Math.min(top, node.y);
+      right = Math.max(right, node.x + 288);
+      bottom = Math.max(bottom, node.y + 160);
+    }
+    const scale = Math.min(1, (viewport.clientWidth - 40) / (right - left), (viewport.clientHeight - 80) / (bottom - top));
+    setZoom(scale);
+    setPan({ x: 20 - left * scale, y: 60 - top * scale });
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -201,9 +222,13 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
 
   // Node selection for detail drawer
   const handleSelectNode = (node: GraphNode) => {
+    if (node.type === "resource" && typeof node.data.resourceId === "string" && onSelectResource?.(node.data.resourceId)) {
+      setSelectedNode(null);
+      return;
+    }
     setSelectedNode(node);
     if (node.type === "account") {
-      const found = identities
+      const found = loadedIdentities
         .flatMap((i) => i.accounts)
         .find((a) => a.id === node.data.accountId);
       setSelectedAccount(found || null);
@@ -244,7 +269,14 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
     };
 
     // Group nodes hierarchically by identity
-    const identityNodes = graphData.nodes.filter((n) => n.type === "identity");
+    const identityNodes = graphData.nodes.filter((node) => node.type === "identity");
+    const childrenByParent = new Map<string, GraphNode[]>();
+    for (const node of graphData.nodes) {
+      if (!node.parentId) continue;
+      const children = childrenByParent.get(node.parentId);
+      if (children) children.push(node);
+      else childrenByParent.set(node.parentId, [node]);
+    }
 
     for (const ident of identityNodes) {
       const identVisible = true;
@@ -258,7 +290,7 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
       });
       idToPos.set(ident.id, { x: TIER_X.identity, y: identY, visible: identVisible });
 
-      const emailNodes = graphData.nodes.filter((n) => n.type === "email" && n.parentId === ident.id);
+      const emailNodes = (childrenByParent.get(ident.id) ?? []).filter(node => node.type === "email");
       let providerStartY = identY;
 
       for (const mail of emailNodes) {
@@ -266,9 +298,7 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
       const mailY = providerStartY;
       nodesWithPos.push({ ...mail, x: TIER_X.email, y: mailY, visible: mailVisible });
       idToPos.set(mail.id, { x: TIER_X.email, y: mailY, visible: mailVisible });
-      const providerNodes = graphData.nodes.filter(
-        (n) => n.type === "provider" && n.parentId === mail.id
-      );
+      const providerNodes = (childrenByParent.get(mail.id) ?? []).filter(node => node.type === "provider");
 
       for (const prov of providerNodes) {
         const provVisible = mailVisible && !collapsedNodes.has(mail.id);
@@ -282,9 +312,7 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
         });
         idToPos.set(prov.id, { x: TIER_X.provider, y: provY, visible: provVisible });
 
-        const accountNodes = graphData.nodes.filter(
-          (n) => n.type === "account" && n.parentId === prov.id
-        );
+        const accountNodes = (childrenByParent.get(prov.id) ?? []).filter(node => node.type === "account");
 
         let accountStartY = provY;
 
@@ -300,10 +328,8 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
           });
           idToPos.set(acc.id, { x: TIER_X.account, y: accY, visible: accVisible });
 
-          const descendantNodes = graphData.nodes.filter(
-            (n) =>
-              (n.type === "resource" || n.type === "quota" || n.type === "secret_ref") &&
-              n.parentId === acc.id
+          const descendantNodes = (childrenByParent.get(acc.id) ?? []).filter(
+            node => node.type === "resource" || node.type === "quota" || node.type === "secret_ref"
           );
 
           let descStartY = accY;
@@ -443,7 +469,8 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
           <input
             id="identity-search-input"
-            type="text"
+            aria-label="Search identity graph"
+            type="search"
             placeholder="Search email, mobile, account ID, or label..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -545,12 +572,18 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
             </button>
             <div className="w-[1px] h-4 bg-zinc-700 mx-1" />
             <button
-              onClick={handleFitToView}
+              onClick={() => fitGraph()}
               className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
               title="Fit to View"
+              aria-label="Fit graph to view"
             >
               <Maximize2 className="h-4 w-4" />
             </button>
+            {selectedNode && <button
+              type="button"
+              onClick={() => fitGraph(selectedNode.id)}
+              className="rounded px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >Fit selection</button>}
             <button
               onClick={handleResetZoom}
               className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
@@ -606,6 +639,20 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
           {/* Draggable & Pannable Interactive Canvas Layer */}
           <div
             ref={canvasRef}
+            tabIndex={0}
+            role="region"
+            aria-label="Identity graph. Use arrow keys to pan."
+            onKeyDown={event => {
+              if (event.target !== event.currentTarget) return;
+              const offsets = {
+                ArrowLeft: { x: 80, y: 0 }, ArrowRight: { x: -80, y: 0 },
+                ArrowUp: { x: 0, y: 80 }, ArrowDown: { x: 0, y: -80 },
+              };
+              const offset = Object.entries(offsets).find(([key]) => key === event.key)?.[1];
+              if (!offset) return;
+              event.preventDefault();
+              setPan(current => ({ x: current.x + offset.x, y: current.y + offset.y }));
+            }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -709,12 +756,12 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
                         style={{ left: node.x, top: node.y }}
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                               <User className="h-4 w-4" />
                             </div>
-                            <div>
-                              <div className="text-sm font-semibold text-white tracking-tight">
+                            <div className="min-w-0">
+                              <div title={node.label} className="truncate text-sm font-semibold text-white tracking-tight">
                                 {node.label}
                               </div>
                               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
@@ -926,27 +973,28 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
 
                   if (node.type === "resource") {
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={node.id}
                         onClick={() => handleSelectNode(node)}
-                        className={`absolute w-64 p-2.5 rounded-lg border bg-zinc-900/90 text-xs transition-all cursor-pointer ${
+                        className={`absolute w-64 p-2.5 rounded-lg border bg-zinc-900/90 text-left text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                           isSelected
                             ? "border-emerald-400 ring-1 ring-emerald-400"
                             : "border-zinc-800 hover:border-zinc-700"
                         }`}
                         style={{ left: node.x, top: node.y }}
                       >
-                        <div className="flex items-center gap-1.5 truncate">
+                        <span className="flex items-center gap-1.5 truncate">
                           <Server className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                           <span className="font-medium text-white truncate">{node.label}</span>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
+                        </span>
+                        <span className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
                           <span>{node.subLabel}</span>
                           {node.isProtected && (
                             <span className="text-emerald-400 font-mono text-[9px]">shielded</span>
                           )}
-                        </div>
-                      </div>
+                        </span>
+                      </button>
                     );
                   }
 
@@ -1185,6 +1233,8 @@ export function IdentityAccountsView({ onRefreshParent, filter }: IdentityAccoun
             {/* Account Details */}
             {selectedNode.type === "account" && selectedAccount && (
               <div className="space-y-5 text-xs">
+                {fleetAccount && <FleetAccountFacts account={fleetAccount} />}
+
                 {/* Authoritative Protection Callout */}
                 <div
                   className={`p-3.5 rounded-xl border flex items-center justify-between ${

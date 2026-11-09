@@ -13,7 +13,7 @@ const snapshot: FleetSnapshot = {
 it("shows an unsupported account without claiming active resources", () => {
   const renderer: unknown = createRequire(import.meta.url)("react-dom/server");
   if (typeof renderer !== "object" || renderer === null || !("renderToStaticMarkup" in renderer) || typeof renderer.renderToStaticMarkup !== "function") throw new Error("React server renderer unavailable");
-  const html: unknown = renderer.renderToStaticMarkup(createElement(FleetOverviewHub, { snapshot, onRefresh: async () => {}, isRefreshing: false, onOpenOnboarding: () => {}, onOpenAuth: () => {} }));
+  const html: unknown = renderer.renderToStaticMarkup(createElement(FleetOverviewHub, { snapshot, onRefresh: async () => {}, isRefreshing: false, onOpenOnboarding: () => {}, onOpenAuth: () => {}, onSelectResource: () => {} }));
   if (typeof html !== "string") throw new Error("Expected rendered HTML");
   expect(html).toContain("OCI manual");
   expect(html).toContain("unsupported");
@@ -30,7 +30,7 @@ it("offers collection retry for a supported account after a failed first scan", 
     ...snapshot,
     accounts: [{ ...snapshot.accounts[0], kind: "cloudflare", enabled: false, collection: { ...snapshot.accounts[0].collection, state: "error", errorCode: "unauthorized", message: "Credentials rejected." } }],
   };
-  const html: unknown = renderer.renderToStaticMarkup(createElement(FleetOverviewHub, { snapshot: retrySnapshot, onRefresh: async () => {}, isRefreshing: false, onOpenOnboarding: () => {}, onOpenAuth: () => {} }));
+  const html: unknown = renderer.renderToStaticMarkup(createElement(FleetOverviewHub, { snapshot: retrySnapshot, onRefresh: async () => {}, isRefreshing: false, onOpenOnboarding: () => {}, onOpenAuth: () => {}, onSelectResource: () => {} }));
   if (typeof html !== "string") throw new Error("Expected rendered HTML");
   expect(html).toContain("Collect inventory");
   expect(html).toContain("Credentials rejected.");

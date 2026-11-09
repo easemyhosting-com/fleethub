@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Activity, useState, useEffect, useMemo } from "react";
 import { Smartphone, Server, Clock, Shield, Search, ExternalLink, Bot, Zap, Plus, Wifi, RefreshCw, Lock, Menu, X, Compass } from "lucide-react";
 import { FleetOverviewHub } from "@/components/FleetOverviewHub";
 import { IdentityAccountsView } from "@/components/IdentityAccountsView";
@@ -15,8 +15,10 @@ import { DevicesPanel } from "@/components/DevicesPanel";
 import { CapacityLimitsPanel } from "@/components/CapacityLimitsPanel";
 import { FleetFilterBar } from "@/components/FleetFilterBar";
 import { useIdentities } from "@/components/IdentityPicker";
+import { filterFleetProblems } from "@/lib/fleet/problem-search";
 import { applyBilling, hasPaidResources } from "@/lib/fleet/billing";
 import { hasFilter, filterSnapshot, filterToParams, parseFilter, type FleetFilter } from "@/lib/fleet/filters";
+import { FleetResourceDetails } from "@/components/FleetResourceDetails";
 import { FleetMapPanel } from "@/components/FleetMapPanel";
 import { ProjectsView } from "@/components/ProjectsView";
 import { markTourDone, shouldAutoStartTour, type TourAction } from "@/lib/tour/steps";
@@ -34,6 +36,15 @@ export default function FleetDeckPage() {
   const [initialSetupStep, setInitialSetupStep] = useState<"tailscale" | "infisical" | "cliproxy" | undefined>(undefined);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  const selectedResource = selectedResourceId ? fleetData?.resources.find(resource => resource.id === selectedResourceId) : undefined;
+  const selectedResourceAccount = selectedResource?.accountId ? fleetData?.accounts.find(account => account.id === selectedResource.accountId) : undefined;
+  const selectResource = (id: string) => {
+    if (!fleetData?.resources.some(resource => resource.id === id)) return false;
+    setSelectedResourceId(id);
+    return true;
+  };
+  const isFleetView = activeTab === "resources" || activeTab === "map" || activeTab === "identity";
   const [filter, setFilterState] = useState<FleetFilter>({});
   const people = useIdentities();
   useEffect(() => { setFilterState(parseFilter(new URLSearchParams(window.location.search))); }, []);
@@ -43,9 +54,17 @@ export default function FleetDeckPage() {
     window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`);
   };
   const [showPaid, setShowPaid] = useState(true);
-  const matching = fleetData ? filterSnapshot(fleetData, filter) : null;
-  const shown = matching ? applyBilling(matching, showPaid) : null;
-  const filterBar = (activeTab === "resources" || activeTab === "map" || activeTab === "identity") && fleetData ? <FleetFilterBar filter={filter} onChange={setFilter} paid={hasPaidResources(fleetData) ? { show: showPaid, onChange: setShowPaid } : undefined} identities={people} resultCount={matching?.accounts.length} providers={[...new Set(fleetData.accounts.map(account => account.kind))].sort()} /> : null;
+  const [search, setSearch] = useState("");
+  const [attention, setAttention] = useState(false);
+  const scoped = useMemo(() => fleetData ? filterSnapshot(fleetData, filter) : null, [fleetData, filter]);
+  const billed = useMemo(() => scoped ? applyBilling(scoped, showPaid) : null, [scoped, showPaid]);
+  const shown = useMemo(() => billed ? filterFleetProblems(billed, search, attention) : null, [billed, search, attention]);
+  const isSearching = Boolean(search.trim() || attention);
+  const identityMatches = useMemo(() => shown && (isSearching || billed !== scoped) ? {
+    accounts: new Set(shown.accounts.map(account => account.id)),
+    resources: new Set(shown.resources.map(resource => resource.id)),
+  } : undefined, [shown, isSearching, billed, scoped]);
+  const filterBar = isFleetView && fleetData ? <FleetFilterBar search={search} onSearch={setSearch} attention={attention} onAttention={setAttention} filter={filter} onChange={setFilter} paid={hasPaidResources(fleetData) ? { show: showPaid, onChange: setShowPaid } : undefined} identities={people} resultCount={shown?.accounts.length} providers={[...new Set(fleetData.accounts.map(account => account.kind))].sort()} /> : null;
 
   // Modals & Drawers state
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -469,24 +488,25 @@ export default function FleetDeckPage() {
           {fleetData && <ExpiryBanner accounts={fleetData.accounts} onReview={() => setActiveTab("resources")} />}
           {/* TAB 1: FLEET RESOURCES */}
           {fleetError && fleetData && <p role="alert" className="mb-4 rounded-xl border border-amber-900 p-4 text-sm text-amber-300">{fleetError} Showing the previous snapshot from {new Date(fleetData.timestamp).toLocaleString()}. Worker status has not been rechecked.</p>}
-          {activeTab === "resources" && (fleetStatus === "loading" ? <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">Loading stored inventory…</div> : fleetStatus === "signedout" ? <div className="rounded-xl border border-zinc-800 p-8"><h2 className="text-lg font-semibold">Sign in to view inventory</h2><button onClick={() => setIsAuthModalOpen(true)} className="mt-4 rounded bg-emerald-500 px-4 py-2 text-sm text-black">Open Access & Auth</button></div> : fleetStatus === "unavailable" ? <div role="alert" className="rounded-xl border border-rose-900 p-8"><h2 className="text-lg font-semibold">Inventory unavailable</h2><p className="mt-2 text-sm text-rose-300">{fleetError}</p><button onClick={refreshAll} className="mt-4 rounded border border-zinc-700 px-4 py-2 text-sm">Retry</button></div> : shown ? <FleetOverviewHub onConnectCredentials={account => { setCredentialAccount(account); setInitialProviderForModal(account.kind); setIsOnboardingOpen(true); }} snapshot={shown} filtered={hasFilter(filter)} onRefresh={refreshAll} isRefreshing={isRefreshing} onOpenOnboarding={handleOpenOnboarding} onOpenAuth={() => setIsAuthModalOpen(true)} /> : null)}
+          {activeTab === "resources" && (fleetStatus === "loading" ? <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">Loading stored inventory…</div> : fleetStatus === "signedout" ? <div className="rounded-xl border border-zinc-800 p-8"><h2 className="text-lg font-semibold">Sign in to view inventory</h2><button onClick={() => setIsAuthModalOpen(true)} className="mt-4 rounded bg-emerald-500 px-4 py-2 text-sm text-black">Open Access & Auth</button></div> : fleetStatus === "unavailable" ? <div role="alert" className="rounded-xl border border-rose-900 p-8"><h2 className="text-lg font-semibold">Inventory unavailable</h2><p className="mt-2 text-sm text-rose-300">{fleetError}</p><button onClick={refreshAll} className="mt-4 rounded border border-zinc-700 px-4 py-2 text-sm">Retry</button></div> : shown ? <FleetOverviewHub onSelectResource={selectResource} onConnectCredentials={account => { setCredentialAccount(account); setInitialProviderForModal(account.kind); setIsOnboardingOpen(true); }} snapshot={shown} filtered={hasFilter(filter) || isSearching} onRefresh={refreshAll} isRefreshing={isRefreshing} onOpenOnboarding={handleOpenOnboarding} onOpenAuth={() => setIsAuthModalOpen(true)} /> : null)}
 
           {activeTab === "clock" && <StatusPanel title="Quota usage unavailable" text="FleetHub has no measured usage or verified account entitlements in this view. Check each provider console for current limits and billing." action="View accounts" onAction={() => setActiveTab("resources")} />}
           {activeTab === "dispatcher" && <StatusPanel title="Workload dispatch is not connected" text="No host execution targets are verified here. Use the host enrollment planning API to inspect a proposed placement before connecting a worker. This page does not run jobs." action="View inventory" onAction={() => setActiveTab("resources")} />}
 
           {/* TAB 4: IDENTITY & ACCOUNTS RELATIONSHIP GRAPH */}
-          {activeTab === "identity" && (
-            <IdentityAccountsView onRefreshParent={loadFleetData} filter={filter} />
-          )}
+          <Activity mode={activeTab === "identity" ? "visible" : "hidden"}>
+            <IdentityAccountsView matches={identityMatches} fleetAccounts={fleetData?.accounts} onSelectResource={selectResource} onRefreshParent={loadFleetData} filter={filter} />
+          </Activity>
 
           {activeTab === "agents" && <AgentAccessPanel />}
           {activeTab === "devices" && <DevicesPanel />}
           {activeTab === "limits" && <CapacityLimitsPanel />}
-          {activeTab === "map" && (shown ? <FleetMapPanel fleet={shown} onReload={loadFleetData} /> : <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">{fleetStatus === "loading" ? "Loading stored inventory…" : "Inventory is unavailable."}</div>)}
+          {activeTab === "map" && (shown ? <FleetMapPanel fleet={shown} selectedId={selectedResourceId} onSelectResource={selectResource} /> : <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">{fleetStatus === "loading" ? "Loading stored inventory…" : "Inventory is unavailable."}</div>)}
           {activeTab === "projects" && <ProjectsView />}
           {activeTab === "mesh" && <StatusPanel title="Mesh status is not measured here" text="Set up or reverify this FleetHub host's Tailscale connection. Peer lists and node health need a separate verified source." action="Open Tailscale setup" onAction={() => handleOpenOnboarding("tailscale")} />}
           {activeTab === "infisical" && <StatusPanel title="Vault credentials stay in Infisical" text="FleetHub stores scoped credential references for registered accounts. Open the verified vault console to manage secret values." action="Open Infisical setup" onAction={() => handleOpenOnboarding("infisical")} externalUrl={infisicalConsoleUrl} externalLabel="Open verified vault console" />}
           {activeTab === "aiGateway" && <StatusPanel title="Gateway telemetry unavailable" text="This page has no verified live model list, key health, request totals, or quota measurements. Open the verified CLIProxyAPI console for current details." action="Open CLIProxyAPI setup" onAction={() => handleOpenOnboarding("cliproxyapi")} externalUrl={cliproxyManagementUrl} externalLabel="Open verified gateway console" />}
+          {isFleetView && selectedResource && <FleetResourceDetails key={selectedResource.id} resource={selectedResource} account={selectedResourceAccount} onClose={() => setSelectedResourceId(null)} onSaved={loadFleetData} />}
         </main>
       </div>
 
