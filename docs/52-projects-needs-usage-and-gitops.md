@@ -93,6 +93,14 @@ Add a **Projects** tab. One row per project: what it has (allocations and links)
 
 The fleet Project filter uses `?project=<slug>` and shares the current tab through `view`. It includes allocated or in-use links from project reports and GitOps. Inferred links also require a current owner confirmation. Archived projects, archived accounts, and missing resources are excluded. `GET /api/fleet`, `GET /api/inventory`, and `GET /api/identities` accept the project slug. The Projects view reads the selected project's usage and requests confirmed links from `GET /api/projects/footprint?project=<slug>&confirmedOnly=true`.
 
+### Authorize a GitHub App for GitOps
+
+Register a dedicated GitHub App with **Contents** read access and install it only on the repositories FleetHub should read. Keep the default user-token expiration setting enabled. FleetHub requests `offline_access` to obtain an expiring access token and a refresh token even if the app setting is off. Register `<FLEETHUB_APP_URL>/api/gitops/github/callback` as its user authorization callback. Use HTTPS outside loopback. Configure `FLEETHUB_GITHUB_APP_CLIENT_ID`, `FLEETHUB_GITHUB_APP_CLIENT_SECRET`, and `FLEETHUB_SECRET_STORE_KEY` in FleetHub's server environment.
+
+A signed-in operator can choose **Connect GitHub** on the Projects page. FleetHub uses the GitHub App's expiring user authorization for that operator's GitOps reads. The built-in vault encrypts the access and refresh tokens. The operator's token takes precedence over the optional `FLEETHUB_GITHUB_READ_TOKEN`. Reconnect when token refresh fails or the vault key no longer decrypts the saved credentials. Disconnect can remove unusable or unreadable stored credentials locally. It reports whether GitHub also revoked the grant. If GitHub cannot revoke it from FleetHub, the operator can revoke the authorization from GitHub settings. The manifest push hook remains available.
+
+[GitHub App user authorization](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app) and [GitHub token refresh](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens) describe the provider flow.
+
 ## Build order
 
 1. Quick wins 1 to 3 above, plus the in-app fetch prompt for the five existing providers.

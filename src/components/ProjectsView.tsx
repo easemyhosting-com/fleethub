@@ -1,4 +1,5 @@
 "use client";
+import { GithubGitopsConnection } from "./GithubGitopsConnection";
 import { useCallback, useEffect, useState } from "react";
 import type { ProjectFootprint } from "@/lib/projects/footprint";
 import { confidenceLabel, filterProjectsByKind, groupProjectLinks, projectAttentionReasons, projectKindConfirmation, projectKindLabel, type ProjectKindFilter, type ProjectLink } from "@/lib/projects/view";
@@ -36,6 +37,7 @@ export function ProjectsView({ project }: { project?: string }) {
   async function decide(project: ProjectFootprint, link: ProjectLink, decision: "confirm" | "reject") { try { const res = await fetch("/api/projects/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, resourceId: link.resourceId, decision }) }); const body = await res.json().catch(() => ({})) as { error?: string }; if (!res.ok) throw new Error(body.error || `Could not ${decision} link (${res.status}).`); setMessage(decision === "confirm" ? `${link.name} confirmed for ${project.name}.` : `${link.name} suggestion rejected.`); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : "Could not update link."); } }
   return <section className="space-y-6" aria-label="Projects">
     <div><h2 className="text-xl font-semibold text-white">Projects</h2><p className="text-sm text-zinc-400">What each project has, needs and uses.</p>{project && <p role="note" className="mt-1 text-xs text-amber-200">Showing confirmed, active links. Choose All projects to review suggestions and stale links.</p>}</div>
+    <GithubGitopsConnection />
     {!project && <HostCapacity />}
     <ConnectorsPanel onRegistered={refresh} />
     <GitopsDiscovery onRegistered={refresh} />

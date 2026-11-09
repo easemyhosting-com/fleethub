@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
+import type { Sql, TransactionSql } from "postgres";
 import { queryClient } from "@/lib/db/client";
 import { SetupError } from "@/lib/onboarding/model";
 
@@ -19,20 +20,24 @@ export interface SecretRows {
   names?(limit: number, after?: string): Promise<string[]>;
 }
 
-export const databaseSecretRows: SecretRows = {
-  async get(name) {
-    const row = (await queryClient`SELECT nonce, ciphertext FROM secret_store WHERE name = ${name}`)[0];
-    return row ? { nonce: Buffer.from(row.nonce), ciphertext: Buffer.from(row.ciphertext) } : undefined;
-  },
-  async put(name, nonce, ciphertext) {
-    await queryClient`INSERT INTO secret_store (name, nonce, ciphertext) VALUES (${name}, ${nonce}, ${ciphertext})
-      ON CONFLICT (name) DO UPDATE SET nonce = EXCLUDED.nonce, ciphertext = EXCLUDED.ciphertext`;
-  },
-  async del(name) { await queryClient`DELETE FROM secret_store WHERE name = ${name}`; },
-  async names(limit, after) {
-    return (await queryClient`SELECT name FROM secret_store WHERE name NOT LIKE 'FLEETHUB\\_PROBE\\_%' AND name > ${after ?? ""} ORDER BY name LIMIT ${limit}`).map(row => String(row.name));
-  },
-};
+export function secretRows(sql: Sql | TransactionSql): SecretRows {
+  return {
+    async get(name) {
+      const row = (await sql`SELECT nonce, ciphertext FROM secret_store WHERE name = ${name}`)[0];
+      return row ? { nonce: Buffer.from(row.nonce), ciphertext: Buffer.from(row.ciphertext) } : undefined;
+    },
+    async put(name, nonce, ciphertext) {
+      await sql`INSERT INTO secret_store (name, nonce, ciphertext) VALUES (${name}, ${nonce}, ${ciphertext})
+        ON CONFLICT (name) DO UPDATE SET nonce = EXCLUDED.nonce, ciphertext = EXCLUDED.ciphertext`;
+    },
+    async del(name) { await sql`DELETE FROM secret_store WHERE name = ${name}`; },
+    async names(limit, after) {
+      return (await sql`SELECT name FROM secret_store WHERE name NOT LIKE 'FLEETHUB\\_PROBE\\_%' AND name > ${after ?? ""} ORDER BY name LIMIT ${limit}`).map(row => String(row.name));
+    },
+  };
+}
+
+export const databaseSecretRows = secretRows(queryClient);
 
 /** The master key comes only from the environment and is never stored in the database, so a database leak alone reveals nothing. */
 export function builtinKey(env: Record<string, string | undefined> = process.env): Buffer {
