@@ -73,6 +73,18 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("session and p
   expect(await status(fromOther.id)).toBe("cancelled"); expect(await status(keptCode.id)).toBe("pending");
   expect(await redeemPairing(fromOther.code)).toBeNull(); expect(await redeemPairing(legacy.code)).not.toBeNull();
  });
+ it("still revokes on an upgraded install before the bootstrap has added created_by_session", async () => {
+  await clean();
+  const [first, second, keep] = await Promise.all(["One", "Two", "Keep"].map(label => createServerSession(user, "browser", "operator", label)));
+  await queryClient`ALTER TABLE device_pairings DROP COLUMN created_by_session`;
+  try {
+   expect(await revokeSession(first)).toBe(true); expect(await checkSession(first)).toEqual({ status: "inactive" });
+   expect(await revokeOtherSessions(keep)).toBe(1); expect(await checkSession(second)).toEqual({ status: "inactive" }); expect(await checkSession(keep)).toMatchObject({ status: "active" });
+  } finally {
+   expect((await bootstrapDatabase()).success).toBe(true);
+  }
+  const [column] = await queryClient`SELECT 1 AS present FROM information_schema.columns WHERE table_name = 'device_pairings' AND column_name = 'created_by_session'`; expect(column?.present).toBe(1);
+ });
  it("refuses a code whose creating session was revoked or expired without going through revokeSession", async () => {
   await clean();
   const creatorSid = await createServerSession(user, "browser", "operator", "Creator");

@@ -97,19 +97,31 @@ export async function listSessions(): Promise<SessionSummary[]> {
 }
 /** Revoking a session also cancels the pairing codes it created, in the same statement, so a stolen session cannot leave a working code behind. */
 export async function revokeSession(id: string): Promise<boolean> {
-  return (await queryClient`
-    WITH revoked AS (UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id),
-    cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
-    SELECT id FROM revoked`).length > 0;
+  return (await withoutPairingLink(
+    () => queryClient`
+      WITH revoked AS (UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id),
+      cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
+      SELECT id FROM revoked`,
+    () => queryClient`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id`)).length > 0;
 }
 export async function revokeOtherSessions(keepId: string | undefined): Promise<number> {
   if (!keepId) throw new Error("revokeOtherSessions requires the caller's session id");
-  return (await queryClient`
-    WITH revoked AS (UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id),
-    cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
-    SELECT id FROM revoked`).length;
+  return (await withoutPairingLink(
+    () => queryClient`
+      WITH revoked AS (UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id),
+      cancelled AS (UPDATE device_pairings SET cancelled_at = NOW() WHERE created_by_session IN (SELECT id FROM revoked) AND consumed_at IS NULL AND cancelled_at IS NULL)
+      SELECT id FROM revoked`,
+    () => queryClient`UPDATE auth_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND expires_at > NOW() AND id <> ${keepId} RETURNING id`)).length;
 }
-
+/** Logout revokes without running the schema bootstrap. Before the created_by_session column exists no code can be linked to a session, so a plain revoke is complete. */
+async function withoutPairingLink<T>(linked: () => Promise<T>, plain: () => Promise<T>): Promise<T> {
+  try {
+    return await linked();
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code !== "42703") throw error;
+    return plain();
+  }
+}
 export async function createPairing(input: z.infer<typeof pairingInput>, creator: SessionUser): Promise<PairingSummary & { code: string }> {
   const code = generatePairingCode();
   const id = `pair-${randomUUID()}`;
