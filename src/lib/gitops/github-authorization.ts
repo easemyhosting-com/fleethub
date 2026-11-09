@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { TransactionSql } from "postgres";
 import { z } from "zod";
 import { queryClient } from "@/lib/db/client";
-import { builtinKey, createBuiltinVault, secretRows } from "@/lib/vault/builtin";
+import { builtinKey, createBuiltinVault, secretRows, type Vault } from "@/lib/vault/builtin";
 
 const tokenUrl = "https://github.com/login/oauth/access_token";
 const callbackPath = "/api/gitops/github/callback";
@@ -102,11 +102,23 @@ async function withConnection<T>(app: App, userId: string, action: (tx: Transact
   return result.value;
 }
 
-async function storedConnection(tx: TransactionSql, name: string) {
+type StoredConnection =
+  | { status: "disconnected"; vault: Vault }
+  | { status: "unreadable"; vault: Vault }
+  | { status: "connected"; vault: Vault; credentials: Credentials };
+
+async function storedConnection(tx: TransactionSql, name: string): Promise<StoredConnection> {
   const rows = secretRows(tx);
   const vault = createBuiltinVault(rows);
-  const credentials = await rows.get(name) ? credentialsSchema.parse(JSON.parse(await vault.read(name))) : null;
-  return { vault, credentials };
+  const row = await rows.get(name);
+  if (!row) return { status: "disconnected", vault };
+  try {
+    const reader = createBuiltinVault({ ...rows, get: async () => row });
+    const credentials = credentialsSchema.parse(JSON.parse(await reader.read(name)));
+    return { status: "connected", vault, credentials };
+  } catch {
+    return { status: "unreadable", vault };
+  }
 }
 
 export async function finishGithubAuthorization(operator: Operator, origin: string, state: string | null, code: string | null) {
@@ -127,9 +139,10 @@ export async function githubConnectionStatus(userId: string) {
   const app = githubApp();
   if (!app) return "not_configured";
   return withConnection(app, userId, async (tx, name) => {
-    const { credentials } = await storedConnection(tx, name);
-    if (!credentials) return "disconnected";
-    return credentials.refreshExpiresAt > Date.now() ? "connected" : "reconnect";
+    const connection = await storedConnection(tx, name);
+    if (connection.status === "disconnected") return "disconnected";
+    if (connection.status === "unreadable") return "reconnect";
+    return connection.credentials.refreshExpiresAt > Date.now() ? "connected" : "reconnect";
   });
 }
 
@@ -142,8 +155,10 @@ export async function githubReadToken(userId: string): Promise<string | undefine
   const app = githubApp();
   if (!app) return undefined;
   return withConnection(app, userId, async (tx, name) => {
-    const { vault, credentials } = await storedConnection(tx, name);
-    if (!credentials) return undefined;
+    const connection = await storedConnection(tx, name);
+    if (connection.status === "disconnected") return undefined;
+    if (connection.status === "unreadable") throw new GithubAuthorizationError("reconnect");
+    const { vault, credentials } = connection;
     if (credentials.expiresAt > Date.now() + refreshBufferMs) return credentials.access;
     const next = await refresh(app, credentials);
     await vault.write(name, JSON.stringify(next));
@@ -151,12 +166,17 @@ export async function githubReadToken(userId: string): Promise<string | undefine
   });
 }
 
-export async function disconnectGithubAuthorization(userId: string): Promise<"revoked" | "expired" | "absent"> {
+export async function disconnectGithubAuthorization(userId: string): Promise<"revoked" | "expired" | "absent" | "unreadable"> {
   const app = requireApp();
   // Commit any rotated token even if GitHub's subsequent grant deletion fails.
   const outcome = await withConnection(app, userId, async (tx, name) => {
-    const { vault, credentials } = await storedConnection(tx, name);
-    if (!credentials) return "absent";
+    const connection = await storedConnection(tx, name);
+    if (connection.status === "disconnected") return "absent";
+    if (connection.status === "unreadable") {
+      await connection.vault.remove(name);
+      return "unreadable";
+    }
+    const { vault, credentials } = connection;
     const now = Date.now();
     if (credentials.expiresAt <= now && credentials.refreshExpiresAt <= now) {
       await vault.remove(name);

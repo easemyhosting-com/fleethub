@@ -188,6 +188,27 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("GitHub App au
     }
   });
 
+  it("offers reconnect for unreadable ciphertext without falling back to the server token", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockImplementationOnce(async () => credentials("before-key-change"))
+      .mockImplementationOnce(async () => credentials("after-key-change"));
+    expect((await callback(request((await begin()).path))).headers.get("location")).toContain("github_connection=connected");
+    vi.stubEnv("FLEETHUB_SECRET_STORE_KEY", "fixture-replacement-key-for-test-only-123");
+    vi.stubEnv("FLEETHUB_GITHUB_READ_TOKEN", "fixture-shared-read-token");
+    expect(await (await GET(request())).json()).toEqual({ status: "reconnect" });
+    const base = request("/api/gitops/sync", "POST");
+    const sync = await syncGitops(new Request(base, {
+      body: JSON.stringify({ projectId: `prj-${randomUUID()}`, repo: "fixture-owner/fixture-repo" }),
+    }));
+    expect(sync.status).toBe(409);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await (await DELETE(request(endpoint, "DELETE"))).json()).toEqual({ status: "disconnected", outcome: "unreadable" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await githubReadToken(subject.id)).toBeUndefined();
+    expect((await callback(request((await begin()).path))).headers.get("location")).toContain("github_connection=connected");
+    expect(await githubReadToken(subject.id)).toBe("ghu_fixture_after-key-change");
+  });
+
   it("requires HTTPS away from loopback", async () => {
     await expect(startGithubAuthorization({ id: subject.id, sid }, "http://fleet.example.test")).rejects.toMatchObject({ code: "not_configured" });
   });

@@ -6,7 +6,7 @@ import { z } from "zod";
 const endpoint = "/api/gitops/github";
 const statusSchema = z.object({ status: z.enum(["not_configured", "disconnected", "connected", "reconnect"]) });
 const startSchema = z.object({ url: z.url() });
-const disconnectSchema = z.object({ outcome: z.enum(["revoked", "expired", "absent"]) });
+const disconnectSchema = z.object({ outcome: z.enum(["revoked", "expired", "absent", "unreadable"]) });
 const errorSchema = z.object({ error: z.string() });
 const button = "min-h-11 rounded border border-zinc-700 px-3 text-xs text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-50";
 
@@ -54,7 +54,7 @@ export function GithubGitopsConnection() {
       const { outcome } = disconnectSchema.parse(body);
       setStatus("disconnected");
       setNotice(outcome === "revoked" ? "GitHub authorization revoked." :
-        outcome === "expired" ? "Unusable credentials removed. You can revoke the app authorization in GitHub settings." :
+        outcome === "expired" || outcome === "unreadable" ? "Stored credentials removed. You can revoke the app authorization in GitHub settings." :
         "No GitHub credentials are stored.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "GitHub authorization is unavailable.");
@@ -67,11 +67,11 @@ export function GithubGitopsConnection() {
   return <section aria-label="GitHub authorization" className="space-y-2 rounded-xl border border-zinc-800 p-4">
     <h3 className="text-sm font-semibold text-white">GitHub authorization</h3>
     <p className="text-xs text-zinc-300">{status === "connected" ? "Connected for read-only GitOps in this operator account." :
-      status === "reconnect" ? "This connection expired. Reconnect to read repositories." :
+      status === "reconnect" ? "Reconnect to read repositories, or remove the stored connection and review the authorization in GitHub settings." :
       "Connect a GitHub App to read GitOps files from its installed repositories."}</p>
     {status && status !== "not_configured" && <div className="flex flex-wrap gap-2">
       <button type="button" disabled={busy} onClick={() => void change("POST")} className={button}>{status === "disconnected" ? "Connect GitHub" : "Reconnect GitHub"}</button>
-      {status !== "disconnected" && <button type="button" disabled={busy} onClick={() => void change("DELETE")} className={button}>Disconnect GitHub</button>}
+      {status !== "disconnected" && <button type="button" disabled={busy} onClick={() => void change("DELETE")} className={button}>{status === "reconnect" ? "Remove stored connection" : "Disconnect GitHub"}</button>}
     </div>}
     {notice && <p role="status" className="text-xs text-emerald-200">{notice}</p>}
     {error && <p role="alert" className="text-xs text-rose-200">{error}</p>}
