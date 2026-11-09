@@ -701,6 +701,11 @@ export const legacyDemoSeedIds = {
 };
 
 type Sql = typeof queryClient;
+/**
+ * Prevents demo cleanup from cascading or detaching non-demo data.
+ * Locks seeded parent rows before checking references so concurrent foreign-key inserts cannot race deletion.
+ * Throws on a reference, causing the caller's transaction to roll back without deleting demo rows.
+ */
 async function assertCurrentDemoRowsUnreferenced(sql: Sql): Promise<void> {
   const ids = demoSeedIds;
 
