@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // Database integration files share one disposable database and some alter its schema, so they must not run concurrently.
+    fileParallelism: process.env.DATABASE_INTEGRATION !== "true" && process.env.AUTH_DATABASE_INTEGRATION !== "true",
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

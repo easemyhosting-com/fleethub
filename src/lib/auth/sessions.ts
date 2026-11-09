@@ -104,6 +104,7 @@ export async function revokeSession(id: string): Promise<boolean> {
       SELECT id FROM revoked`,
     () => queryClient`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ${id} RETURNING id`)).length > 0;
 }
+/** Revokes every active session except the caller's, cancelling their pending pairing codes the same way. */
 export async function revokeOtherSessions(keepId: string | undefined): Promise<number> {
   if (!keepId) throw new Error("revokeOtherSessions requires the caller's session id");
   return (await withoutPairingLink(
