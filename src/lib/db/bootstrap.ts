@@ -649,6 +649,9 @@ export const demoSeedIds = {
   resources: ["demo-atlas", "demo-borealis", "demo-polar-night-owl", "demo-upstash-box", "demo-github-runner", "demo-r2-artifacts", "demo-cf-ephemeral-worker", "demo-oci-block", "demo-global-redis", "demo-nvidia-nim-llm", "demo-turso-edge", "demo-freellmapi-gateway", "demo-alex-dev-vm"],
   gateways: ["demo-gw-office"],
 };
+const demoSeedContactIds = [
+  "demo-ct-operator-email-1", "demo-ct-operator-email-2", "demo-ct-operator-phone-1", "demo-ct-alex-email-1",
+];
 
 /**
  * Rows the demo seed wrote before the `demo-` prefix (until 2026-11-09), with the values that identify them. An older install
@@ -698,6 +701,70 @@ export const legacyDemoSeedIds = {
 };
 
 type Sql = typeof queryClient;
+/**
+ * Prevents demo cleanup from cascading or detaching non-demo data.
+ * Locks seeded parent rows before checking references so concurrent foreign-key inserts cannot race deletion.
+ * Throws on a reference, causing the caller's transaction to roll back without deleting demo rows.
+ */
+async function assertCurrentDemoRowsUnreferenced(sql: Sql): Promise<void> {
+  const ids = demoSeedIds;
+
+  // Lock rows that can be deleted so a concurrent foreign-key insert cannot race the reference checks.
+  await sql`SELECT id FROM identities WHERE id IN ${sql(ids.identities)} ORDER BY id FOR UPDATE`;
+  await sql`SELECT id FROM identity_contacts WHERE id IN ${sql(demoSeedContactIds)} ORDER BY id FOR UPDATE`;
+  await sql`SELECT id FROM provider_accounts WHERE id IN ${sql(ids.accounts)} ORDER BY id FOR UPDATE`;
+  await sql`SELECT id FROM resources WHERE id IN ${sql(ids.resources)} ORDER BY id FOR UPDATE`;
+
+  const [referencedResource] = await sql`
+    SELECT r.id FROM resources r
+    WHERE r.id IN ${sql(ids.resources)}
+      AND (
+        EXISTS (SELECT 1 FROM resource_profiles x WHERE x.resource_id = r.id)
+        OR EXISTS (SELECT 1 FROM external_observations x WHERE x.resource_id = r.id)
+        OR EXISTS (SELECT 1 FROM project_placements x WHERE x.host_resource_id = r.id)
+        OR EXISTS (SELECT 1 FROM project_usage_reports x WHERE x.resource_id = r.id)
+        OR EXISTS (SELECT 1 FROM project_resource_links x WHERE x.resource_id = r.id)
+        OR EXISTS (SELECT 1 FROM project_link_decisions x WHERE x.resource_id = r.id)
+      )
+    LIMIT 1`;
+  if (referencedResource) throw new Error("Demo resources are referenced by real data");
+
+  const [referencedAccount] = await sql`
+    SELECT a.id FROM provider_accounts a
+    WHERE a.id IN ${sql(ids.accounts)}
+      AND (
+        a.secret_ref_id IS NOT NULL
+        OR EXISTS (SELECT 1 FROM account_collections x WHERE x.account_id = a.id)
+        OR EXISTS (SELECT 1 FROM credential_rotation x WHERE x.account_id = a.id)
+        OR EXISTS (SELECT 1 FROM quota_meters x WHERE x.account_id = a.id)
+        OR EXISTS (SELECT 1 FROM resources x WHERE x.account_id = a.id AND x.id NOT IN ${sql(ids.resources)})
+      )
+    LIMIT 1`;
+  if (referencedAccount) throw new Error("Demo accounts are referenced by real data");
+
+  const [referencedIdentity] = await sql`
+    SELECT i.id FROM identities i
+    WHERE i.id IN ${sql(ids.identities)}
+      AND (
+        EXISTS (
+          SELECT 1 FROM identity_contacts c
+          WHERE c.identity_id = i.id AND c.id NOT IN ${sql(demoSeedContactIds)}
+        )
+        OR EXISTS (
+          SELECT 1 FROM provider_accounts a
+          WHERE a.identity_id = i.id AND a.id NOT IN ${sql(ids.accounts)}
+        )
+      )
+    LIMIT 1`;
+  if (referencedIdentity) throw new Error("Demo identities are referenced by real data");
+
+  const [referencedContact] = await sql`
+    SELECT a.id FROM provider_accounts a
+    WHERE a.id NOT IN ${sql(ids.accounts)} AND a.contact_id IN ${sql(demoSeedContactIds)}
+    LIMIT 1`;
+  if (referencedContact) throw new Error("Demo contacts are referenced by real accounts");
+}
+
 async function removeLegacyDemoRows(sql: Sql): Promise<void> {
   const seed = legacyDemoSeed;
   // Accounts that still match the seed and carry no credentials, collection, rotation or quota data of their own.
@@ -743,7 +810,7 @@ export async function removeDemoSeed(): Promise<void> {
   await queryClient.begin(async transaction => {
     const sql = transaction as unknown as Sql;
     const ids = demoSeedIds;
-    await sql`DELETE FROM quota_meters WHERE account_id IN ${sql(ids.accounts)}`;
+    await assertCurrentDemoRowsUnreferenced(sql);
     await sql`DELETE FROM resources WHERE id IN ${sql(ids.resources)}`;
     await sql`DELETE FROM network_gateways WHERE id IN ${sql(ids.gateways)}`;
     await sql`DELETE FROM provider_accounts WHERE id IN ${sql(ids.accounts)}`;
