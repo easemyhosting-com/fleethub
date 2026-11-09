@@ -80,6 +80,22 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("demo seed res
     }
     expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
   });
+
+  it("preserves a current demo resource and profile when real data references it", async () => {
+    expect((await call(POST, "demo-admin-fixture")).status).toBe(200);
+    await queryClient`INSERT INTO resource_profiles (resource_id, updated_by) VALUES ('demo-borealis', 'operator')`;
+    try {
+      expect((await call(DELETE, "demo-admin-fixture")).status).toBe(500);
+      expect(await queryClient`SELECT id FROM resources WHERE id = 'demo-borealis'`).toHaveLength(1);
+      expect(await queryClient`SELECT resource_id FROM resource_profiles WHERE resource_id = 'demo-borealis'`).toHaveLength(1);
+      expect(await count("provider_accounts", demoSeedIds.accounts)).toBe(demoSeedIds.accounts.length);
+      expect(await count("identities", demoSeedIds.identities)).toBe(demoSeedIds.identities.length);
+    } finally {
+      await queryClient`DELETE FROM resource_profiles WHERE resource_id = 'demo-borealis'`;
+    }
+    expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+  });
+
   it("removes rows an older install seeded without the demo- prefix, and keeps real rows that reuse those IDs", async () => {
     await insertLegacySeedRows();
     await queryClient`INSERT INTO identities (id, display_name) VALUES ('ident-alex-chen', 'Someone real')`;
