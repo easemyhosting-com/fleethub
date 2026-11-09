@@ -1,3 +1,5 @@
+import { readProjectFleetMatches } from "@/lib/projects/fleet-scope";
+import { selectIdentityAccounts } from "./fleet-selection";
 import { queryClient } from "@/lib/db/client";
 import { filterIdentities, type FleetFilter } from "@/lib/fleet/filters";
 import { publicResourceAttributes, publicResourceTags, resourceBilling } from "@/lib/providers/config-security";
@@ -477,7 +479,12 @@ function publicFallbackIdentities(): IdentityWithAccounts[] {
  * Retrieve all identities with their associated contacts, provider accounts, resources, quotas, and safe secret refs.
  */
 export async function getIdentitiesWithAccounts(filter: FleetFilter = {}): Promise<IdentityWithAccounts[]> {
-  return filterIdentities(await loadIdentitiesWithAccounts(), filter);
+  const [identities, project] = await Promise.all([
+    loadIdentitiesWithAccounts(),
+    filter.project ? readProjectFleetMatches(filter.project) : null,
+  ]);
+  const filtered = filterIdentities(identities, filter);
+  return project ? selectIdentityAccounts(filtered, project) : filtered;
 }
 
 async function loadIdentitiesWithAccounts(): Promise<IdentityWithAccounts[]> {
@@ -675,7 +682,7 @@ export async function getIdentityGraph(filter?: {
   protection?: string;
   resourceCategory?: string;
 } & FleetFilter): Promise<IdentityGraphResponse> {
-  const identities = await getIdentitiesWithAccounts({ person: filter?.person, email: filter?.email, plan: filter?.plan });
+  const identities = await getIdentitiesWithAccounts({ person: filter?.person, email: filter?.email, plan: filter?.plan, project: filter?.project });
 
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];

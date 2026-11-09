@@ -1,4 +1,5 @@
 import { readProjectMeasurements, type ProjectMeasurement } from "./measurements";
+import { readProjectFleetMatches } from "./fleet-scope";
 import { queryClient } from "@/lib/db/client";
 
 const iso = (value: Date | string | null) => value === null ? null : new Date(value).toISOString();
@@ -18,24 +19,25 @@ export interface ProjectFootprint {
 }
 
 /** Everything the dashboard and agents need about each project. A project that stops reporting is `stale`, never zero. */
-export async function readFootprints(projectSlug?: string): Promise<ProjectFootprint[]> {
+export async function readFootprints(projectSlug?: string, confirmedOnly = false): Promise<ProjectFootprint[]> {
   const projects = await queryClient`SELECT * FROM projects WHERE archived_at IS NULL AND (${projectSlug ?? null}::text IS NULL OR slug = ${projectSlug ?? null}) ORDER BY name LIMIT 200`;
   if (!projects.length) return [];
   const ids = projects.map(row => String(row.id));
-  const [links, needs, usage, keys, placements, measured] = await Promise.all([
-    queryClient`SELECT l.project_id, l.resource_id, l.source, l.confidence, l.status, l.purpose, l.evidence, l.last_seen, r.name, r.provider, r.category, COALESCE(r.attributes->>'billing', 'unknown') AS billing
+  const [links, needs, usage, keys, placements, measured, scope] = await Promise.all([
+    queryClient`SELECT l.id, l.project_id, l.resource_id, l.source, l.confidence, l.status, l.purpose, l.evidence, l.last_seen, r.name, r.provider, r.category, COALESCE(r.attributes->>'billing', 'unknown') AS billing
       FROM project_resource_links l JOIN resources r ON r.id = l.resource_id WHERE l.project_id = ANY(${ids}) ORDER BY l.last_seen DESC`,
     queryClient`SELECT id, project_id, kind, purpose, status, recommendation, created_at FROM project_needs WHERE project_id = ANY(${ids}) ORDER BY created_at DESC`,
     queryClient`SELECT project_id, resource_id, resource_ref, amount, unit, period_end, received_at FROM project_usage_reports WHERE project_id = ANY(${ids}) ORDER BY received_at DESC`,
     queryClient`SELECT id, project_id, key_hint, expires_at, revoked_at FROM project_keys WHERE project_id = ANY(${ids}) ORDER BY created_at DESC`,
     queryClient`SELECT project_id, host_name, host_resource_id, runtime, evidence, status, declared FROM project_placements WHERE project_id = ANY(${ids}) ORDER BY host_name`,
     readProjectMeasurements(ids),
+    confirmedOnly && projectSlug ? readProjectFleetMatches(projectSlug) : null,
   ]);
   return projects.map(project => {
     const own = (rows: ReadonlyArray<Record<string, any>>) => rows.filter(row => row.project_id === project.id);
     const usageRows = own(usage);
     const last = usageRows[0]?.received_at ?? null;
-    const projectLinks = own(links).map(row => ({ resourceId: String(row.resource_id), name: String(row.name), provider: String(row.provider), category: String(row.category), billing: String(row.billing), source: String(row.source), confidence: row.confidence as number | null, status: String(row.status), purpose: row.purpose as string | null, evidence: row.evidence as string | null, lastSeen: iso(row.last_seen)! }));
+    const projectLinks = own(links).filter(row => !scope || scope.links.has(row.id)).map(row => ({ resourceId: String(row.resource_id), name: String(row.name), provider: String(row.provider), category: String(row.category), billing: String(row.billing), source: String(row.source), confidence: row.confidence as number | null, status: String(row.status), purpose: row.purpose as string | null, evidence: row.evidence as string | null, lastSeen: iso(row.last_seen)! }));
     return {
       id: String(project.id), slug: String(project.slug), name: String(project.name), kind: String(project.kind), kindManual: Boolean(project.kind_manual),
       placements: own(placements).map(row => ({ host: String(row.host_name), runtime: String(row.runtime), hostResourceId: row.host_resource_id as string | null, evidence: String(row.evidence), status: String(row.status), declared: row.declared as Record<string, number | null> })), environment: String(project.environment), criticality: String(project.criticality), repoUrl: project.repo_url as string | null,

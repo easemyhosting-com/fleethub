@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { getIdentityGraph, getIdentitiesWithAccounts } from "../src/lib/identity/service";
+import { readSnapshot } from "../src/lib/inventory/snapshot";
 import { queryClient } from "../src/lib/db/client";
 import { bootstrapDatabase } from "../src/lib/db/bootstrap";
 import { authenticateProjectKey, createProjectKey, revokeProjectKey } from "../src/lib/projects/keys";
@@ -27,6 +30,64 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
     await queryClient`DELETE FROM projects WHERE slug = 'integration-app'`;
     await queryClient`DELETE FROM resources WHERE id IN ('proj-free-db','proj-paid-db')`;
     await queryClient.end();
+  });
+
+  it("scopes inventory, identities, graph and footprint to confirmed active project links", async () => {
+    const slug = "scoped-fleet-app";
+    const owner = "ident-project-scope";
+    const account = "acc-project-scope";
+    const archivedAccount = "acc-project-archived";
+    const email = "scope@example.test";
+    const linked = await createProject({ slug, name: "Scoped fleet", environment: "prod", criticality: "normal" }, null);
+    const resourceCases = [
+      { id: "scope-declared", source: "declared", status: "in_use", visible: true },
+      { id: "scope-gitops", source: "gitops", status: "allocated", visible: true },
+      { id: "scope-confirmed", source: "inferred", status: "in_use", confirmed: true, visible: true },
+      { id: "scope-suggested", source: "inferred", status: "suggested" },
+      { id: "scope-unconfirmed", source: "inferred", status: "in_use" },
+      { id: "scope-stale", source: "gitops", status: "stale" },
+      { id: "scope-retired", source: "gitops", status: "in_use", retired: true },
+      { id: "scope-archived", source: "declared", status: "in_use", archived: true },
+      { id: "scope-unlinked" },
+    ];
+    try {
+      await queryClient`INSERT INTO identities (id, display_name) VALUES (${owner}, 'Scope fixture')`;
+      await queryClient`INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email, archived_at)
+        VALUES (${account}, ${owner}, 'neon', 'Scope account', ${email}, NULL),
+               (${archivedAccount}, ${owner}, 'neon', 'Archived account', ${email}, NOW())`;
+      for (const item of resourceCases) {
+        await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, inventory_source, retired_at)
+          VALUES (${item.id}, ${item.id}, 'database', 'neon', ${item.archived ? archivedAccount : account}, ${email}, 'provider', CASE WHEN ${Boolean(item.retired)} THEN NOW() END)`;
+        if (item.source) await queryClient`INSERT INTO project_resource_links (id, project_id, resource_id, source, status)
+          VALUES (${randomUUID()}, ${linked.id}, ${item.id}, ${item.source}, ${item.status})`;
+        if (item.confirmed) expect(await decideLink(linked.id, item.id, "confirm", "fixture")).toBe(true);
+      }
+      const expected = resourceCases.filter(item => item.visible).map(item => item.id).sort();
+      const snapshot = await readSnapshot({ project: slug });
+      expect(snapshot.accounts.map(item => item.id)).toEqual([account]);
+      expect(snapshot.accounts[0].collection.resourceCount).toBe(expected.length);
+      expect(snapshot.resources.map(item => item.id).sort()).toEqual(expected);
+      expect((await readSnapshot({ project: slug, provider: "oracle" })).resources).toEqual([]);
+      const identities = await getIdentitiesWithAccounts({ project: slug });
+      expect(identities.map(item => item.id)).toEqual([owner]);
+      expect(identities[0].accounts.flatMap(item => item.resources.map(resource => resource.id)).sort()).toEqual(expected);
+      const graph = await getIdentityGraph({ project: slug });
+      expect(graph.nodes.filter(node => node.type === "resource").map(node => node.data.resourceId).sort()).toEqual(expected);
+      const [footprint] = await readFootprints(slug, true);
+      expect(footprint.links.map(link => link.resourceId).sort()).toEqual(expected);
+      expect((await readFootprints(slug))[0].links.length).toBeGreaterThan(expected.length);
+
+      await decideLink(linked.id, "scope-confirmed", "clear", "fixture");
+      expect((await readSnapshot({ project: slug })).resources.map(item => item.id)).not.toContain("scope-confirmed");
+      await queryClient`UPDATE projects SET archived_at = NOW() WHERE id = ${linked.id}`;
+      expect((await readSnapshot({ project: slug })).resources).toEqual([]);
+      expect((await getIdentityGraph({ project: slug })).nodes).toEqual([]);
+    } finally {
+      await queryClient`DELETE FROM projects WHERE id = ${linked.id}`;
+      await queryClient`DELETE FROM resources WHERE id = ANY(${resourceCases.map(item => item.id)})`;
+      await queryClient`DELETE FROM provider_accounts WHERE id IN (${account}, ${archivedAccount})`;
+      await queryClient`DELETE FROM identities WHERE id = ${owner}`;
+    }
   });
 
   it("rejects a duplicate slug", async () => {

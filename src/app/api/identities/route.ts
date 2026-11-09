@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyApiAccess, createUnauthorizedResponse, readJsonWithLimit } from "@/lib/auth/guard";
 import { bootstrapDatabase } from "@/lib/db/bootstrap";
 import { queryClient } from "@/lib/db/client";
+import { projectSlug } from "@/lib/projects/schemas";
 import { parseFilter } from "@/lib/fleet/filters";
 import {
   getIdentitiesWithAccounts,
@@ -25,6 +26,9 @@ export async function GET(req: Request) {
     await bootstrapDatabase();
 
     const url = new URL(req.url);
+    if (url.searchParams.has("project") && !projectSlug.safeParse(url.searchParams.get("project")).success) {
+      return NextResponse.json({ error: "Invalid project slug" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
     const isGraph = url.searchParams.get("graph") === "true";
     const search = url.searchParams.get("search") || undefined;
     const provider = url.searchParams.get("provider") || undefined;

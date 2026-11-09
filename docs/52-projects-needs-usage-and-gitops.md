@@ -91,6 +91,8 @@ Principle: **the GitOps repo is the source of truth for desired state; FleetHub 
 
 Add a **Projects** tab. One row per project: what it has (allocations and links), what it uses (latest usage, gauge against the free allowance), source badges (declared / observed / GitOps), disagreements, and cost exposure (any billable resource). A resource drawer gains "Used by". An **Orphans and idle** view lists resources with no project and low usage: candidates to reuse. The filter bar gains a Project filter, and the Fleet Map can group by project.
 
+The fleet Project filter uses `?project=<slug>` and shares the current tab through `view`. It includes allocated or in-use links from project reports and GitOps. Inferred links also require a current owner confirmation. Archived projects, archived accounts, and missing resources are excluded. `GET /api/fleet`, `GET /api/inventory`, and `GET /api/identities` accept the project slug. The Projects view reads the selected project's usage and requests confirmed links from `GET /api/projects/footprint?project=<slug>&confirmedOnly=true`.
+
 ## Build order
 
 1. Quick wins 1 to 3 above, plus the in-app fetch prompt for the five existing providers.

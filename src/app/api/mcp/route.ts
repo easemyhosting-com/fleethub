@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     }
     if (name === "list_resources") {
       const filter = resourceFilter.parse(args);
-      const snapshot = await readSnapshot({ accountId: filter.accountId });
+      const snapshot = await readSnapshot({ accountId: filter.accountId, project: filter.project });
       return result(id, snapshot.resources.filter(resource => (filter.includeMissing || resource.presence === "present") && (!filter.category || resource.category === filter.category)));
     }
     const snapshot = await readSnapshot();

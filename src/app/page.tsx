@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, useState, useEffect, useMemo, useRef } from "react";
+import { Activity, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Smartphone, Server, Clock, Shield, Search, ExternalLink, Bot, Zap, Plus, Wifi, RefreshCw, Lock, Menu, X, Compass } from "lucide-react";
 import { FleetOverviewHub } from "@/components/FleetOverviewHub";
 import { IdentityAccountsView } from "@/components/IdentityAccountsView";
@@ -13,7 +13,7 @@ import { GuidedTour } from "@/components/GuidedTour";
 import { AgentAccessPanel } from "@/components/AgentAccessPanel";
 import { DevicesPanel } from "@/components/DevicesPanel";
 import { CapacityLimitsPanel } from "@/components/CapacityLimitsPanel";
-import { FleetFilterBar } from "@/components/FleetFilterBar";
+import { FleetFilterBar, FleetProjectSelect, type FleetProjectOption } from "@/components/FleetFilterBar";
 import { useIdentities } from "@/components/IdentityPicker";
 import { filterFleetProblems } from "@/lib/fleet/problem-search";
 import { applyBilling, hasPaidResources } from "@/lib/fleet/billing";
@@ -25,14 +25,25 @@ import { markTourDone, shouldAutoStartTour, type TourAction } from "@/lib/tour/s
 import { z } from "zod";
 import { fleetSnapshotSchema, retainSnapshotAfterReadFailure, type FleetSnapshot, type FleetAccount } from "@/lib/inventory/model";
 
-type MainTab = "resources" | "clock" | "dispatcher" | "identity" | "mesh" | "infisical" | "aiGateway" | "agents" | "devices" | "limits" | "map" | "projects";
+const mainTab = z.enum(["resources", "clock", "dispatcher", "identity", "mesh", "infisical", "aiGateway", "agents", "devices", "limits", "map", "projects"]);
+type MainTab = z.infer<typeof mainTab>;
+type FleetRead =
+  | { project: string | undefined; status: "signedout" | "unavailable"; error?: string }
+  | { project: string | undefined; status: "ready"; snapshot: FleetSnapshot; error?: string };
+
+const projectOptionsSchema = z.object({ projects: z.array(z.object({ slug: z.string(), name: z.string(), archived: z.boolean().optional() })) });
 
 export default function FleetDeckPage() {
-  const [activeTab, setActiveTab] = useState<MainTab>("resources");
+  const [activeTab, setActiveTabState] = useState<MainTab>("resources");
+  const [filter, setFilterState] = useState<FleetFilter>({});
+  const [projects, setProjects] = useState<FleetProjectOption[]>([]);
+  const [fleetRead, setFleetRead] = useState<FleetRead | null>(null);
+  const fleetRequest = useRef<AbortController | null>(null);
+  const scopedRead = fleetRead?.project === filter.project ? fleetRead : null;
+  const fleetData = scopedRead?.status === "ready" ? scopedRead.snapshot : null;
+  const fleetStatus = scopedRead?.status ?? "loading";
+  const fleetError = scopedRead?.error ?? "";
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [fleetData, setFleetData] = useState<FleetSnapshot | null>(null);
-  const [fleetStatus, setFleetStatus] = useState<"loading" | "signedout" | "unavailable" | "ready">("loading");
-  const [fleetError, setFleetError] = useState("");
   const [initialSetupStep, setInitialSetupStep] = useState<"tailscale" | "infisical" | "cliproxy" | undefined>(undefined);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -45,10 +56,27 @@ export default function FleetDeckPage() {
     return true;
   };
   const isFleetView = activeTab === "resources" || activeTab === "map" || activeTab === "identity";
-  const [filter, setFilterState] = useState<FleetFilter>({});
   const people = useIdentities();
-  useEffect(() => { setFilterState(parseFilter(new URLSearchParams(window.location.search))); }, []);
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setFilterState(parseFilter(params));
+      setActiveTabState(mainTab.safeParse(params.get("view")).data ?? "resources");
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  const setActiveTab = (tab: MainTab) => {
+    if (tab === activeTab) return;
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === "resources") url.searchParams.delete("view");
+    else url.searchParams.set("view", tab);
+    window.history.pushState(null, "", url);
+  };
   const setFilter = (next: FleetFilter) => {
+    if (next.project !== filter.project) setSelectedResourceId(null);
     setFilterState(next);
     const params = filterToParams(next, new URLSearchParams(window.location.search));
     window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}${window.location.hash}`);
@@ -65,7 +93,7 @@ export default function FleetDeckPage() {
     accounts: new Set(shown.accounts.map(account => account.id)),
     resources: new Set(shown.resources.map(resource => resource.id)),
   } : undefined, [shown, isSearching, billed, scoped]);
-  const filterBar = isFleetView && fleetData ? <FleetFilterBar searchInputRef={searchInputRef} search={search} onSearch={setSearch} attention={attention} onAttention={setAttention} filter={filter} onChange={setFilter} paid={hasPaidResources(fleetData) ? { show: showPaid, onChange: setShowPaid } : undefined} identities={people} resultCount={shown?.accounts.length} providers={[...new Set(fleetData.accounts.map(account => account.kind))].sort()} /> : null;
+  const filterBar = isFleetView && (fleetData || filter.project) ? <FleetFilterBar projects={projects} searchInputRef={searchInputRef} search={search} onSearch={setSearch} attention={attention} onAttention={setAttention} filter={filter} onChange={setFilter} paid={fleetData && hasPaidResources(fleetData) ? { show: showPaid, onChange: setShowPaid } : undefined} identities={people} resultCount={shown?.accounts.length} providers={[...new Set((fleetData?.accounts ?? []).map(account => account.kind))].sort()} /> : null;
 
   // Modals & Drawers state
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -114,23 +142,45 @@ export default function FleetDeckPage() {
     } catch { setSetupLinks({ infisical: null, cliproxy: null }); }
   };
 
-  const loadFleetData = async () => {
+  const project = filter.project;
+  const loadFleetData = useCallback(async () => {
+    if (parseFilter(new URLSearchParams(window.location.search)).project !== project) return;
+    fleetRequest.current?.abort();
+    const controller = new AbortController();
+    fleetRequest.current = controller;
     setIsRefreshing(true);
     try {
-      const res = await fetch("/api/fleet", { cache: "no-store" });
-      if (res.status === 401) { setFleetData(null); setFleetStatus("signedout"); return; }
+      const params = new URLSearchParams(project ? { project } : {});
+      const res = await fetch(params.size ? `/api/fleet?${params}` : "/api/fleet", { cache: "no-store", signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (res.status === 401) { setFleetRead({ project, status: "signedout" }); return; }
       if (!res.ok) throw new Error(res.status === 503 ? "Stored inventory is unavailable. Try again after the database is ready." : `Inventory request failed (${res.status}).`);
       const parsed = fleetSnapshotSchema.safeParse(await res.json());
       if (!parsed.success) throw new Error("Inventory response has an unexpected format.");
-      setFleetData(parsed.data);
-      setFleetStatus("ready");
-      setFleetError("");
+      if (!controller.signal.aborted) setFleetRead({ project, status: "ready", snapshot: parsed.data });
     } catch (cause) {
-      setFleetData(previous => previous ? retainSnapshotAfterReadFailure(previous) : null);
-      setFleetStatus(previous => previous === "ready" ? "ready" : "unavailable");
-      setFleetError(cause instanceof Error ? cause.message : "Could not load inventory.");
-    } finally { setIsRefreshing(false); }
-  };
+      if (controller.signal.aborted) return;
+      const error = cause instanceof Error ? cause.message : "Could not load inventory.";
+      setFleetRead(previous => previous?.project === project && previous?.status === "ready"
+        ? { project, status: "ready", snapshot: retainSnapshotAfterReadFailure(previous.snapshot), error }
+        : { project, status: "unavailable", error });
+    } finally {
+      if (fleetRequest.current === controller) {
+        fleetRequest.current = null;
+        if (!controller.signal.aborted) setIsRefreshing(false);
+      }
+    }
+  }, [project]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/projects", { cache: "no-store", signal: controller.signal }).then(async response => {
+      if (!response.ok) return;
+      const parsed = projectOptionsSchema.safeParse(await response.json());
+      if (parsed.success && !controller.signal.aborted) setProjects(parsed.data.projects.filter(item => !item.archived));
+    }).catch(() => { /* Inventory remains available without the project catalog. */ });
+    return () => controller.abort();
+  }, [activeTab]);
 
   const refreshAll = async () => { await Promise.all([loadFleetData(), loadSetupLinks()]); };
 
@@ -148,16 +198,22 @@ export default function FleetDeckPage() {
   };
 
   useEffect(() => {
-    loadFleetData();
+    void loadFleetData();
+    return () => fleetRequest.current?.abort();
+  }, [loadFleetData]);
+
+  useEffect(() => {
     checkUserSession();
     loadSetupLinks();
   }, []);
 
   useEffect(() => {
     if (!fleetData?.accounts.some(account => account.collection.state === "queued" || account.collection.state === "running")) return;
-    const timer = setInterval(loadFleetData, 5000);
+    const timer = setInterval(() => {
+      if (!fleetRequest.current) void loadFleetData();
+    }, 5000);
     return () => clearInterval(timer);
-  }, [fleetData]);
+  }, [fleetData, loadFleetData]);
 
   useEffect(() => {
     const timer = setInterval(loadSetupLinks, 60000);
@@ -497,14 +553,17 @@ export default function FleetDeckPage() {
 
           {/* TAB 4: IDENTITY & ACCOUNTS RELATIONSHIP GRAPH */}
           <Activity mode={activeTab === "identity" ? "visible" : "hidden"}>
-            <IdentityAccountsView matches={identityMatches} fleetAccounts={fleetData?.accounts} onSelectResource={selectResource} onRefreshParent={loadFleetData} filter={filter} />
+            <IdentityAccountsView key={project ?? ""} matches={identityMatches} fleetAccounts={fleetData?.accounts} onSelectResource={selectResource} onRefreshParent={loadFleetData} filter={filter} />
           </Activity>
 
           {activeTab === "agents" && <AgentAccessPanel />}
           {activeTab === "devices" && <DevicesPanel />}
           {activeTab === "limits" && <CapacityLimitsPanel />}
           {activeTab === "map" && (shown ? <FleetMapPanel fleet={shown} selectedId={selectedResourceId} onSelectResource={selectResource} /> : <div role="status" className="rounded-xl border border-zinc-800 p-8 text-zinc-300">{fleetStatus === "loading" ? "Loading stored inventory…" : "Inventory is unavailable."}</div>)}
-          {activeTab === "projects" && <ProjectsView />}
+          {activeTab === "projects" && <div className="space-y-4">
+            <FleetProjectSelect projects={projects} project={project} onChange={value => setFilter({ ...filter, project: value })} />
+            <ProjectsView key={project ?? ""} project={project} />
+          </div>}
           {activeTab === "mesh" && <StatusPanel title="Mesh status is not measured here" text="Set up or reverify this FleetHub host's Tailscale connection. Peer lists and node health need a separate verified source." action="Open Tailscale setup" onAction={() => handleOpenOnboarding("tailscale")} />}
           {activeTab === "infisical" && <StatusPanel title="Vault credentials stay in Infisical" text="FleetHub stores scoped credential references for registered accounts. Open the verified vault console to manage secret values." action="Open Infisical setup" onAction={() => handleOpenOnboarding("infisical")} externalUrl={infisicalConsoleUrl} externalLabel="Open verified vault console" />}
           {activeTab === "aiGateway" && <StatusPanel title="Gateway telemetry unavailable" text="This page has no verified live model list, key health, request totals, or quota measurements. Open the verified CLIProxyAPI console for current details." action="Open CLIProxyAPI setup" onAction={() => handleOpenOnboarding("cliproxyapi")} externalUrl={cliproxyManagementUrl} externalLabel="Open verified gateway console" />}
