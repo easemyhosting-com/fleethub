@@ -42,7 +42,7 @@ Order approved by the owner on 2026-11-08 ([plan revisions](60-reuse-first-onboa
 - [x] **R9 Public install defaults.**
   - Present the built-in store and Connect existing Infisical as the public paths. Link local Infisical installation to upstream guidance.
   - Publish a deprecation note for the bundled `infisical` profile that preserves volumes. Keep the `cliproxy` profile. See [R8/R9 verification](verification/2026-11-08-r8-r9-verification.md).
-- [ ] **R10 Non-LLM authorization adapter.** One provider-specific adapter after capability research.
+- [x] **R10 Non-LLM authorization adapter.** A GitHub App authorizes read-only GitOps for a signed-in FleetHub operator. The authorization code uses PKCE and one-use session-bound state. PostgreSQL tests cover refresh serialization, encrypted storage, revocation, reconnect and the existing GitOps sync route with mocked GitHub responses. See [GitHub App setup](52-projects-needs-usage-and-gitops.md#authorize-a-github-app-for-gitops).
 
 The project filter scopes Resources, Fleet Map, identity list and graph, and the Projects view by a URL slug. Inventory APIs and the resource-list MCP tool use the same scope. Outbound decision delivery remains pending. The OCI scan call budget found in the [full-tree review](verification/2026-11-08-security-continuation.md#full-tree-privacy-review-and-history-audit) is resolved: compute has its own 80-call budget that covers the 50-compartment cap, optional products share 220 calls, and a product that would not fit is reported as not covered before any call is spent instead of failing the scan. This was verified with mocked responses only, not against a live tenancy.
 
