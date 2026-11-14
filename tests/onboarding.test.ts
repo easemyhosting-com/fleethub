@@ -71,6 +71,18 @@ describe("outbound transport", () => {
       expect(() => approvedApiUrl(url)).toThrow("FLEETHUB_ONBOARDING_ALLOWED_ORIGINS");
     }
   });
+  it("blocks allowlisted remote HTTP before sending credentials, with an explicit trusted-network opt-in", async () => {
+    vi.stubEnv("FLEETHUB_ONBOARDING_ALLOWED_ORIGINS", "http://vault.example.test,http://127.0.0.1:8080,http://[::1]:8080");
+    vi.stubEnv("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP", "false");
+    expect(() => approvedApiUrl("http://vault.example.test")).toThrow("Use HTTPS");
+    await expect(requestJson("http://vault.example.test/login", { method: "POST", body: "secret" })).rejects.toThrow("Use HTTPS");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(approvedApiUrl("http://127.0.0.1:8080")).toBe("http://127.0.0.1:8080");
+    expect(approvedApiUrl("http://[::1]:8080")).toBe("http://[::1]:8080");
+    vi.stubEnv("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP", "true");
+    expect(approvedApiUrl("http://vault.example.test")).toBe("http://vault.example.test");
+    vi.unstubAllEnvs();
+  });
   it("enforces no redirect/cache and parses empty or JSON responses", async () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValueOnce(json({ ok: true }));
     await expect(requestJson("https://vault.example.test/health")).resolves.toEqual({});

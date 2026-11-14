@@ -19,6 +19,18 @@ describe("Infisical Secrets Management & Agent Vault Security", () => {
     vi.restoreAllMocks();
   });
 
+  it("never sends credentials to a remote HTTP vault", async () => {
+    vi.stubEnv("INFISICAL_URL", "http://vault.example.test");
+    vi.stubEnv("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP", "false");
+    vi.stubEnv("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID", "fixture-client");
+    vi.stubEnv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET", "fixture-secret");
+    vi.stubEnv("AGENT_VAULT_URL", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await getInfisicalStatus()).connected).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("fails closed when Agent Vault proxy is unreachable", async () => {
     const originalFetch = global.fetch;
     global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
@@ -61,8 +73,9 @@ describe("Infisical Secrets Management & Agent Vault Security", () => {
     process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID = "test-client-id";
     process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET = "test-client-secret";
 
-    global.fetch = vi.fn().mockImplementation((url: string) => {
+    global.fetch = vi.fn().mockImplementation((url: string, init: RequestInit) => {
       if (url.includes("/universal-auth/login")) {
+        expect(init.redirect).toBe("error");
         return Promise.resolve({
           ok: true,
           status: 200,

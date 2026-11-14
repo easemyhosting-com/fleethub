@@ -61,3 +61,5 @@ Keep the original services and volumes until the destination is verified. Stoppi
 
 The Compose file bind-mounts the CLIProxy config and the Tailscale status file. Colima only shares the host directories listed under `mounts:` in its configuration; an unshared path makes Docker create an empty directory in its place, and CLIProxy then restarts with `config.yaml: is a directory`. Create the setup directory (`node scripts/prepare-local-setup.mjs --directory <path>`) inside a path Colima shares, or add that path to Colima's mounts.
 
+
+Service credentials require HTTPS outside loopback. Loopback HTTP is supported for local simulators. For an isolated, trusted container network, explicitly set `FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP=true` in the FleetHub runtime environment. This permits cleartext credentials on that network, so keep it disabled for remote services. The exact-origin onboarding allowlist still applies, and credential-bearing requests reject redirects.
