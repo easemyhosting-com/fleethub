@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { GET } from "../src/app/api/onboarding/cliproxy-capabilities/route";
 const mocks = vi.hoisted(() => ({ access: vi.fn(), bootstrap: vi.fn(), state: vi.fn(), inspect: vi.fn() }));
-vi.mock("@/lib/auth/guard", () => ({ verifyApiAccess: mocks.access, createUnauthorizedResponse: () => Response.json({ error: "Unauthorized" }, { status: 401 }) }));
+vi.mock("@/lib/auth/guard", async importOriginal => ({ ...await importOriginal<typeof import("../src/lib/auth/guard")>(), verifyApiAccess: mocks.access, createUnauthorizedResponse: () => Response.json({ error: "Unauthorized" }, { status: 401 }) }));
 vi.mock("@/lib/db/bootstrap", () => ({ bootstrapDatabase: mocks.bootstrap }));
 vi.mock("@/lib/onboarding/service", () => ({ getSetupState: mocks.state }));
 vi.mock("@/lib/cliproxy/capabilities", () => ({ inspectCliProxy: mocks.inspect }));
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.access.mockResolvedValue({ authorized: true });
+  mocks.access.mockResolvedValue({ authorized: true, principalId: "api:admin" });
   mocks.bootstrap.mockResolvedValue({ success: true });
   mocks.state.mockResolvedValue({ steps: [{ id: "cliproxy", status: "configured", config: { apiUrl: "https://gateway.example.test" } }] });
   mocks.inspect.mockResolvedValue({ schemaVersion: 1 });
@@ -16,7 +16,7 @@ const request = () => new Request("http://localhost/api/onboarding/cliproxy-capa
 it("requires operator access before touching setup or gateway", async () => {
   mocks.access.mockResolvedValue({ authorized: false });
   expect((await GET(request())).status).toBe(401);
-  expect(mocks.access).toHaveBeenCalledWith(expect.any(Request), { requireWrite: true });
+  expect(mocks.access).toHaveBeenCalledWith(expect.any(Request));
   expect(mocks.bootstrap).not.toHaveBeenCalled();
   expect(mocks.inspect).not.toHaveBeenCalled();
 });
@@ -38,4 +38,11 @@ it("suppresses internal exception content", async () => {
   const result = await GET(request());
   expect(result.status).toBe(422);
   expect(await result.text()).not.toContain("private");
+});
+
+it("rejects read-only access before probing with privileged gateway credentials", async () => {
+  mocks.access.mockResolvedValue({ authorized: true, scope: "read", user: { id: "reader" } });
+  expect((await GET(request())).status).toBe(403);
+  expect(mocks.bootstrap).not.toHaveBeenCalled();
+  expect(mocks.inspect).not.toHaveBeenCalled();
 });

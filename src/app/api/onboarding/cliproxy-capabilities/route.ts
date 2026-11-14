@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { createUnauthorizedResponse, verifyApiAccess } from "@/lib/auth/guard";
+import { createUnauthorizedResponse, isOperator, verifyApiAccess } from "@/lib/auth/guard";
 import { bootstrapDatabase } from "@/lib/db/bootstrap";
 import { getSetupState } from "@/lib/onboarding/service";
 import { inspectCliProxy } from "@/lib/cliproxy/capabilities";
 
 export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
-  const access = await verifyApiAccess(req, { requireWrite: true });
+  const access = await verifyApiAccess(req);
   if (!access.authorized) return createUnauthorizedResponse(access);
+  if (!isOperator(access)) return NextResponse.json({ error: "Operator access is required" }, { status: 403 });
   const headers = { "Cache-Control": "no-store" };
   try {
     if (!(await bootstrapDatabase()).success) return NextResponse.json({ error: "Setup database is unavailable" }, { status: 503, headers });
