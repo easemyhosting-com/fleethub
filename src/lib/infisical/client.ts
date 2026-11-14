@@ -70,8 +70,8 @@ export function _resetTokenCache() {
   cachedToken = null;
 }
 
-async function getUniversalAuthToken(): Promise<string | null> {
-  const { baseUrl, clientId, clientSecret } = getCredentials();
+async function getUniversalAuthToken(credentials: ReturnType<typeof getCredentials>): Promise<string | null> {
+  const { baseUrl, clientId, clientSecret } = credentials;
   if (!clientId || !clientSecret) {
     // Fail closed: Missing credentials must never use a hardcoded fallback
     return null;
@@ -129,9 +129,10 @@ export async function checkAgentVaultStatus(): Promise<"online" | "offline"> {
 }
 
 export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
-  const { baseUrl } = getCredentials();
+  const credentials = getCredentials();
+  const { baseUrl } = credentials;
   const agentVaultState = await checkAgentVaultStatus();
-  const token = await getUniversalAuthToken();
+  const token = await getUniversalAuthToken(credentials);
 
   let workspaces: InfisicalWorkspace[] = [];
   const secretReferences: SecretReferenceItem[] = [];
