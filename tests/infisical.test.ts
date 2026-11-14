@@ -22,24 +22,27 @@ describe("Infisical Secrets Management & Agent Vault Security", () => {
   it("keeps one vault configuration across a concurrent runtime reload", async () => {
     vi.stubEnv("INFISICAL_UNIVERSAL_AUTH_CLIENT_ID", "original-client");
     vi.stubEnv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET", "original-secret");
-    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+    const fetchMock = vi.fn<typeof fetch>(async input => {
       const url = String(input);
       if (url === "http://agent-vault.test") {
         vi.stubEnv("INFISICAL_URL", "https://replacement-vault.test");
         vi.stubEnv("INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET", "replacement-secret");
         return new Response(null, { status: 200 });
       }
-      expect(url.startsWith("https://vault.test/")).toBe(true);
       if (url.endsWith("/login")) {
-        expect(JSON.parse(String(init?.body))).toMatchObject({ clientSecret: "original-secret" });
         return Response.json({ accessToken: "original-vault-token" });
       }
-      expect(init?.headers).toEqual({ Authorization: "Bearer original-vault-token" });
       return Response.json({ workspaces: [] });
     });
     vi.stubGlobal("fetch", fetchMock);
     await getInfisicalStatus();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "https://vault.test/api/v1/auth/universal-auth/login", expect.objectContaining({
+      body: JSON.stringify({ clientId: "original-client", clientSecret: "original-secret" }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "https://vault.test/api/v1/workspace", expect.objectContaining({
+      headers: { Authorization: "Bearer original-vault-token" },
+    }));
   });
 
   it("never sends credentials to a remote HTTP vault", async () => {
