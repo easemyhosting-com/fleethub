@@ -7,7 +7,7 @@ import { expect, it } from "vitest";
 import { z } from "zod";
 
 const composeSchema = z.object({
-  services: z.record(z.string(), z.object({ depends_on: z.record(z.string(), z.unknown()).optional(), ports: z.array(z.unknown()).optional() })),
+  services: z.record(z.string(), z.object({ environment: z.record(z.string(), z.string()).optional(), depends_on: z.record(z.string(), z.unknown()).optional(), ports: z.array(z.unknown()).optional() })),
   volumes: z.record(z.string(), z.object({ name: z.string() })),
 });
 
@@ -50,6 +50,7 @@ it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status
       const config = composeSchema.parse(JSON.parse(stdout));
       const expected = [...core, ...(profiles.includes("infisical") || profiles.includes("integrations") ? vault : []), ...(profiles.includes("cliproxy") || profiles.includes("integrations") ? ["cli-proxy-api"] : [])];
       expect(Object.keys(config.services).sort()).toEqual(expected.sort());
+      for (const service of ["fleetdeck", "inventory-worker"]) expect(config.services[service].environment?.FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP).toBe("false");
       expect(config.services.fleetdeck.depends_on).toHaveProperty("fleetdeck-db");
       expect(Object.keys(config.services.fleetdeck.depends_on ?? {})).toEqual(["fleetdeck-db"]);
       expect(config.volumes.fleetdeck_pg_data.name).toBe("fleethub-profile-test_fleetdeck_pg_data");
@@ -70,5 +71,10 @@ it("enables internal HTTP only when the local setup helper is explicitly asked",
   try {
     await promisify(execFile)(process.execPath, ["scripts/prepare-local-setup.mjs", "--directory", target, "--allow-local-service-http"]);
     expect(await readFile(join(target, ".env"), "utf8")).toContain("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP=true");
+    if (spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status === 0) {
+      const { stdout } = await promisify(execFile)("docker", ["compose", "-f", resolve("compose.yml"), "--env-file", join(target, ".env"), "config", "--format", "json"], { env: { ...process.env, COMPOSE_PROFILES: "", FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP: "true" } });
+      const config = composeSchema.parse(JSON.parse(stdout));
+      for (const service of ["fleetdeck", "inventory-worker"]) expect(config.services[service].environment?.FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP).toBe("true");
+    }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
