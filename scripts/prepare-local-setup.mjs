@@ -3,12 +3,13 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, open, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
-const args = process.argv.slice(2);
+const allowLocalServiceHttp = process.argv.slice(2).includes("--allow-local-service-http");
+const args = process.argv.slice(2).filter(value => value !== "--allow-local-service-http");
 let directory = '.local-setup';
 if (args.length === 2 && args[0] === '--directory' && args[1] && !args[1].startsWith('-')) {
   directory = args[1];
 } else if (args.length !== 0) {
-  console.error('Usage: node scripts/prepare-local-setup.mjs [--directory NEW_DIRECTORY]');
+  console.error('Usage: node scripts/prepare-local-setup.mjs [--directory NEW_DIRECTORY] [--allow-local-service-http]');
   process.exit(2);
 }
 
@@ -35,6 +36,8 @@ const env = [
   'INFISICAL_SITE_URL=http://localhost:8088',
   'INFISICAL_URL=http://infisical:8080',
   '# These origins authorize API requests, not container startup. Replace them when reusing services.',
+  '# Enable only for bundled services on a trusted container network; keep false for remote services.',
+  `FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP=${allowLocalServiceHttp}`,
   'FLEETHUB_ONBOARDING_ALLOWED_ORIGINS=http://infisical:8080,http://cli-proxy-api:8317',
   'CLIPROXY_IMAGE=eceasy/cli-proxy-api:latest@sha256:3f74ca56cba8bea2a2a096a215bb774482d87d257da04c5047e6046493bfd644',
   'INFISICAL_IMAGE=infisical/infisical:latest@sha256:cb971a75043b6fafdc738e9ca6d4f8a09b4f979a60b2b9ade39af5e095bcc5fb',

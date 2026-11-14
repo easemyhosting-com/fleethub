@@ -23,6 +23,7 @@ it("generates private bootstrap files once and refuses to overwrite them", async
     expect(result.stdout).not.toContain(secret);
     expect(result.stdout).toContain("No containers were started");
     expect(result.stdout).toContain("--profile infisical or --profile cliproxy");
+    expect(env).toContain("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP=false");
     expect(env).toContain("FLEETHUB_ONBOARDING_ALLOWED_ORIGINS=http://infisical:8080,http://cli-proxy-api:8317");
     expect((await stat(join(target, ".env"))).mode & 0o777).toBe(0o600);
     expect((await stat(join(target, "cliproxy-config.yaml"))).mode & 0o777).toBe(0o600);
@@ -59,5 +60,15 @@ it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status
       }
       if (config.services["cli-proxy-api"]) expect(config.volumes.cliproxy_auth.name).toBe("fleethub-profile-test_cliproxy_auth");
     }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+it("enables internal HTTP only when the local setup helper is explicitly asked", async () => {
+  const root = await mkdtemp(join(tmpdir(), "fleethub-trusted-http-test-"));
+  const target = join(root, "local-integrations");
+  try {
+    await promisify(execFile)(process.execPath, ["scripts/prepare-local-setup.mjs", "--directory", target, "--allow-local-service-http"]);
+    expect(await readFile(join(target, ".env"), "utf8")).toContain("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP=true");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

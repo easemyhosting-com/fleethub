@@ -63,3 +63,5 @@ The Compose file bind-mounts the CLIProxy config and the Tailscale status file. 
 
 
 Service credentials require HTTPS outside loopback. Loopback HTTP is supported for local simulators. For an isolated, trusted container network, explicitly set `FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP=true` in the FleetHub runtime environment. This permits cleartext credentials on that network, so keep it disabled for remote services. The exact-origin onboarding allowlist still applies, and credential-bearing requests reject redirects.
+
+When generating files for the bundled Compose integrations, use `node scripts/prepare-local-setup.mjs --allow-local-service-http`. That explicit option writes the trusted-network HTTP opt-in to the generated environment file. Without it, the helper keeps HTTP disabled outside loopback. Existing local installations can set the same environment variable before restarting FleetHub and the inventory worker.
