@@ -62,3 +62,14 @@ docs/archive/
 
 # Local private identifier seeds and supplements (never commit)
 /security/.local-forbidden*
+
+# Private agent state and audit material
+.codex/
+.cursor/
+.agent/
+.journal/
+journals/
+fleethub-audit-private/
+__pycache__/
+*.p12
+*.pfx

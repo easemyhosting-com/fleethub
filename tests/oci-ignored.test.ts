@@ -1,3 +1,4 @@
+import { invalidPrivateKey } from "./fixtures/invalid-key";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { OCI_IGNORED_KEY, forgetIgnored, loadIgnored, mergeIgnored, normalizeIgnored, profileFingerprint, saveIgnored, type IgnoredStore } from "../src/lib/providers/oci-ignored";
@@ -25,7 +26,7 @@ describe("OCI ignored-profile fingerprints", () => {
 
   it("is stable across whitespace and independent of the profile name or any key material", async () => {
     const padded = { tenancy: ` ${profile.tenancy} `, user: `${profile.user}\t`, region: ` ${profile.region}` };
-    const withSecrets = { ...profile, profile: "another-name", fingerprint: "aa:bb:cc", keyFile: "owner.pem", privateKey: `-----BEGIN PRIVATE KEY-----\n${"A".repeat(64)}\n-----END PRIVATE KEY-----` }; // gitleaks:allow (synthetic fixture)
+    const withSecrets = { ...profile, profile: "another-name", fingerprint: "aa:bb:cc", keyFile: "owner.pem", privateKey: invalidPrivateKey() };
     expect(await profileFingerprint(padded)).toBe(expected);
     expect(await profileFingerprint(withSecrets)).toBe(expected);
   });
@@ -56,7 +57,7 @@ describe("OCI ignored-profile storage", () => {
 
   it("saves a JSON array under the versioned key and never stores anything but fingerprints", () => {
     const store = memoryStore();
-    const secret = `-----BEGIN RSA PRIVATE KEY-----\n${"A".repeat(64)}\n-----END RSA PRIVATE KEY-----`;
+    const secret = invalidPrivateKey("RSA");
     const written = saveIgnored([expected, secret, "aa:bb:cc:dd"], store);
     expect(written).toEqual([expected]);
     expect(store.data.get(OCI_IGNORED_KEY)).toBe(JSON.stringify([expected]));

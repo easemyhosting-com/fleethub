@@ -1,0 +1,29 @@
+# exact literal or CIDR<TAB>justification<TAB>optional exact file or directory scope
+347839428+easemyhosting-com@users.noreply.github.com	Configured project identity
+GitHub <noreply@github.com>	GitHub merge committer identity
+noreply@github.com	GitHub web merge committer email
+https://github.com/easemyhosting-com/fleethub	Canonical repository URL
+example.com	Reserved example domain
+example.org	Reserved example domain
+example.net	Reserved example domain
+your-tailnet.ts.net	Exact documented placeholder
+192.0.2.0/24	RFC 5737 documentation network
+198.51.100.0/24	RFC 5737 documentation network
+203.0.113.0/24	RFC 5737 documentation network
+127.0.0.0/8	Loopback test endpoints
+::1	IPv6 loopback
+localhost	Loopback service endpoints
+10.0.0.17	Synthetic private-network classification fixture	tests/addresses.test.ts
+172.20.1.1	Synthetic private-network classification fixture	tests/addresses.test.ts
+192.168.1.9	Synthetic private-network classification fixture	tests/addresses.test.ts
+192.168.1.5	Synthetic private-network classification fixture	tests/allowed-origins.test.ts
+192.168.1.99	Synthetic private-network classification fixture	tests/api-auth.test.ts
+10.0.0.1	Synthetic private-network classification fixture	tests/connector-probe.test.ts
+192.168.1.1	Synthetic private-network classification fixture	tests/connector-probe.test.ts
+192.168.1.5	Synthetic private-network classification fixture	tests/connector-probe.test.ts
+10.0.0.1	Synthetic private-network classification fixture	tests/connector-service.test.ts
+10.0.0.2	Synthetic private-network classification fixture	tests/connector-service.test.ts
+10.0.0.17	Synthetic private-network classification fixture	tests/connectors.test.ts
+10.9.9.9	Synthetic private-network classification fixture	tests/connectors.test.ts
+172.18.0.2	Synthetic private-network classification fixture	tests/onboarding.test.ts
+10.0.0.1	Synthetic private-network classification fixture	tests/scoped-usage.test.ts

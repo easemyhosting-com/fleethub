@@ -9,3 +9,9 @@
 /scripts/check-compose-policy.mjs @easemyhosting-com
 /.githooks/pre-commit @easemyhosting-com
 /.github/workflows/security.yml @easemyhosting-com
+/security/ @easemyhosting-com
+/.githooks/ @easemyhosting-com
+/.github/workflows/ @easemyhosting-com
+/scripts/check-* @easemyhosting-com
+/.gitleaks.toml @easemyhosting-com
+/.npmrc @easemyhosting-com
