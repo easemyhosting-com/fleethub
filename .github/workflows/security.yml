@@ -25,6 +25,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Install checksum-pinned gitleaks for the real pre-commit hook test
+        run: |
+          python3 scripts/install-security-tools.py "$RUNNER_TEMP/security-bin"
+          echo "$RUNNER_TEMP/security-bin" >> "$GITHUB_PATH"
       - name: Validate exception scope and review deadline
         run: |
           python3 scripts/check-security-exceptions.py
