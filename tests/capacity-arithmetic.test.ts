@@ -74,6 +74,7 @@ describe("Compute unit normalization", () => {
     expect(parseComputeMilli("4 vcpu")).toBe(4000);
     expect(parseComputeMilli("500m")).toBe(500);
     expect(parseComputeMilli("250 milli")).toBe(250);
+    expect(parseComputeMilli("250 milliCPUs")).toBe(250);
   });
 
   it("converts milli to decimal cores", () => {
@@ -124,6 +125,7 @@ describe("Shared Allowance Pool & Deduplicated Allocations", () => {
     totalAllowance: 10 * 1024 * 1024 * 1024, // 10 GiB free tier
     unit: "GiB",
     period: "none",
+    inventoryComplete: true,
   };
 
   const bucket1: ResourceItem = {
@@ -194,6 +196,7 @@ describe("Object Storage Comparison Slice", () => {
     totalAllowance: 10 * 1024 * 1024 * 1024,
     unit: "GiB",
     period: "none",
+    inventoryComplete: true,
   };
 
   const poolOci: SharedAllowancePool = {
@@ -205,6 +208,7 @@ describe("Object Storage Comparison Slice", () => {
     totalAllowance: 10 * 1024 * 1024 * 1024,
     unit: "GiB",
     period: "pool",
+    inventoryComplete: true,
   };
 
   const candidates: ResourceItem[] = [
@@ -255,10 +259,10 @@ describe("Object Storage Comparison Slice", () => {
     const results = compareObjectStorageCandidates(candidates, [poolR2, poolOci], need);
     expect(results.length).toBe(3);
 
-    // Photos bucket fits within 8 GiB remaining R2 allowance
+    // Unknown sibling usage makes shared headroom unknown
     const photos = results.find(r => r.name === "photos");
-    expect(photos?.fitVerdict).toBe("fits");
-    expect(photos?.reasons).toContain("Zero egress fees (Cloudflare R2)");
+    expect(photos?.fitVerdict).toBe("unverified");
+    expect(photos?.sharedAllowanceRemainingBytes).toBeNull();
 
     // OCI bucket fits within 9 GiB remaining OCI allowance, and matches preferred region
     const oci = results.find(r => r.name === "archive-bucket");
@@ -269,5 +273,90 @@ describe("Object Storage Comparison Slice", () => {
     const mystery = results.find(r => r.name === "mystery-bucket");
     expect(mystery?.fitVerdict).toBe("unverified");
     expect(mystery?.reasons.some(r => r.includes("Telemetry is unmeasured"))).toBe(true);
+  });
+});
+
+describe("Capacity advice regressions", () => {
+  const pool: SharedAllowancePool = {
+    poolId: "pool", accountId: "account", provider: "manual", product: "s3",
+    metric: "storage_bytes", totalAllowance: 100, unit: "B", period: "none", inventoryComplete: true,
+  };
+  const item: ResourceItem = {
+    resourceId: "bucket", name: "bucket", accountId: "account", provider: "manual",
+    category: "object_storage", product: "s3", observedBytes: 95,
+    telemetryFreshness: "fresh", supportedApis: ["s3_compatible"],
+  };
+  const compare = (items = [item], pools = [pool], need: ObjectStorageNeed = { estimatedBytes: 20 }) =>
+    compareObjectStorageCandidates(items, pools, need);
+
+  it("uses observed usage independently of declarations without subtracting twice", () => {
+    expect(compare()[0].fitVerdict).toBe("over");
+    const accounting = calculatePoolCapacity(pool, [{ ...item, declaredBytes: 80 }]);
+    expect(accounting.remainingUnallocated).toBe(20);
+    expect(accounting.remainingObserved).toBe(5);
+  });
+
+  it.each(["stale", "expired", "unmeasured"] as const)("preserves %s pool usage as unknown", telemetryFreshness => {
+    const sibling = { ...item, resourceId: "sibling", telemetryFreshness };
+    expect(compare([item, sibling])[0].fitVerdict).toBe("unverified");
+    expect(compare([{ ...item, telemetryFreshness }])[0].fitVerdict).toBe("unverified");
+  });
+
+  it("does not infer freshness from a value or a fresh label without a value", () => {
+    expect(compare([{ ...item, telemetryFreshness: undefined }])[0].fitVerdict).toBe("unverified");
+    expect(compare([{ ...item, observedBytes: null }])[0].fitVerdict).toBe("unverified");
+  });
+
+  it("rejects incompatible APIs and preserves unknown compatibility", () => {
+    const need: ObjectStorageNeed = { estimatedBytes: 1, requiredApi: "oci_native" };
+    expect(compare([item], [pool], need)[0].fitVerdict).toBe("over");
+    expect(compare([{ ...item, supportedApis: undefined }], [pool], need)[0].fitVerdict).toBe("unverified");
+  });
+
+  it("keeps providers separate and refuses ambiguous or periodic pools", () => {
+    expect(calculatePoolCapacity({ ...pool, provider: "other" }, [item]).resources).toHaveLength(0);
+    expect(compare([item], [{ ...pool, provider: "other" }])[0].fitVerdict).toBe("unverified");
+    expect(compare([item], [pool, { ...pool, poolId: "other" }])[0].fitVerdict).toBe("unverified");
+    expect(compare([item], [{ ...pool, period: "month" }])[0].fitVerdict).toBe("unverified");
+    expect(() => calculatePoolCapacity({ ...pool, metric: "requests_per_month" }, [item])).toThrow();
+  });
+
+  it("deduplicates candidate rows and consumers", () => {
+    const binding: ProjectResourceBinding = { resourceId: item.resourceId, projectId: "project", status: "in_use" };
+    const result = compareObjectStorageCandidates([item, item], [pool], { estimatedBytes: 1 }, [binding, binding]);
+    expect(result).toHaveLength(1);
+    expect(result[0].sharedAllowanceRemainingBytes).toBe(5);
+    expect(result[0].projectConsumers).toEqual(["project"]);
+  });
+
+  it("refuses conflicting duplicate observations regardless of row order", () => {
+    const conflicting = { ...item, observedBytes: 1 };
+    for (const items of [[item, conflicting], [conflicting, item]]) {
+      expect(compare(items)[0].fitVerdict).toBe("unverified");
+    }
+  });
+
+  it("requires complete membership before reporting measured pool headroom", () => {
+    expect(compare([item], [{ ...pool, inventoryComplete: undefined }])[0].fitVerdict).toBe("unverified");
+    expect(calculatePoolCapacity(pool, []).remainingObserved).toBeNull();
+  });
+
+  it("keeps compute observations separate from declared budgets", () => {
+    const cpu = calculatePoolCapacity({ ...pool, metric: "compute_milli_cpu" },
+      [{ ...item, declaredMilliCpu: 20, observedMilliCpu: 95 }]);
+    expect(cpu.remainingObserved).toBe(5);
+    expect(cpu.remainingUnallocated).toBe(80);
+    const memory = calculatePoolCapacity({ ...pool, metric: "compute_mem_mi" },
+      [{ ...item, declaredMemMi: 20, observedMemMi: 90 }]);
+    expect(memory.remainingObserved).toBe(10);
+  });
+
+  it("rejects invalid units, unsafe numbers, demand and future timestamps", () => {
+    expect(parseStorageBytes("1 garbage")).toBeNull();
+    expect(parseStorageBytes("999999999999999 TB")).toBeNull();
+    expect(parseComputeMilli(Number.MAX_VALUE)).toBeNull();
+    expect(() => compare([item], [pool], { estimatedBytes: -1 })).toThrow();
+    expect(evaluateFreshness("2099-01-01", new Date("2026-11-16"))).toBe("unmeasured");
+    expect(evaluateFreshness("2026-11-16", new Date("invalid"))).toBe("unmeasured");
   });
 });
