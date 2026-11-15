@@ -16,13 +16,15 @@ def validate(text, today):
     if len(entries) != 1:
         raise ValueError("Expected exactly the owner-approved optional-image exception")
     entry = entries[0]
-    required = {"id", "finding", "path", "severity", "owner", "review_by", "reason", "risk"}
+    required = {"id", "finding", "path", "severity", "owner", "review_by", "reason", "risk", "compose_path", "service"}
     if set(entry) != required or not all(isinstance(v, str) and v.strip() for v in entry.values()):
         raise ValueError("Incomplete exception record")
     if (entry["id"], entry["finding"], entry["path"], entry["severity"], entry["owner"]) != (
         "EX-001", "AVD-DS-0002", "cliproxy/Dockerfile", "HIGH", "@easemyhosting-com"
     ):
         raise ValueError("Exception cannot broaden paths, ownership, findings or severity")
+    if (entry["compose_path"], entry["service"]) != ("compose.yml", "cli-proxy-api"):
+        raise ValueError("Exception must identify exactly the accepted gateway service")
     deadline = date.fromisoformat(entry["review_by"])
     if deadline > date(2026, 12, 15):
         raise ValueError("Exception extension requires a reviewed policy change")

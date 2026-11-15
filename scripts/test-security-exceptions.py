@@ -27,7 +27,7 @@ class ExceptionTests(unittest.TestCase):
             policy.validate(self.text, date(2026, 12, 16))
 
     def test_scope_and_severity_cannot_be_changed(self):
-        for old, new in [("cliproxy/Dockerfile", "Dockerfile"), ("HIGH", "LOW"), ("AVD-DS-0002", "AVD-DS-0001")]:
+        for old, new in [("cliproxy/Dockerfile", "Dockerfile"), ("HIGH", "LOW"), ("AVD-DS-0002", "AVD-DS-0001"), ("cli-proxy-api", "another-service"), ("compose.yml", "other.yml")]:
             with self.assertRaises(ValueError):
                 policy.validate(self.text.replace(old, new), date(2026, 11, 15))
 
