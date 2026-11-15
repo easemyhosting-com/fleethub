@@ -1,0 +1,11 @@
+# Repository rules must require CODEOWNER approval for these controls.
+/security/known-exceptions.md @easemyhosting-com
+/security/allowed-identifiers.txt @easemyhosting-com
+/scripts/check-security-exceptions.py @easemyhosting-com
+/.github/CODEOWNERS @easemyhosting-com
+/.github/workflows/ci.yml @easemyhosting-com
+/compose.yml @easemyhosting-com
+/compose.yaml @easemyhosting-com
+/scripts/check-compose-policy.mjs @easemyhosting-com
+/.githooks/pre-commit @easemyhosting-com
+/.github/workflows/security.yml @easemyhosting-com
