@@ -5,6 +5,7 @@ import { readSnapshot } from "../src/lib/inventory/snapshot";
 import { queryClient } from "../src/lib/db/client";
 import { bootstrapDatabase } from "../src/lib/db/bootstrap";
 import { authenticateProjectKey, createProjectKey, revokeProjectKey } from "../src/lib/projects/keys";
+import { hostKey } from "../src/lib/capacity/addresses";
 import { readHostCapacities } from "../src/lib/capacity/read";
 import { readFootprints, readOrphans, readUsedBy } from "../src/lib/projects/footprint";
 import { decideLink, syncProjectFromFiles } from "../src/lib/gitops/sync";
@@ -108,6 +109,32 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
     expect(ids).toContain("proj-free-db"); expect(ids).not.toContain("proj-paid-db");
     await expect(recordNeed(projectId, "need-key", { ...need, purpose: "something else" })).rejects.toBeInstanceOf(ReportConflict);
   });
+  it("joins real host metadata and measurements into constraints-first compute advice", async () => {
+    const hosts = ["compute-fit-good", "compute-fit-wrong"];
+    try {
+      for (const id of hosts) {
+        const attributes = { billing: "free_tier", specs: { ocpus: 4, memoryGb: 8, architecture: id.endsWith("wrong") ? "amd64" : "aarch64" } };
+        await queryClient`INSERT INTO resources (id,name,category,provider,account_email,state,region,attributes)
+          VALUES (${id},${id},'compute','manual','fixture@example.com','online','region-a',${JSON.stringify(attributes)})`;
+        await queryClient`INSERT INTO project_placements (id,project_id,host_name,host_resource_id,runtime,source,evidence,declared)
+          VALUES (${randomUUID()},${projectId},${id},${id},'docker','manual','fixture',${JSON.stringify({ cpuRequestMilli: 1000, memRequestMi: 2048 })})`;
+        await queryClient`INSERT INTO host_measurements (connector_id,instance,host_key,cpu_cores,cpu_busy_cores,mem_total_mi,mem_used_mi,measured_at)
+          VALUES ('compute-fit-fixture',${id},${hostKey(id)},4,1,8192,2048,NOW())`;
+      }
+      const need = { kind: "compute" as const, purpose: "compute fixture", spec: { cpu: 1, memoryGb: 2, arch: "arm64" as const, region: "region-a" } };
+      const first = await recordNeed(projectId, "compute-fit-current", need);
+      expect(first.recommendation).toMatchObject({ allocated: false, candidates: [{ resourceId: hosts[0], computeFit: { verdict: "fits" } }], excluded: [{ resourceId: hosts[1], computeFit: { verdict: "mismatch" } }] });
+      await queryClient`UPDATE host_measurements SET measured_at = NOW() - interval '2 hours' WHERE connector_id = 'compute-fit-fixture'`;
+      const stale = await recordNeed(projectId, "compute-fit-stale", need);
+      expect(stale.recommendation).toMatchObject({ candidates: [{ resourceId: hosts[0], computeFit: { verdict: "unverified" } }] });
+    } finally {
+      await queryClient`DELETE FROM project_needs WHERE project_id = ${projectId} AND idempotency_key IN ('compute-fit-current','compute-fit-stale')`;
+      await queryClient`DELETE FROM host_measurements WHERE connector_id = 'compute-fit-fixture'`;
+      await queryClient`DELETE FROM project_placements WHERE host_resource_id = ANY(${hosts})`;
+      await queryClient`DELETE FROM resources WHERE id = ANY(${hosts})`;
+    }
+  });
+
   it("accepts usage with no need, links a registered resource, and keeps unknown references", async () => {
     const period = { periodStart: new Date(Date.now() - 3600_000).toISOString(), periodEnd: new Date().toISOString(), metrics: {} };
     expect(await recordUsage(projectId, "use-1", { resource: "proj-free-db", amount: 1, unit: "GB", ...period })).toMatchObject({ matched: true, duplicate: false });
