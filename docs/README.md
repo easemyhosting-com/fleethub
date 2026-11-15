@@ -44,3 +44,5 @@ Never put private host state, credentials or local environment exports in docume
 - [Resource collection and evidence coverage](65-resource-coverage-matrix.md): implemented collectors, manual evidence, catalog-only references and unsupported measurements.
 
 - [Offline master-key rotation](66-offline-master-key-rotation.md): transactional maintenance, separate key files and interruption recovery.
+
+- [Backend selection and credential migration](67-backend-selection-and-migration-design.md): design for an explicit per-credential backend choice and verified, reversible migration between stores.
