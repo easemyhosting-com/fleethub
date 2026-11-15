@@ -26,8 +26,12 @@ describe("cloudflare token expiry", () => {
     expect((await cloudflareTokenExpiry("t", "acct1", signal))?.toISOString()).toBe("2027-03-01T00:00:00.000Z");
     mockFetch(() => ({ success: true, result: { id: "tok-1", status: "active" } }));
     expect(await cloudflareTokenExpiry("t", "acct1", signal)).toBeNull();
-    mockFetch(() => ({ success: true, result: { id: "tok-1", expires_on: "not a date" } }));
-    expect(await cloudflareTokenExpiry("t", "acct1", signal)).toBeNull();
+    mockFetch(() => ({ success: true, result: { id: "tok-1", expires_on: "2027-03-01T05:30:00+05:30" } }));
+    expect((await cloudflareTokenExpiry("t", "acct1", signal))?.toISOString()).toBe("2027-03-01T00:00:00.000Z");
+    for (const malformed of ["not a date", "2027-03-01T00:00:00", "2027-03-01"]) {
+      mockFetch(() => ({ success: true, result: { id: "tok-1", expires_on: malformed } }));
+      await expect(cloudflareTokenExpiry("t", "acct1", signal), malformed).rejects.toMatchObject({ code: "provider_rejected" });
+    }
   });
 });
 
