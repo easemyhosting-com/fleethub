@@ -20,7 +20,7 @@ New tables `entitlements` (what a plan offers), `allowances` (what the owner per
 - Seeded: Workers AI 10,000 neurons/day (verified from Cloudflare's pricing page), Upstash Box 5 CPU-hours/month and 10 concurrent boxes (verified from Upstash's pricing page), OCI Ampere A1 (reported), and Workers, KV, R2 and D1 figures (unverified, to be checked).
 - Allowances are global or per account; planning uses the smaller of entitlement and allowance.
 - UI: **Limits & allowances** in the sidebar shows every figure with its status and source, lets an operator set or clear an allowance, and correct a figure (which marks it `reported`). API: `GET/POST /api/capacity/limits` (operator-only writes, audited, strict validation).
-- Not built yet: agent-proposed changes that wait for approval, YAML export/import, and the MCP read tools; they come with the capacity tools in M2.
+- Not built yet: agent-proposed allowance changes with approval and YAML export/import. Read-only MCP tools already exist; they do not expose a complete entitlement-editing API or establish measured remaining quota. See [agent tools](35-connect-agents-to-mcp.md).
 
 ## Verification
 

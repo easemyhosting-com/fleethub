@@ -1,5 +1,7 @@
 # Reuse-first onboarding: first implementation batch
 
+Historical snapshot: pending work and test counts in this record apply to its original increment. For current shipped behavior and remaining work, use [delivery tasks](../61-reuse-first-delivery-tasks.md) and [the current execution plan](../62-next-two-weeks.md).
+
 Implemented on the pre-release development tree. Tracked work: [delivery checklist](../61-reuse-first-delivery-tasks.md). This record describes the first slice, not completion of the broader roadmap.
 
 ## Delivered behavior

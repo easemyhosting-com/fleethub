@@ -48,11 +48,15 @@ The [operating model](docs/25-safe-orchestration-operating-model.md) defines gui
 
 ## Standard MCP (local stdio, read-only)
 
-`npm run build:mcp` bundles a standard MCP server that speaks stdio using the official SDK. Configure a client to run `node build/mcp-stdio.mjs` with `FLEETHUB_URL` (default `http://localhost:3060`; https or loopback http only) and a per-agent key from **Agent access** in `FLEETHUB_READONLY_KEY` (the shared `FLEETHUB_READONLY_KEY` from your setup also works). It exposes the six read-only tools, relays calls to the authenticated `/api/mcp` bridge, and reports any failure as an error result rather than empty inventory. It has no write, refresh, SSH or execution tools. Streamable HTTP transport and MCP OAuth are not implemented. See [connecting agents](docs/35-connect-agents-to-mcp.md) for Claude Code, Codex and T3 Code setup. The bundle needs `node_modules`, so it is not part of the Docker image.
+`npm run build:mcp` bundles a standard MCP server that speaks stdio using the official SDK. Configure a client to run `node build/mcp-stdio.mjs` with `FLEETHUB_URL` (default `http://localhost:3060`; https or loopback http only) and a per-agent key from **Agent access** in `FLEETHUB_READONLY_KEY` (the shared `FLEETHUB_READONLY_KEY` from your setup also works). It exposes the nine read-only tools declared in `src/lib/mcp/tools.ts`, relays calls to the authenticated `/api/mcp` bridge, and reports any failure as an error result rather than empty inventory. It has no write, refresh, SSH or execution tools. Streamable HTTP transport and MCP OAuth are not implemented. See [connecting agents](docs/35-connect-agents-to-mcp.md) for Claude Code, Codex and T3 Code setup. The bundle needs `node_modules`, so it is not part of the Docker image.
 
 ## Agent context
 
 `GET /api/agent-context` and the `get_fleet_context` bridge tool report registered inventory, setup readiness, credential-reference metadata, protection rules, unknowns, and connection guidance. They do not probe hosts or retrieve secrets. See [the minimum context contract](docs/26-agent-context-contract.md). External agents can submit structured, unverified reports through [observation writeback](docs/27-observation-writeback.md), using a dedicated reporting credential. Reports never change inventory or permissions.
+
+## Contributing and next work
+
+The canonical product repository is [easemyhosting-com/fleethub](https://github.com/easemyhosting-com/fleethub). Use a clean checkout of its public main for new work. The original private development history is retained separately, not merged into public contributions. See [repository workflow](docs/63-repository-and-release-workflow.md), [the next two weeks](docs/62-next-two-weeks.md), and the [documentation audit](docs/planning/2026-11-15-plan-audit.md).
 
 ## Maintenance
 

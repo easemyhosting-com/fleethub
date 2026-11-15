@@ -24,7 +24,7 @@ Implements the first part of the approved plan in [product scope](44-product-sco
 - Key rotation for the built-in store is not implemented (re-encrypt all secrets under a new key); plan it before recommending the store for important credentials. Until then, losing or leaking the key means replacing the stored credentials.
 - Moving existing credentials between Infisical and the built-in store is not implemented.
 - The setup verification still expires after 15 minutes (configurable, docs/38); for the built-in store a re-verify is one local click.
-- Next slices of M1: Cloudflare resource listings, entitlements and allowances store, OCI read-only collector, resource vocabulary and the Fleet Map ([product scope](44-product-scope-and-onboarding-tiers.md)).
+- Cloudflare listings, entitlements/allowances, the read-only OCI collector, resource profiles and Fleet Map have since shipped. Use [the current plan](62-next-two-weeks.md) for follow-ups; do not rebuild them from the historical M1 proposal.
 
 ## Verification
 

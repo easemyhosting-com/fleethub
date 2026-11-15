@@ -2,6 +2,9 @@
 
 ## Start here
 
+- [Next two weeks](62-next-two-weeks.md): current baseline, ordered tasks, acceptance cases and briefs for smaller models.
+- [Repository and release workflow](63-repository-and-release-workflow.md): canonical public repository, history boundary and merge gates.
+
 - [Self-onboarding runbook](23-self-onboarding.md): installation commands and connection checks. Connect existing Infisical and CLIProxyAPI instances, or install either locally through its own optional Compose profile.
 - [Setup tiers and the built-in store](45-setup-tiers-and-builtin-secret-store.md): independent setup connections and credential-backend behavior.
 - [Reuse-first onboarding and UX plan](60-reuse-first-onboarding-and-ux-plan.md): current integration decisions, credential ownership, the database decision and delivery batches.
@@ -25,6 +28,8 @@
 - [Connecting agents over MCP](35-connect-agents-to-mcp.md)
 
 ## Operations
+
+- [Documentation audit](planning/2026-11-15-plan-audit.md): inventory, drift corrections and evidence limits.
 
 - [Low-write local Docker](34-low-write-local-docker.md) and [hot-reloaded configuration](38-hot-reload-config.md)
 - [Read-only Kubernetes RBAC](assets/fleethub-readonly-rbac.yaml) and [Docker socket proxy](assets/docker-socket-proxy.compose.yml) examples

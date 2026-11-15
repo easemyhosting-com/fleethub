@@ -1,5 +1,7 @@
 # Product scope and onboarding tiers (proposal)
 
+Current planning: [next two weeks](62-next-two-weeks.md). M1-M4 below are product themes, not completion checklists. Setup tiers, built-in credentials, read-only OCI inventory, GitOps reads, connector schedules and MCP have progressed beyond the original baseline. No milestone label authorizes execution.
+
 Status: approved by the owner on 2026-10-28; first slice (setup tiers and built-in secret store) implemented, see [docs/45](45-setup-tiers-and-builtin-secret-store.md). FleetHub is being built as an open-source project, so the default install must not assume any particular stack (Tailscale, Flux, k3s, CLIProxy).
 
 > Updated direction: [reuse-first onboarding and UX plan](60-reuse-first-onboarding-and-ux-plan.md). Existing-service connection comes first, local installation is explicit and independent, and both the identity mind map and Fleet Map are preserved. Historical “today” descriptions below predate the implemented setup tiers.

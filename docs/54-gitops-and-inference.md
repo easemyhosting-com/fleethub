@@ -5,7 +5,7 @@ Part of [docs/52](52-projects-needs-usage-and-gitops.md) steps 5 and 7 (read sid
 ## Two ways in, one reconcile
 
 1. **Push (no token stored in FleetHub):** a CI job in the GitOps repo posts its YAML to `POST /api/hooks/gitops` with a project key. Body `{files:[{path, content}]}`, at most 200 files, 200 KB each, 2 MB total. Links are written only for the key's own project. Same auth, timestamp window and rate limit as the other hooks.
-2. **Pull (operator-triggered):** `POST /api/gitops/sync {projectId, repo, branch?, path?}` reads YAML under a path through the GitHub API, read-only. It needs `FLEETHUB_GITHUB_READ_TOKEN` on the server (a fine-grained token with Contents: read on that one repository). Without it the route answers 409 with instructions; the token is never sent to the browser.
+2. **Pull (operator-triggered):** `POST /api/gitops/sync {projectId, repo, branch?, path?}` reads YAML under a path through the GitHub API, read-only. It uses the signed-in operator's GitHub App authorization when connected, otherwise `FLEETHUB_GITHUB_READ_TOKEN` on the server (a fine-grained token with Contents: read on that repository). Without usable authorization the route reports a connection error; credentials are never sent to the browser. See [GitHub App setup](52-projects-needs-usage-and-gitops.md#authorize-a-github-app-for-gitops).
 
 Both call `syncProjectFromFiles` (`src/lib/gitops/sync.ts`).
 
@@ -40,7 +40,7 @@ Every link stores its evidence sentence, so "why does project X use this" has an
 
 ## Not built yet
 
-Cloudflare Worker bindings as evidence (needs the Workers settings API), observed traffic, Flux Kustomization health, drift ("manifest says it runs on a stopped node"), and opening pull requests back to the repo (M4). A GitHub App or per-repo stored token instead of the env token.
+Cloudflare Worker bindings as evidence, observed-traffic attribution, desired-versus-live placement drift, and opening pull requests back to the repo (M4). GitHub App authorization is implemented. Live Kubernetes/Flux discovery and Prometheus measurements are separate [connectors](56-live-connectors.md); neither establishes complete reconciliation of desired state or universal service health.
 
 ## Tests
 

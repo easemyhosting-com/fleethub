@@ -14,7 +14,7 @@ Part of [docs/52](52-projects-needs-usage-and-gitops.md). Recommend-only: nothin
 
 ## Hook API (project key)
 
-Both endpoints require `Authorization: Bearer fhp_...`, `X-FleetHub-Timestamp: <ISO time within 5 minutes>`, and `Idempotency-Key`. The project comes only from the key; a body can never name another project. Bodies are strict schemas (unknown keys rejected) with an 8 KB limit; 120 requests per minute per project (Redis when configured, per process otherwise; a failing shared limiter denies).
+Both endpoints require `Authorization: Bearer fhp_...`, `X-FleetHub-Timestamp: <ISO time within 5 minutes>`, and `Idempotency-Key`. The project comes only from the key; a body can never name another project. Bodies are strict schemas (unknown keys rejected) with an 8 KB limit; 120 requests per minute per project (shared PostgreSQL in non-local production, per process in local/development mode; a failing shared limiter denies).
 
 ```bash
 curl -sS -X POST "$FLEETHUB/api/hooks/needs" \
@@ -36,11 +36,11 @@ The original capacity design planned HMAC signatures with a per-source secret "s
 
 - `GET /api/projects/footprint` (read-only; `?project=slug` for one): footprints, orphans (resources no project links to) and the resource to projects map. A project with no usage reports shows `never`; one that stopped for 7 days shows `stale`, never zero.
 - Projects tab: register a project, issue and revoke keys (key shown once, curl examples use placeholders), footprint cards with attention reasons, Orphans and idle. Resource drawer on the Fleet Map shows "Used by".
-- MCP (read-only, 8 tools now): `find_free_capacity {kind, providers?}` and `get_project_footprint {project?}`. Declaring a need is deliberately not an MCP tool; projects post to the hook so MCP stays read-only.
+- MCP (read-only; the authoritative tool list is `src/lib/mcp/tools.ts`): `find_free_capacity {kind, providers?}` and `get_project_footprint {project?}`. Declaring a need is deliberately not an MCP tool; projects post to the hook so MCP stays read-only.
 
 ## Not built yet
 
-Outbound `needs.decided` webhook, leases and allocations, a Project filter in the filter bar, inference and GitOps (docs/52 build order, steps 5 to 7). `/api/hooks/*` bypass the session proxy by design; the routes authenticate themselves (`src/proxy.ts`).
+Outbound `needs.decided` webhook and leases/reservations remain unimplemented. The Project filter, inference and GitOps are implemented; see [the current project contract](52-projects-needs-usage-and-gitops.md#dashboard-project-footprint). Existing `allocated` link statuses do not reserve capacity. `/api/hooks/*` bypass the session proxy by design; the routes authenticate themselves (`src/proxy.ts`).
 
 ## Tests
 

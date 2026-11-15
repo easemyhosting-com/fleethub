@@ -1,6 +1,8 @@
 # Projects, needs, usage and GitOps (roadmap and design, 2026-11-05)
 
-Status: proposal; build order steps 2 and 3 (schema, webhook inbox) built 2026-11-05, see [docs/53](53-project-hooks.md); GitOps ingestion and inference (read side) built the same day, see [docs/54](54-gitops-and-inference.md). Written after a full review of the open items (docs/40, 42, 43, 44, 51). Defaults below are assumptions; change them by editing this file, not by answering questions.
+Current status, 2026-11-15: the original baseline and build order below are historical. Projects, independent needs/usage hooks, GitOps ingestion and inference, project filtering, declared host capacity, Prometheus measurements, provider fetch prompts and read-only MCP tools exist. GitHub App authorization is implemented. Outbound decision delivery, reservations, an inventory collector for GitHub, and execution are not implemented. Use [the current plan](62-next-two-weeks.md) before selecting work; [hooks](53-project-hooks.md), [GitOps](54-gitops-and-inference.md) and [connectors](56-live-connectors.md) describe the supported contracts.
+
+Status: proposal; build order steps 2 and 3 (schema, webhook inbox) built 2026-11-05, see [docs/53](53-project-hooks.md); GitOps ingestion and inference (read side) built the same day, see [docs/54](54-gitops-and-inference.md). Written after a review of the then-current backlog; some internal predecessor records were not published. Defaults below are assumptions; change them by editing this file, not by answering questions.
 
 ## What the owner asked for
 
@@ -34,17 +36,15 @@ Quick wins first (each shippable alone):
 
 Then the new product layer (this document): projects, needs, usage reports, inference, GitOps.
 
-Then M3 as designed: audit UI, policies, kill switch, leases, actuator. Leases are the same object as an "allocation" here; do not build two.
+Then M3 as designed: audit UI, policies, kill switch, leases, actuator. A future lease and allocation must share one lifecycle design; the existing project-resource link status is not a lease or exclusive reservation.
 
 Security and hygiene (carry over): audit trail UI, account-scoped agent keys, nonce CSP, DPoP, external notifications for expiry, Tailscale CLI upgrade, Node 26 LTS review.
 
 ## 1. Connect-and-fetch prompt (per provider)
 
-After an account is connected and its first scan runs, the dialog shows a **"Fetch everything" prompt** specific to that provider. It is generated from a template per provider, filled with non-secret facts (account label, scope id, region, which resource kinds the collector already lists, which are still missing). The owner pastes it into any LLM agent that has the provider's CLI or MCP configured; the agent returns facts through the existing signed `POST /api/observations` path (extended with `kind: inventory_supplement` for resources the built-in collector cannot see).
+The in-app prompt builder is implemented in `src/lib/providers/prompts/index.ts`, with tests in `tests/provider-prompts.test.ts`. It covers the five inventory providers and additional catalog-only providers, using non-secret account/scope facts. The agent must use its own authorized read-only tooling and exclude credential values.
 
-Rules: the prompt never contains a secret, tells the agent to use its own already-authenticated tooling, asks for read-only calls only, and ends with the exact JSON shape to post back. Templates live in `src/lib/providers/prompts/<provider>.ts`, each with a test that asserts no credential-looking strings and that the JSON example validates against the schema.
-
-Until the in-app version ships, I (the assistant) produce this prompt on request right after you connect an account.
+The output is a manual JSON report containing provider/account, resources, limits and notes. It is not the strict `/api/observations` schema, and there is no `inventory_supplement` ingest endpoint. Observations can report only registered resources. Review the report manually; do not tell an agent to post this JSON to FleetHub or treat an unverified limit as measured quota. A validated import workflow would require a separate contract and is not part of the current two-week plan.
 
 ## 2. Projects
 

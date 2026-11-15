@@ -51,9 +51,9 @@ See [Observation writeback](27-observation-writeback.md) for the scoped reporter
 
 ## Compatibility and scope
 
-The current bridge is a limited JSON-RPC interface. Standard MCP transport, initialization/OAuth compatibility, per-client resource scopes, and a packaged agent skill remain separate integration work. A normal authenticated HTTP client can consume the context endpoint now.
+The HTTP bridge is a limited JSON-RPC interface. A standard local stdio MCP adapter is implemented; see [agent setup](35-connect-agents-to-mcp.md). Streamable HTTP, MCP OAuth, account-scoped client grants and a packaged agent skill remain separate integration work. A normal authenticated HTTP client can consume the context endpoint now.
 
-The existing global prerequisite gate is unchanged. The capability-specific prerequisite recommendation in document 25 remains proposed. No live infrastructure or production secrets were modified for this increment.
+The original increment preserved the then-global prerequisite gate. That gate has since been replaced by independent setup tiers: one verified secret backend enables credential storage, while private access and CLIProxy are optional. See [implemented setup tiers](45-setup-tiers-and-builtin-secret-store.md). The historical validation below did not modify live infrastructure or production secrets.
 
 ## Validation of this increment
 
