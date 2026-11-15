@@ -40,3 +40,5 @@
 Numbered files are stable records, so numbering has gaps where earlier internal planning notes were not published. A higher number alone does not prove a feature shipped; check each document's status.
 
 Never put private host state, credentials or local environment exports in documentation. Use placeholders such as `example.com` and documentation IP ranges.
+
+- [Resource collection and evidence coverage](65-resource-coverage-matrix.md): implemented collectors, manual evidence, catalog-only references and unsupported measurements.
