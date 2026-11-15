@@ -1,5 +1,7 @@
 # Reuse-first onboarding and FleetHub UX plan
 
+Current status, 2026-11-15: R0-R10 are implemented. This is the design decision record, not the next sprint backlog. Use [the two-week execution plan](62-next-two-weeks.md) for remaining work and [delivery evidence](61-reuse-first-delivery-tasks.md) for completed items. Detailed refinements below are design intent unless tied to implementation evidence.
+
 Decision date: 2026-11-08. The owner approved connecting existing services first, explicit optional local installation, and preserving the fleet mind map. This document records that direction and proposes implementation batches. It does not claim the batches are implemented or authorize deleting live data.
 
 Read this with [product scope](44-product-scope-and-onboarding-tiers.md), [implemented setup tiers](45-setup-tiers-and-builtin-secret-store.md), [identity hierarchy](51-person-email-account-hierarchy.md), and [delivery tasks](61-reuse-first-delivery-tasks.md). For integration onboarding and UX priorities, this decision supersedes older mandatory Tailscale/Infisical/CLIProxy sequences. Existing inventory, projects, hosts, usage attribution and MCP work remain in scope.
@@ -37,7 +39,7 @@ Keep PostgreSQL; do not add SQLite support. The web application and inventory wo
 | Rate limiting | Shared fail-closed PostgreSQL limiter | Verify deployment uses the new build |
 | CLIProxy | Verification checks models and a management credential-list response | Separate inference, management, account-status and quota capabilities |
 | Fleet exploration | Identity Graph defaults to graph; Fleet Map is a separate resource view | Preserve both; improve navigation, selection, readability and recovery |
-| Documentation | Older guides still describe ordered setup gates and manual-only OCI | Make current guidance easy to find and identify historical material |
+| Documentation | Current guides describe independent setup and read-only OCI collection; dated records retain historical evidence | Follow the [current execution plan](62-next-two-weeks.md) and distinguish shipped behavior from proposed work |
 
 ## Onboarding contract
 
@@ -147,7 +149,7 @@ The review used rendered page content and read-only navigation. It did not read 
 | 5 | Map/detail refinements | Both maps and current defaults remain; filters and selection agree across views; problem-account search preserves ownership context; unknown/stale/failed quota stays distinct; keyboard, mobile, long labels and large fleets are checked in the browser |
 | 6 | One non-LLM provider authorization adapter | Provider supports the chosen flow; state/PKCE or device-flow checks, refresh races, revocation, reconnect and secret-redaction tests pass |
 
-Batches 1 and 2 are implemented. Optional-service skips now persist separately from saved connections, and public guidance deprecates the bundled Infisical profile while preserving volumes and compatibility commands. The read-only v8 capability contract and bounded collection diagnostics are implemented. The owner's Infisical migration has verified runtime reads and stopped duplicate containers with volumes retained. The owner's gateway cutover is also runtime-verified, with duplicate service containers stopped and volumes retained. Shared map/details refinements and a new non-LLM authorization adapter remain pending. See [delivery tasks](61-reuse-first-delivery-tasks.md) for current evidence. No current deployment should be stopped merely to match the plan. Keep the pending project filter and outbound decision delivery visible; coordinate the project filter with shared view-filter semantics. Reservations and automatic actions retain their existing M3 policy boundary and are not prerequisites for this onboarding work.
+Batches 1 and 2 are implemented. Optional-service skips now persist separately from saved connections, and public guidance deprecates the bundled Infisical profile while preserving volumes and compatibility commands. The read-only v8 capability contract and bounded collection diagnostics are implemented. The owner's Infisical migration has verified runtime reads and stopped duplicate containers with volumes retained. The owner's gateway cutover is also runtime-verified, with duplicate service containers stopped and volumes retained. Shared map/details refinements (R7) and the GitHub App authorization adapter (R10) have merged into the public repository. See [delivery tasks](61-reuse-first-delivery-tasks.md) for current evidence. No current deployment should be stopped merely to match the plan. The confirmed-link project filter has merged. Outbound decision delivery remains pending; it must not introduce reservations or execution. Reservations and automatic actions retain their existing M3 policy boundary and are not prerequisites for this onboarding work.
 
 ## Repository organization
 

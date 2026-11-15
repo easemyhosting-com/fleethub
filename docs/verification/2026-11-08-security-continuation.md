@@ -1,5 +1,7 @@
 # Security continuation verification
 
+Historical snapshot: pending work and test counts in this record apply to its original increment. For current shipped behavior and remaining work, use [delivery tasks](../61-reuse-first-delivery-tasks.md) and [the current execution plan](../62-next-two-weeks.md).
+
 This follow-up starts from public commit `0af8cd8a5d3de312a639414ec90c6a0aafe6dbb4`. Changes remain local. Nothing in this record establishes full authenticated application acceptance.
 
 ## Ownership finding and fix

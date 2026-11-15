@@ -1,5 +1,7 @@
 # Person, email, account: the identity hierarchy (design, 2026-10-30)
 
+Current status: the problem and schema proposal below describe the pre-implementation baseline. The header lists completed steps; use [delivery tasks](61-reuse-first-delivery-tasks.md) and [the current plan](62-next-two-weeks.md) before treating a proposed field or view as missing.
+
 Status: steps 1 to 3 and 5 built 2026-10-31 to 2026-11-02 (schema, email dropdown, filter bar and server filters, plan detection and billing flag); step 4 (collapsible person and email tree with roll-up lines, in the Tiers view) built 2026-11-05. Requested by the owner after looking at the Identities and Accounts view.
 
 ## The problem

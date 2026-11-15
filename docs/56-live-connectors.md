@@ -73,7 +73,7 @@ Update 2026-11-06: the connector screen exists (Projects tab, "Connect a cluster
 
 ## Not built yet
 
-Scheduled rescans (today a scan is operator-triggered), Rancher Fleet and Argo `ApplicationSet` specifics beyond the label fallbacks, Portainer/Coolify APIs, Terraform state, and Flux notification-controller webhooks as a "something changed, rescan now" trigger.
+Rancher Fleet and Argo `ApplicationSet` specifics beyond the label fallbacks, Portainer/Coolify APIs and Terraform state. [Scheduled rescans and the scoped rescan hook](58-connector-schedules-and-rescan-hook.md) are implemented. A hook endpoint does not mean a Flux Provider/Alert has been installed on a live cluster.
 
 ## Tests
 

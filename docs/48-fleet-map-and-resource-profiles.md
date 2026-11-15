@@ -4,7 +4,7 @@ Status: built (M1). Part of [product scope](44-product-scope-and-onboarding-tier
 
 ## What the owner gets
 
-A "Fleet Map" tab, now the default view. Every resource from every account is one tile.
+A "Fleet Map" tab displays resources as tiles. Identities and Accounts retains its own default Graph view; the map does not replace it. Shared fleet filters can narrow the visible resources.
 
 - Group by provider, account, role, kind or region. Size by capacity or equally.
 - Filter by provider, account, kind, state, role; a needs-attention toggle.

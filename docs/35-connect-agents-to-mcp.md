@@ -38,7 +38,7 @@ T3 Code's own MCP server is a different thing: it lets outside agents drive T3 C
 ## What the tools return
 
 - `get_fleet_context`: registered accounts, setup readiness, protection rules, unknowns.
-- `list_resources`: the stored resource snapshot, with freshness and protection. Filter by `accountId`, `category`, `includeMissing`.
+- `list_resources`: the stored resource snapshot, with freshness and protection. Filter by `accountId`, `project`, `category`, `includeMissing`.
 - `get_fleet_capacity`: inventory counts. CPU, memory and storage capacity are `null` until measured.
 - `get_quotas`, `get_llm_endpoints`: quota is reported unavailable and the gateway endpoint as configured, never as measured usage.
 - `plan_host_enrollment`: a non-executable proposal. It does not connect to hosts.

@@ -1,5 +1,7 @@
 # FleetHub operating model for safe assisted orchestration
 
+Status update, 2026-11-15: the prerequisite discussion below records the 2026-10-26 baseline. Independent optional connections and a built-in encrypted backend have since shipped; [docs/45](45-setup-tiers-and-builtin-secret-store.md) and [docs/60](60-reuse-first-onboarding-and-ux-plan.md) supersede that global gate. The local stdio MCP adapter is implemented. SSH, privileged executors and resource mutation remain deferred. Do not implement those proposals as part of [the current two-week plan](62-next-two-weeks.md).
+
 Researched 2026-10-26. This document recommends the product direction. It distinguishes existing implementation from proposed execution features. No live server enrollment, SSH access, secret import, or network policy change is authorized by this research.
 
 ## Vision
