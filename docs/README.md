@@ -2,6 +2,8 @@
 
 ## Start here
 
+- [Current product direction](64-resource-advisor-and-integration-boundaries.md): resource comparisons, evidence-backed advice, replaceable integrations and provider-policy boundaries.
+
 - [Next two weeks](62-next-two-weeks.md): current baseline, ordered tasks, acceptance cases and briefs for smaller models.
 - [Repository and release workflow](63-repository-and-release-workflow.md): canonical public repository, history boundary and merge gates.
 

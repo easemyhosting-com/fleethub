@@ -1,5 +1,7 @@
 # Product scope and onboarding tiers (proposal)
 
+> Direction update, 2026-11-15: [resource advisor and replaceable integrations](64-resource-advisor-and-integration-boundaries.md) takes precedence over conflicting priorities below. Prove the core account/resource/capacity/service-relationship journey first. Generic AI endpoints and retirement of bundled gateway profiles are target work, not implemented behavior. Existing security and migration gates remain unchanged.
+
 Current planning: [next two weeks](62-next-two-weeks.md). M1-M4 below are product themes, not completion checklists. Setup tiers, built-in credentials, read-only OCI inventory, GitOps reads, connector schedules and MCP have progressed beyond the original baseline. No milestone label authorizes execution.
 
 Status: approved by the owner on 2026-10-28; first slice (setup tiers and built-in secret store) implemented, see [docs/45](45-setup-tiers-and-builtin-secret-store.md). FleetHub is being built as an open-source project, so the default install must not assume any particular stack (Tailscale, Flux, k3s, CLIProxy).
@@ -20,7 +22,7 @@ A feature moves from recipe to connector only when two unrelated users would nee
 
 ## Onboarding today versus proposed
 
-Today the wizard requires Tailscale, then Infisical, then CLIProxy before any credentialed provider can be stored. That is the owner's stack and too heavy for a new open-source user.
+Historical baseline before the implemented setup tiers: the wizard required Tailscale, Infisical and CLIProxy. Those external integrations no longer gate inventory.
 
 Proposed: a **checklist with tiers**, each item showing verified, skipped or not applicable, none blocking except the secret store:
 

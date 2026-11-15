@@ -1,5 +1,9 @@
 # Reuse-first onboarding and FleetHub UX plan
 
+> Direction update, 2026-11-15: [resource advisor and replaceable integrations](64-resource-advisor-and-integration-boundaries.md) takes precedence over conflicting priorities below. Prove the core account/resource/capacity/service-relationship journey first. Generic AI endpoints and retirement of bundled gateway profiles are target work, not implemented behavior. Existing security and migration gates remain unchanged.
+
+The earlier decision to retain the bundled CLIProxy profile is superseded as a distribution target. Current profiles remain available until a separately tested compatibility release; never stop services or delete volumes as part of this documentation change.
+
 Current status, 2026-11-15: R0-R10 are implemented. This is the design decision record, not the next sprint backlog. Use [the two-week execution plan](62-next-two-weeks.md) for remaining work and [delivery evidence](61-reuse-first-delivery-tasks.md) for completed items. Detailed refinements below are design intent unless tied to implementation evidence.
 
 Decision date: 2026-11-08. The owner approved connecting existing services first, explicit optional local installation, and preserving the fleet mind map. This document records that direction and proposes implementation batches. It does not claim the batches are implemented or authorize deleting live data.

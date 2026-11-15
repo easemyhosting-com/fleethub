@@ -1,5 +1,9 @@
 # FleetHub execution plan, 16-29 November 2026
 
+> Direction update, 2026-11-15: [resource advisor and replaceable integrations](64-resource-advisor-and-integration-boundaries.md) takes precedence over conflicting priorities below. Prove the core account/resource/capacity/service-relationship journey first. Generic AI endpoints and retirement of bundled gateway profiles are target work, not implemented behavior. Existing security and migration gates remain unchanged.
+
+The public-main SHA and PR references below are historical planning evidence, not this checkout’s current release checkpoint. N4/N5 outbound delivery now follows the core comparison/evidence work in docs/64. No remote refresh or release acceptance is implied.
+
 Status: prepared plan, not a claim of release acceptance. This plan audits the
 existing roadmap and proposes a bounded order for the next ten working days.
 It does not authorize infrastructure mutation or expand FleetHub into an executor.
