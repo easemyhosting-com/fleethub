@@ -2,6 +2,8 @@ name: Configuration security
 on:
   push:
   pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
   schedule:
     - cron: '19 4 * * 1'
 permissions: {}
@@ -59,3 +61,107 @@ jobs:
           format: table
           severity: HIGH,CRITICAL
           exit-code: '1'
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Install checksum-pinned gitleaks
+        run: |
+          python3 scripts/install-security-tools.py "$RUNNER_TEMP/security-bin"
+          echo "$RUNNER_TEMP/security-bin" >> "$GITHUB_PATH"
+      - name: Enforce tree, suppression and hook policies
+        run: |
+          bash scripts/check-forbidden.sh
+          bash scripts/test-guardrails.sh
+          node --test scripts/test-owner-review.mjs
+      - name: Verify all PR commit identities
+        if: github.event.pull_request != null
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/check-commit-policy.py --range "$BASE_SHA..$HEAD_SHA"
+      - name: Reject added suppression directives independently
+        run: python3 scripts/check-repository-policy.py --suppressions-only
+      - name: Scan PR commit history or all history on push and schedule
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            gitleaks git --redact --no-banner --ignore-gitleaks-allow --log-opts="$BASE_SHA..$HEAD_SHA" .
+          else
+            gitleaks git --redact --no-banner --ignore-gitleaks-allow .
+          fi
+      - run: npm audit --audit-level=high
+  owner-review:
+    if: github.event.pull_request != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Require owner review of identifier and exception policy edits
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-owner-review.mjs
+  static-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verified pinned analysis tools in an isolated environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/analysis-tools"
+          "$RUNNER_TEMP/analysis-tools/bin/pip" install --disable-pip-version-check semgrep==1.185.0 zizmor==1.32.0
+          echo "$RUNNER_TEMP/analysis-tools/bin" >> "$GITHUB_PATH"
+      - name: Export tracked source only
+        run: |
+          mkdir "$RUNNER_TEMP/scan-source"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/scan-source"
+      - name: Semgrep, including test fixtures and without inline bypasses
+        env:
+          SEMGREP_SEND_METRICS: 'off'
+        run: |
+          status=0
+          semgrep scan --config p/default --config p/typescript --config p/owasp-top-ten --config p/jwt --disable-nosem --metrics=off --error --json --output "$RUNNER_TEMP/semgrep.json" "$RUNNER_TEMP/scan-source/src" "$RUNNER_TEMP/scan-source/tests" "$RUNNER_TEMP/scan-source/scripts" > "$RUNNER_TEMP/semgrep-console.log" 2>&1 || status=$?
+          python3 scripts/scan-summary.py semgrep "$RUNNER_TEMP/semgrep.json"
+          exit "$status"
+      - name: Zizmor workflow security
+        run: zizmor --offline --min-severity low .github/workflows
+      - name: Trivy filesystem vulnerabilities and secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.1
+          scan-type: fs
+          scanners: vuln,secret
+          scan-ref: ${{ runner.temp }}/scan-source
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: json
+          output: ${{ runner.temp }}/trivy-fs.json
+      - name: Report filesystem finding counts only
+        if: always()
+        run: python3 scripts/scan-summary.py trivy "$RUNNER_TEMP/trivy-fs.json"

@@ -1,0 +1,40 @@
+name: CodeQL
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '41 4 * * 1'
+permissions: {}
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - name: Analyze
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          # Private repositories need GitHub Advanced Security before SARIF uploads are
+          # accepted. Set the CODEQL_UPLOAD repository variable to true once code
+          # scanning is enabled; analysis and the findings summary run either way.
+          upload: ${{ (github.event.repository.visibility == 'public' || vars.CODEQL_UPLOAD == 'true') && 'always' || 'never' }}
+          output: ${{ runner.temp }}/codeql-results
+      - name: Test redacted analysis summaries
+        run: node --test scripts/test-codeql-summary.mjs
+      - name: Summarize findings
+        env:
+          CODEQL_UPLOAD: ${{ github.event.repository.visibility == 'public' || vars.CODEQL_UPLOAD == 'true' }}
+        run: node scripts/codeql-summary.mjs "$RUNNER_TEMP/codeql-results"

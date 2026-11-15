@@ -4,17 +4,20 @@ on:
   pull_request:
   schedule:
     - cron: '23 3 * * 1'
-permissions:
-  contents: read
+permissions: {}
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   quality:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -26,45 +29,29 @@ jobs:
       - run: npm test
       - run: npm run build
   dependencies:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=moderate
-  codeql:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  container:
     permissions:
       contents: read
-      actions: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
-        with:
-          languages: javascript-typescript
-      - name: Analyze
-        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
-        with:
-          # Private repositories need GitHub Advanced Security before SARIF uploads are
-          # accepted. Set the CODEQL_UPLOAD repository variable to true once code
-          # scanning is enabled; analysis and the findings summary run either way.
-          upload: ${{ vars.CODEQL_UPLOAD == 'true' && 'always' || 'never' }}
-          output: ${{ runner.temp }}/codeql-results
-      - name: Summarize findings
-        env:
-          CODEQL_UPLOAD: ${{ vars.CODEQL_UPLOAD }}
-        run: node scripts/codeql-summary.mjs "$RUNNER_TEMP/codeql-results"
-  container:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: docker build --tag fleethub:ci .
       - name: Check production HTTP behavior
         run: |
@@ -78,20 +65,37 @@ jobs:
           image-ref: fleethub:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          scanners: vuln,secret
+          format: json
+          output: ${{ runner.temp }}/trivy-image.json
           exit-code: '1'
+      - name: Report image finding counts only
+        if: always()
+        run: python3 scripts/scan-summary.py trivy "$RUNNER_TEMP/trivy-image.json"
   secrets:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.76.1
           scan-type: fs
           scanners: secret
           scan-ref: .
+          format: json
+          output: ${{ runner.temp }}/trivy-secrets.json
           exit-code: '1'
+      - name: Report secret finding counts only
+        if: always()
+        run: python3 scripts/scan-summary.py trivy "$RUNNER_TEMP/trivy-secrets.json"
   inventory:
+    permissions:
+      contents: read
     name: ${{ matrix.timezone == 'UTC' && 'inventory' || format('inventory ({0})', matrix.timezone) }}
     strategy:
       fail-fast: false
@@ -120,6 +124,8 @@ jobs:
       DATABASE_URL: postgres://review:ci-local@127.0.0.1:5432/fleethub_security
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc

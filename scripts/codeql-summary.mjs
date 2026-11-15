@@ -26,8 +26,8 @@ const findSarifFiles = async directory => {
 const levelRank = { error: 0, warning: 1, note: 2, none: 3 };
 const sarifFiles = await findSarifFiles(root);
 if (sarifFiles.length === 0) {
-  console.log(`No SARIF results found under ${root}.`);
-  process.exit(0);
+  console.error("CodeQL produced no SARIF analysis results.");
+  process.exit(1);
 }
 
 const findings = [];
@@ -44,7 +44,6 @@ for (const file of sarifFiles) {
         score: rule?.properties?.['security-severity'] ?? 'n/a',
         ruleId,
         source: `${location?.artifactLocation?.uri ?? '(unknown)'}:${location?.region?.startLine ?? '?'}`,
-        message: (result.message?.text ?? '').replace(/\s+/g, ' ').trim(),
       });
     }
   }
@@ -56,8 +55,7 @@ if (findings.length === 0) {
 } else {
   console.log(`CodeQL reported ${findings.length} finding(s) across ${sarifFiles.length} analysis result file(s):`);
   for (const finding of findings) {
-    const message = finding.message.length > 200 ? `${finding.message.slice(0, 197)}...` : finding.message;
-    console.log(`- [${finding.level}] ${finding.ruleId} (security-severity ${finding.score}) ${finding.source} :: ${message}`);
+    console.log(`- [${finding.level}] ${finding.ruleId} (security-severity ${finding.score}) ${finding.source}`);
   }
 }
 if (process.env.CODEQL_UPLOAD === 'true') {

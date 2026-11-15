@@ -25,10 +25,14 @@ commits = module('commit_policy', 'check-commit-policy.py')
 
 class Guardrails(unittest.TestCase):
     def test_forbidden_examples(self):
-        samples = ['/'.join(['', 'Users', 'x']), 'gh' + 'p_' + 'A' * 36, 'person@' + 'unapproved.invalid', '10.' + '1.2.3', 'node.private.ts.' + 'net']
+        samples = ['/'.join(['', 'Users', 'x']), 'gh' + 'p_' + 'A' * 36, 'person@' + 'unapproved.invalid', 'person@' + 'private-host', '10.' + '1.2.3', 'node.private.ts.' + 'net']
         for sample in samples:
             with self.subTest(sample_kind=samples.index(sample)):
                 self.assertTrue(policy.forbidden_hits(sample, 'sample.txt'))
+
+    def test_action_and_image_references_are_not_email_addresses(self):
+        self.assertFalse(policy.forbidden_hits('actions/setup-node@' + 'a' * 40, 'workflow.yml'))
+        self.assertFalse(policy.forbidden_hits('node:24-alpine@sha256:' + 'a' * 64, 'Dockerfile'))
 
     def test_exact_placeholders_do_not_mask_other_hosts(self):
         self.assertFalse(policy.forbidden_hits('your-tailnet.ts.net user@example.com 192.0.2.10', 'sample.txt'))
