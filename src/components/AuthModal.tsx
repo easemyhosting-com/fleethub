@@ -343,7 +343,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="operator@fleethub.dev"
+                    placeholder="operator@example.com"
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400"
                   />
                 </div>

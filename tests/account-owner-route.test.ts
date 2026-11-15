@@ -44,7 +44,7 @@ describe("/api/accounts/owner", () => {
   });
   it("validates, saves with the actor and maps errors", async () => {
     fixture.resolve.mockResolvedValue({ user: { ...user, sid }, scope: "operator" });
-    for (const bad of [{ accountId: "acc-1", ownerEmail: "nope" }, { accountId: "", ownerEmail: "a@b.co" }, { ...body, extra: 1 }]) expect((await post(bad)).status).toBe(400);
+    for (const bad of [{ accountId: "acc-1", ownerEmail: "nope" }, { accountId: "", ownerEmail: "a@fixture3.example.com" }, { ...body, extra: 1 }]) expect((await post(bad)).status).toBe(400);
     expect((await post(body)).status).toBe(200);
     expect(fixture.set).toHaveBeenCalledWith("acc-1", "alex@example.com", "op@example.test");
     fixture.set.mockRejectedValueOnce(new AccountOwnerError());

@@ -95,7 +95,7 @@ describe("vaulted provider registration", () => {
   it("uses safe defaults and marks Oracle accounts protected", async () => {
     await registerVaultedAccount({ providerId: "oracle", label: "OCI", config: { token: "secret" } });
     const account = fixture.sql.find(item => item.text.includes("INSERT INTO provider_accounts"));
-    expect(account?.values).toContain("operator@fleethub.dev");
+    expect(account?.values).toContain("operator@example.com");
     expect(account?.values).toContain(true);
     expect(account?.text).toContain("false");
   });

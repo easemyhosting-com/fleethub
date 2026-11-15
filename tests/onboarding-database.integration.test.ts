@@ -87,7 +87,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
 
   it("persists readiness and vault references while provider credentials stay outside PostgreSQL", async () => {
     expect((await getSetupState()).ready).toBe(false);
-    await saveSetupStep("tailscale", { tailnet: "fixture.ts.net", deviceId: "fixture-device" });
+    await saveSetupStep("tailscale", { tailnet: "your-tailnet.ts.net", deviceId: "fixture-device" });
     await verifySetupStep("tailscale");
     await saveSetupStep("infisical", { apiUrl: origin, consoleUrl: origin, projectId: "fixture-project", environment: "dev", secretPath: "/providers" });
     await verifySetupStep("infisical");
@@ -104,7 +104,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
     expect(resumed.ready).toBe(true);
     const concurrent = await Promise.all(Array.from({ length: 12 }, (_, index) => registerAccount({ providerId: "cloudflare", label: `Concurrent ${index}`, config: { apiToken: credential } })));
     expect(new Set(concurrent.map(account => account.id)).size).toBe(12);
-    await saveSetupStep("tailscale", { tailnet: "changed.ts.net", deviceId: "fixture-device" });
+    await saveSetupStep("tailscale", { tailnet: "your-tailnet.ts.net", deviceId: "fixture-device-updated" });
     expect((await getSetupState()).steps.map(step => step.status)).toEqual(["configured", "verified", "verified", "unconfigured"]);
     expect((await getSetupState()).ready).toBe(true);
     await saveSetupStep("infisical", { apiUrl: origin, consoleUrl: origin, projectId: "fixture-project", environment: "dev", secretPath: "/changed" });

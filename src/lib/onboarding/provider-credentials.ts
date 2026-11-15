@@ -69,7 +69,7 @@ export async function registerVaultedAccount(input: ProviderOnboarding) {
         if (attached.length !== 1) throw new AccountAttachmentError();
       } else {
         await transaction`INSERT INTO provider_accounts (id, kind, label, identity_id, contact_id, owner_email, login_email, role, is_protected, secret_ref_id, health, meta, enabled)
-          VALUES (${id}, ${input.providerId}, ${input.label}, ${input.identityId ?? null}, (SELECT c.id FROM identity_contacts c WHERE c.kind = 'email' AND LOWER(TRIM(c.value)) = LOWER(TRIM(${input.ownerEmail ?? "operator@fleethub.dev"})) ORDER BY c.is_primary DESC, c.created_at LIMIT 1), ${input.ownerEmail ?? "operator@fleethub.dev"}, ${input.loginEmail ?? input.ownerEmail ?? "operator@fleethub.dev"}, ${input.role ?? "general"}, ${input.providerId === "oracle" || input.isProtected === true}, ${refId}, 'unknown', ${JSON.stringify({ onboardingStatus: "credentials_vaulted" })}, false)`;
+          VALUES (${id}, ${input.providerId}, ${input.label}, ${input.identityId ?? null}, (SELECT c.id FROM identity_contacts c WHERE c.kind = 'email' AND LOWER(TRIM(c.value)) = LOWER(TRIM(${input.ownerEmail ?? "operator@example.com"})) ORDER BY c.is_primary DESC, c.created_at LIMIT 1), ${input.ownerEmail ?? "operator@example.com"}, ${input.loginEmail ?? input.ownerEmail ?? "operator@example.com"}, ${input.role ?? "general"}, ${input.providerId === "oracle" || input.isProtected === true}, ${refId}, 'unknown', ${JSON.stringify({ onboardingStatus: "credentials_vaulted" })}, false)`;
       }
       if (supportsInventory(input.providerId)) await enqueueInventory(id, transaction, credentialDigest(input.config ?? {}));
     });

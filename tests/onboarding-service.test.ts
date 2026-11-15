@@ -78,7 +78,7 @@ import { getSetupState, refreshStaleVaultSteps, runtimeFingerprint, saveSetupSte
 import { freshnessMs } from "../src/lib/onboarding/model";
 
 const configs = {
-  tailscale: { tailnet: "example.ts.net", deviceId: "node_1" },
+  tailscale: { tailnet: "your-tailnet.ts.net", deviceId: "node_1" },
   infisical: { apiUrl: "http://infisical:8080", consoleUrl: "http://localhost:8088", projectId: "proj_1", environment: "dev", secretPath: "/" },
   cliproxy: { apiUrl: "http://cli-proxy-api:8317", consoleUrl: "http://localhost:8317" },
   builtin: {},
@@ -190,7 +190,7 @@ describe("persisted setup state", () => {
   it("saving a step resets only that step, so other verified services stay verified", async () => {
     await readyThrough("cliproxy");
     const old = [...db.rows.values()].map(row => row.revision);
-    const state = await saveSetupStep("tailscale", { tailnet: "changed.ts.net", deviceId: "node_1" });
+    const state = await saveSetupStep("tailscale", { tailnet: "your-tailnet.ts.net", deviceId: "node_new" });
     expect(state.steps.map(step => step.status)).toEqual(["configured", "verified", "verified", "unconfigured"]);
     expect([...db.rows.values()].map(row => row.revision)).toEqual([old[0] + 1, old[1], old[2]]);
     expect(state.ready).toBe(true);
@@ -240,7 +240,7 @@ describe("persisted setup state", () => {
     verification.run.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
     const pending = verifySetupStep("tailscale");
     await vi.waitFor(() => expect(verification.run).toHaveBeenCalled());
-    await saveSetupStep("tailscale", { tailnet: "new.ts.net", deviceId: "node_1" });
+    await saveSetupStep("tailscale", { tailnet: "your-tailnet.ts.net", deviceId: "node_1" });
     release();
     await expect(pending).rejects.toThrow("Settings changed during verification");
     expect(db.rows.get("tailscale")?.status).toBe("configured");

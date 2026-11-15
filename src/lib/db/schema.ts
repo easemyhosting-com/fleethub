@@ -64,7 +64,7 @@ export const identityContacts = pgTable("identity_contacts", {
     .notNull()
     .references(() => identities.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(), // "email" | "phone"
-  value: text("value").notNull(), // e.g. "operator@fleethub.dev" or "+15550100198"
+  value: text("value").notNull(), // e.g. "operator@example.com" or "+15550100198"
   isPrimary: boolean("is_primary").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
   label: text("label"), // "Personal", "Work", "Alerts / SMS"

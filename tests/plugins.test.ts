@@ -34,15 +34,15 @@ describe("Plugin Registry & Launch Collectors", () => {
 
   it("executes collectAll across all 9 provider contexts and handles dashed account IDs", async () => {
     const contexts = [
-      { accountId: "oracle-production", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "cloudflare", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "upstash", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "github", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "turso", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "neon", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "gdrive", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "modal", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
-      { accountId: "freellmapi", accountEmail: "operator@fleethub.dev", credentials: {}, isMock: true },
+      { accountId: "oracle-production", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "cloudflare", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "upstash", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "github", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "turso", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "neon", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "gdrive", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "modal", accountEmail: "operator@example.com", credentials: {}, isMock: true },
+      { accountId: "freellmapi", accountEmail: "operator@example.com", credentials: {}, isMock: true },
     ];
 
     const results = await pluginRegistry.collectAll(contexts);
@@ -145,7 +145,7 @@ describe("Plugin Registry & Launch Collectors", () => {
     // Test collect
     const collectResult = await cliproxy?.collect({
       accountId: "acc-cliproxy",
-      accountEmail: "operator@fleethub.dev",
+      accountEmail: "operator@example.com",
       credentials: { endpointUrl: "http://127.0.0.1:8318" },
       isMock: true,
     });
@@ -172,7 +172,7 @@ describe("Plugin Registry & Launch Collectors", () => {
     // Test Infisical collect
     const infCollect = await infisical?.collect({
       accountId: "acc-inf",
-      accountEmail: "operator@fleethub.dev",
+      accountEmail: "operator@example.com",
       credentials: { baseUrl: "http://127.0.0.1:8088", projectSlug: "fleet" },
       isMock: true,
     });
@@ -186,7 +186,7 @@ describe("Plugin Registry & Launch Collectors", () => {
 
     // Presence of fields alone is not a verified connection.
     const connSuccess = await tailscale?.testConnection?.({
-      tailnet: "my-tailnet.ts.net",
+      tailnet: "your-tailnet.ts.net",
       authKey: "tskey-auth-12345",
     });
     expect(connSuccess?.ok).toBe(false);
@@ -199,9 +199,9 @@ describe("Plugin Registry & Launch Collectors", () => {
     // 3. Collect
     const collectResult = await tailscale?.collect({
       accountId: "acc-tailscale-test",
-      accountEmail: "operator@fleethub.dev",
+      accountEmail: "operator@example.com",
       credentials: {
-        tailnet: "my-tailnet.ts.net",
+        tailnet: "your-tailnet.ts.net",
         tailscaleIp: "100.64.0.1",
         role: "mesh_backbone",
       },

@@ -124,14 +124,14 @@ describe("Cloud Providers Discovery & Live Telemetry", () => {
       {
         id: "cf-main-dns",
         label: "Production DNS (fleethub.dev)",
-        ownerEmail: "operator@fleethub.dev",
+        ownerEmail: "operator@example.com",
         role: "dns_control",
         isProtected: true,
       },
       {
         id: "cf-worker-sandbox",
         label: "Ephemeral Jobs Pool",
-        ownerEmail: "bot@fleethub.dev",
+        ownerEmail: "bot@example.com",
         role: "worker_ephemeral",
         isProtected: false,
       },

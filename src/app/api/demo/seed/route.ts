@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   }
 }
 
-/** Removes only the demo rows, including those an older install seeded without the `demo-` prefix. Real inventory is never touched; if real data references a demo row, nothing is deleted. */
+/** Removes current fixed demo rows; refuses deletion when other data references them. */
 export async function DELETE(req: Request) {
   const auth = await verifyApiAccess(req, { requireWrite: true });
   if (!auth.authorized) {

@@ -14,7 +14,7 @@ export function RegisterResourceModal({ isOpen, onClose, onRegister }: Props) {
   const [selectedProvider, setSelectedProvider] = useState<string>("cloudflare");
   const [resourceName, setResourceName] = useState("");
   const [category, setCategory] = useState<string>("compute");
-  const [ownerEmail, setOwnerEmail] = useState("operator@fleethub.dev");
+  const [ownerEmail, setOwnerEmail] = useState("operator@example.com");
   const [infisicalPath, setInfisicalPath] = useState("/providers/cloudflare/main");
   const [tags, setTags] = useState<string>("arm64, fast");
 
@@ -133,8 +133,8 @@ export function RegisterResourceModal({ isOpen, onClose, onRegister }: Props) {
                 onChange={(e) => setOwnerEmail(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
               >
-                <option value="operator@fleethub.dev">operator@fleethub.dev (Primary)</option>
-                <option value="sandbox@fleethub.dev">sandbox@fleethub.dev (Sandbox)</option>
+                <option value="operator@example.com">operator@example.com (Primary)</option>
+                <option value="sandbox@example.com">sandbox@example.com (Sandbox)</option>
               </select>
               <p className="text-[11px] text-slate-500 mt-1">Isolates credentials & blast radius per identity.</p>
             </div>
