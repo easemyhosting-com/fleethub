@@ -39,6 +39,13 @@ class PrivateIdentifierTests(unittest.TestCase):
             self.assertNotIn("SyntheticOwnerForTest", str(hit))
             self.assertNotIn("synthetic-contact", str(hit))
 
+    def test_staged_identity_cannot_hide_behind_a_clean_working_copy(self):
+        self.seed.write_text("literal\tSyntheticOwnerForTest\n")
+        (self.root / "sample.txt").write_text("public example\n")
+        self.assertEqual(checker.scan(self.root, [self.seed]), [])
+        hits = checker.scan(self.root, [self.seed], staged=True)
+        self.assertEqual(hits, [("ID-1", "full", "sample.txt", 1)])
+
     def test_optional_supplement_is_scanned_without_seed(self):
         supplement = self.root / "supplement.txt"
         supplement.write_text("literal\tSyntheticOwnerForTest\n")
