@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readBoundedJson } from "@/lib/http/bounded";
 import { RotationError, type CredentialRotator, type RotateInput } from "./types";
 
 const base = "https://api.cloudflare.com/client/v4";
@@ -11,7 +12,7 @@ async function call(path: string, token: string, signal: AbortSignal, method = "
     redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
   });
   if (!response.ok) throw new RotationError("provider_rejected");
-  return response.json();
+  return readBoundedJson(response, 64 * 1024);
 }
 
 /** Finds the token's own id: user tokens verify at /user, account-owned tokens at /accounts/{id}. */
@@ -25,11 +26,17 @@ async function ownerPath(token: string, accountId: string, signal: AbortSignal):
   throw new RotationError("provider_rejected");
 }
 
-/** The token's own expiry date as reported by Cloudflare, or null when it never expires. */
+const providerInstant = z.iso.datetime({ offset: true });
+/**
+ * The token's own expiry as reported by Cloudflare, or null when it never expires. A date without
+ * a zone or offset would be read in server-local time, and a malformed one is not "never", so both
+ * are rejected and the stored expiry stays as it was.
+ */
 export async function cloudflareTokenExpiry(token: string, accountId: string, signal: AbortSignal): Promise<Date | null> {
   const { expiresOn } = await ownerPath(token, accountId, signal);
-  const at = expiresOn ? new Date(expiresOn) : null;
-  return at && !Number.isNaN(at.getTime()) ? at : null;
+  if (expiresOn === undefined || expiresOn === null || expiresOn === "") return null;
+  if (!providerInstant.safeParse(expiresOn).success) throw new RotationError("provider_rejected");
+  return new Date(expiresOn);
 }
 
 export const cloudflareRotator: CredentialRotator = {

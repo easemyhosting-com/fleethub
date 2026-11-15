@@ -76,6 +76,11 @@ describe("POST /api/hooks/needs", () => {
     fixture.recordNeed.mockRejectedValueOnce(new ReportConflict());
     expect((await postNeed(req("/api/hooks/needs", need))).status).toBe(409);
   });
+  it("accepts a current timestamp written with an explicit UTC offset", async () => {
+    const offset = new Date(Date.now() + 5.5 * 3_600_000).toISOString().replace("Z", "+05:30");
+    fixture.recordNeed.mockResolvedValue({ id: "need-1", duplicate: false, recommendation: { decision: "none_free", allocated: false } });
+    expect((await postNeed(req("/api/hooks/needs", need, { "x-fleethub-timestamp": offset }))).status).toBe(201);
+  });
   it("rejects missing or invalid keys, stale timestamps, bad bodies and missing idempotency keys", async () => {
     expect((await postNeed(req("/api/hooks/needs", need, { authorization: null }))).status).toBe(401);
     fixture.authenticate.mockResolvedValueOnce({ status: "invalid" });
@@ -83,6 +88,10 @@ describe("POST /api/hooks/needs", () => {
     fixture.authenticate.mockResolvedValueOnce({ status: "unavailable" });
     expect((await postNeed(req("/api/hooks/needs", need))).status).toBe(503);
     expect((await postNeed(req("/api/hooks/needs", need, { "x-fleethub-timestamp": new Date(Date.now() - 10 * 60_000).toISOString() }))).status).toBe(400);
+    const zoneless = new Date().toISOString().replace("Z", "");
+    for (const stamp of [zoneless, String(Date.now()), new Date().toUTCString()]) {
+      expect((await postNeed(req("/api/hooks/needs", need, { "x-fleethub-timestamp": stamp }))).status, stamp).toBe(400);
+    }
     expect((await postNeed(req("/api/hooks/needs", { ...need, kind: "gpu" }))).status).toBe(400);
     expect((await postNeed(req("/api/hooks/needs", need, { "idempotency-key": null }))).status).toBe(400);
     expect(fixture.recordNeed).not.toHaveBeenCalled();

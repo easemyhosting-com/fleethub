@@ -14,7 +14,7 @@ Part of [docs/52](52-projects-needs-usage-and-gitops.md). Recommend-only: nothin
 
 ## Hook API (project key)
 
-Both endpoints require `Authorization: Bearer fhp_...`, `X-FleetHub-Timestamp: <ISO time within 5 minutes>`, and `Idempotency-Key`. The project comes only from the key; a body can never name another project. Bodies are strict schemas (unknown keys rejected) with an 8 KB limit; 120 requests per minute per project (shared PostgreSQL in non-local production, per process in local/development mode; a failing shared limiter denies).
+Both endpoints require `Authorization: Bearer fhp_...`, `X-FleetHub-Timestamp: <ISO time with Z or a UTC offset, within 5 minutes>`, and `Idempotency-Key`. The project comes only from the key; a body can never name another project. Bodies are strict schemas (unknown keys rejected) with an 8 KB limit; 120 requests per minute per project (shared PostgreSQL in non-local production, per process in local/development mode; a failing shared limiter denies).
 
 ```bash
 curl -sS -X POST "$FLEETHUB/api/hooks/needs" \

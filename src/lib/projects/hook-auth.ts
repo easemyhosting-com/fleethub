@@ -1,4 +1,5 @@
 import { authenticateProjectKey } from "./keys";
+import { z } from "zod";
 import { consumeSharedLimit } from "@/lib/auth/rate-limit";
 
 export const hookRequestsPerMinute = 120;
@@ -15,13 +16,17 @@ async function allow(projectId: string, now: number): Promise<boolean> {
 export type HookAuth = { ok: true; projectId: string } | { ok: false; status: 400 | 401 | 429 | 503; error: string };
 
 /** Project key as bearer token, a fresh X-FleetHub-Timestamp (replay window), and a per-project rate limit. The key only reaches its own project. */
+const isoInstant = z.iso.datetime({ offset: true });
+
 export async function authenticateHook(req: Request, now = Date.now()): Promise<HookAuth> {
   const bearer = /^Bearer\s+([^\s]+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
   if (!bearer) return { ok: false, status: 401, error: "Missing project key" };
   const auth = await authenticateProjectKey(bearer);
   if (auth.status === "unavailable") return { ok: false, status: 503, error: "Project key store unavailable" };
   if (auth.status === "invalid") return { ok: false, status: 401, error: "Invalid project key" };
-  const stamp = Date.parse(req.headers.get("x-fleethub-timestamp") ?? "");
+  // A zone-less time would be read in server-local time, so an explicit Z or offset is required.
+  const header = req.headers.get("x-fleethub-timestamp") ?? "";
+  const stamp = isoInstant.safeParse(header).success ? Date.parse(header) : Number.NaN;
   if (!Number.isFinite(stamp) || Math.abs(now - stamp) > hookTimestampWindowMs) return { ok: false, status: 400, error: "X-FleetHub-Timestamp must be an ISO time within five minutes of now" };
   const limited = await allow(auth.projectId, now);
   if (!limited) return { ok: false, status: 429, error: "Rate limit exceeded" };

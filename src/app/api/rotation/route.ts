@@ -11,7 +11,7 @@ const accountId = z.string().regex(/^[A-Za-z0-9_.:-]{1,256}$/);
 const input = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("replace"), accountId, config: z.record(z.string(), z.unknown()) }),
   z.strictObject({ action: z.literal("rotate"), accountId }),
-  z.strictObject({ action: z.literal("expiry"), accountId, expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => !Number.isNaN(Date.parse(value))).nullable() }),
+  z.strictObject({ action: z.literal("expiry"), accountId, expiresOn: z.iso.date().nullable() }),
   z.strictObject({
     action: z.literal("configure"), accountId, rotatorSecret: z.string().min(1).max(4096).optional(),
     scheduleDays: z.number().int().min(1).max(365).nullable().optional(), removeRotator: z.boolean().optional(),

@@ -67,7 +67,7 @@ describe("/api/rotation", () => {
     expect(fixture.s.setManualExpiry).toHaveBeenCalledWith("acc-1", "2027-01-31", "op@example.test");
     expect((await post({ action: "expiry", accountId: "acc-1", expiresOn: null })).status).toBe(200);
     expect(fixture.s.setManualExpiry).toHaveBeenLastCalledWith("acc-1", null, "op@example.test");
-    for (const expiresOn of ["tomorrow", "2027-13-45", 5]) expect((await post({ action: "expiry", accountId: "acc-1", expiresOn })).status).toBe(400);
+    for (const expiresOn of ["tomorrow", "2027-13-45", "2027-02-30", "2027-04-31", 5]) expect((await post({ action: "expiry", accountId: "acc-1", expiresOn })).status).toBe(400);
   });
 
   it("runs replace, rotate and configure for operators with the signed-in actor", async () => {
