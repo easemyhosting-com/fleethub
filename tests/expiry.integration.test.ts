@@ -4,6 +4,7 @@ import { queryClient } from "../src/lib/db/client";
 import { bootstrapDatabase } from "../src/lib/db/bootstrap";
 import { setManualExpiry, runDueExpiryChecks } from "../src/lib/rotation/service";
 import { readSnapshot } from "../src/lib/inventory/snapshot";
+import { expiryNotices } from "../src/lib/rotation/expiry";
 
 describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("credential expiry (PostgreSQL)", () => {
   const manualId = `exp-manual-${randomUUID()}`;
@@ -47,4 +48,24 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("credential ex
     expect(rows.every(row => row.credential_expiry_checked_at === null)).toBe(true);
     expect((await readSnapshot({ accountId: manualId })).accounts[0].credentialExpiresAt).toBe("2027-02-01T00:00:00.000Z");
   });
+
+  it.each(["2027-01-01", "2027-03-14", "2028-02-29"])("keeps %s at UTC midnight through storage and background checks", async (date) => {
+    const expected = `${date}T00:00:00.000Z`;
+    const midnight = Date.parse(expected);
+    await setManualExpiry(manualId, date, "owner@example.com");
+    const [stored] = await queryClient`SELECT EXTRACT(EPOCH FROM credential_expires_at)::double precision AS epoch,
+      credential_expiry_source AS source FROM provider_accounts WHERE id = ${manualId}`;
+    expect(stored.epoch).toBe(midnight / 1000);
+    expect(stored.source).toBe("manual");
+    await queryClient`UPDATE provider_accounts SET credential_expiry_checked_at = NULL WHERE id = ${manualId}`;
+    await runDueExpiryChecks();
+    const [after] = await queryClient`SELECT credential_expiry_checked_at, credential_expiry_source FROM provider_accounts WHERE id = ${manualId}`;
+    expect(after.credential_expiry_checked_at).toBeNull();
+    expect(after.credential_expiry_source).toBe("manual");
+    const account = (await readSnapshot({ accountId: manualId })).accounts[0];
+    expect(account.credentialExpiresAt).toBe(expected);
+    expect(expiryNotices([account], new Date(midnight - 1))[0].level).toBe("critical");
+    expect(expiryNotices([account], new Date(midnight))[0].level).toBe("expired");
+  });
+
 });

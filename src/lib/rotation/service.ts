@@ -221,9 +221,10 @@ export async function refreshCredentialExpiry(accountId: string, force = false):
     WHERE id = ${accountId} AND (${force} OR credential_expiry_source IS DISTINCT FROM 'manual')`;
 }
 
-/** The owner's own date, for providers that do not report one. Null clears it. */
+/** Date-only manual expiry is the start of that day in UTC, independent of the database session timezone. Null clears it. */
 export async function setManualExpiry(accountId: string, date: string | null, actor: string): Promise<void> {
-  const updated = await queryClient`UPDATE provider_accounts SET credential_expires_at = ${date}::timestamptz,
+  const expiresAt = date === null ? null : `${date}T00:00:00.000Z`;
+  const updated = await queryClient`UPDATE provider_accounts SET credential_expires_at = ${expiresAt}::timestamptz,
       credential_expiry_source = ${date ? "manual" : null}, credential_expiry_checked_at = NOW()
     WHERE id = ${accountId} AND secret_ref_id IS NOT NULL RETURNING id`;
   if (updated.length !== 1) throw new RotationError("not_found");
