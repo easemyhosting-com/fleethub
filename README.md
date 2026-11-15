@@ -1,6 +1,6 @@
 # FleetHub
 
-Self-hosted inventory and capacity tracker for the free and paid cloud resources you legitimately hold, built with Next.js and PostgreSQL. Register accounts and manual resources, collect read-only provider metadata, track allowances, usage and expiry, and share the same stored inventory with agents. Unknown usage is never shown as zero, and provider account rules stay in force: FleetHub does not create accounts or evade quota limits.
+Local-first inventory and capacity tracker for personal and authorized family accounts, focused on compute, storage, object storage and CDN, built with Next.js and PostgreSQL. Register accounts and manual resources, collect read-only provider metadata, track allowances, usage and expiry, and share the same stored inventory with agents. Unknown usage is never shown as zero, and provider account rules stay in force: FleetHub does not create accounts or evade quota limits.
 
 The core question is "which of my authorized resources fits this service, what is
 left, and what already depends on it?" FleetHub collates inventory and advises;
@@ -9,6 +9,8 @@ without an external integration. Credentialed collection can use the built-in
 encrypted store. AI, external vaults and private-network vendors remain optional.
 See the [current product direction](docs/64-resource-advisor-and-integration-boundaries.md)
 for the target adapter boundaries and the gaps in today's placement advice.
+You make the resource choice; FleetHub provides visibility and comparisons. Provider-specific
+terms approval is not a setup or recommendation requirement.
 
 Use Node.js 24.22.1, as specified in `.nvmrc`. Run `npm ci`, then `npm run dev`. Run `npm test`, `npm run typecheck`, and `npm run build` before shipping changes.
 
