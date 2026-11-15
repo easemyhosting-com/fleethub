@@ -202,10 +202,12 @@ Supabase, Neon and OCI; entitlement records; project/resource links; partial usa
 observations; separate host-fit checks; recommendation-only plans; built-in encrypted
 secrets and optional Infisical. CLIProxy inspection is optional and has no quota reader.
 
-Current project recommendations rank basic category/provider/billing/state and
-sharing signals. They do not yet join workload requirements to allowance headroom,
-measured usage or host fit. They explicitly report unverified fit. The complete
-capacity-comparison model and generic AI connection described here are target work.
+Project compute recommendations reuse host fit, checking declared CPU/RAM budgets
+and fresh observed load independently, plus requested architecture and region,
+before ranking. Known mismatches are returned as exclusions. Other categories
+retain basic provider/billing/state/sharing ranking and explicitly unverified fit.
+The complete cross-category comparison model and generic AI connection described
+here remain target work.
 The pure arithmetic module separates declared allocation budgets from measured pool
 headroom. Measured headroom requires fresh observations for every supplied member
 and an explicit complete-inventory assertion. Callers must derive freshness from
@@ -300,3 +302,26 @@ The Limits panel links to `/compare/object-storage`, a form comparing two manual
 single-bucket scopes. It requires the operator to affirm that each bucket is the
 only member before showing measured headroom. Multi-bucket pools use the API.
 Saved inventory integration and live usage adapters are not implemented by this slice.
+
+## Compute recommendations
+
+The existing project need hook accepts optional `spec.region` alongside `cpu`,
+`memoryGb` and `arch`. CPU is expressed in cores; memory follows the existing host
+contract, converting each memoryGb to 1024 MiB. A requested region is a hard
+compute constraint. Architecture accepts `arm64` or `amd64`; explicit host
+`aarch64` and `x86_64` metadata normalize to these values. Shape names alone do not
+prove architecture.
+
+Compute candidates expose `computeFit` with `verdict`, `basis`, `reasons` and
+`measuredAt`. `fits` requires compatible requested constraints, explicit CPU/RAM
+demand, declared host fit after reserve, and fresh matching whole-host CPU/RAM
+observations. Existing declared workloads and observed load overlap, so their
+budgets are checked independently rather than summed. Known mismatches appear in
+`excluded`; eligible candidates with sufficient evidence rank ahead of unknowns.
+
+Missing or stale load, missing architecture/region evidence, unregistered load,
+workloads without declarations and invalid telemetry stay unverified. Missing
+compute evidence does not prevent returning unknown candidates. Disk requirements,
+duration allowances and continuous availability are not verified by this compute
+slice. Storage/CDN recommendations remain unverified until their own evidence
+adapters exist. Advice reserves nothing and performs no allocation or failover.

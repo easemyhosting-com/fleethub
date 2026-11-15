@@ -34,7 +34,7 @@ export async function readHostCapacities(): Promise<HostCapacity[]> {
     const key = hostKey(String(row.name)), joinable = !ambiguous.has(key);
     const capacity = hostCapacity({
       id: String(row.id), name: String(row.name), state: String(row.state), region: row.region as string | null,
-      specs: { ocpus: typeof specs.ocpus === "number" ? specs.ocpus : undefined, memoryGb: typeof specs.memoryGb === "number" ? specs.memoryGb : undefined, shape: typeof specs.shape === "string" ? specs.shape : undefined },
+      specs: { arch: typeof specs.arch === "string" ? specs.arch : typeof specs.architecture === "string" ? specs.architecture : undefined, ocpus: typeof specs.ocpus === "number" ? specs.ocpus : undefined, memoryGb: typeof specs.memoryGb === "number" ? specs.memoryGb : undefined, shape: typeof specs.shape === "string" ? specs.shape : undefined },
     }, byHost.get(String(row.id)) ?? []);
     return { ...capacity, projects: capacity.projects.map(project => ({ ...project, measuredUsage: projectMeasurements.filter(m => m.projectId === project.projectId && (m.resourceId === String(row.id) || (m.resourceId === null && joinable && hostKey(m.hostRef.replace(/^host:/, "")) === key))) })), measuredUsage: joinable ? measuredByHost.get(key) ?? null : null, addresses: joinable ? [...(addressesByHost.get(key)?.values() ?? [])].sort((a, b) => a.kind.localeCompare(b.kind) || a.address.localeCompare(b.address)) : [] };
   });

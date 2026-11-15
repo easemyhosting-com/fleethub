@@ -28,6 +28,7 @@ export const needInput = z.strictObject({
     alwaysOn: z.boolean().optional(),
     providers: z.array(text(40)).max(10).optional(),
     arch: z.enum(["arm64", "amd64"]).optional(),
+    region: text(120).optional(),
   }).default({}),
 });
 export type NeedInput = z.infer<typeof needInput>;
