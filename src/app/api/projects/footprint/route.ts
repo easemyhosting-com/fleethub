@@ -14,6 +14,7 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const slug = params.get("project");
   if (slug !== null && !projectSlug.safeParse(slug).success) return NextResponse.json({ error: "Invalid project slug" }, { status: 400, headers });
+  if (params.get("confirmedOnly") === "true" && !slug) return NextResponse.json({ error: "confirmedOnly requires a project slug" }, { status: 400, headers });
   try {
     if (!(await bootstrapDatabase()).success) throw new Error("unavailable");
     const [projects, orphans, usedBy] = await Promise.all([readFootprints(slug ?? undefined, params.get("confirmedOnly") === "true"), slug ? Promise.resolve([]) : readOrphans(), slug ? Promise.resolve({}) : readUsedBy()]);

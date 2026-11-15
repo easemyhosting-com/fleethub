@@ -76,6 +76,7 @@ describe("vault reference resolver", () => {
   });
 
   it("refuses an Infisical reference that no longer matches the verified setup or approved origins", async () => {
+    vi.stubEnv("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP", "true");
     vi.stubEnv("FLEETHUB_ONBOARDING_ALLOWED_ORIGINS", "http://infisical:8080,https://other.example");
     await expect(openVaultForRef({ ...ref, environment: "prod" }, config)).rejects.toThrow("does not match");
     await expect(openVaultForRef({ ...ref, infisical_project: "p2" }, config)).rejects.toThrow("does not match");
@@ -89,6 +90,7 @@ describe("vault reference resolver", () => {
   });
 
   it("reads a reference from the folder it was written to after the configured folder changes", () => {
+    vi.stubEnv("FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP", "true");
     vi.stubEnv("FLEETHUB_ONBOARDING_ALLOWED_ORIGINS", "http://infisical:8080");
     const moved = { ...config, secretPath: "/accounts", connectorSecretPath: "/connectors" };
     expect(refScope(ref, moved)).toEqual({ ...moved, secretPath: "/" });

@@ -13,7 +13,7 @@ async function insertLegacySeedRows() {
   await queryClient`INSERT INTO identities (id, display_name) VALUES ('ident-primary-operator', 'Fleet Operator')`;
   await queryClient`INSERT INTO identity_contacts (id, identity_id, kind, value, is_primary, is_verified, label) VALUES ('ct-operator-email-1', 'ident-primary-operator', 'email', 'operator@fleethub.dev', true, true, 'Primary Infrastructure')`;
   await queryClient`INSERT INTO provider_accounts (id, identity_id, kind, label, owner_email) VALUES ('acc-operator-main', 'ident-primary-operator', 'oracle', 'Oracle Cloud Tenancy 1', 'operator@fleethub.dev')`;
-  await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state) VALUES ('borealis', 'borealis (K3s Cluster 1)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online')`;
+  await queryClient`INSERT INTO resources (id, name, category, provider, account_id, account_email, state, is_protected, tags, attributes) VALUES ('borealis', 'borealis (K3s Cluster 1)', 'compute', 'Oracle Cloud', 'acc-operator-main', 'operator@fleethub.dev', 'online', true, '["arm64", "k3s", "protected"]', '{"ip": "100.64.0.2", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 4, "version": "v1.33.0+k3s1"}')`;
   await queryClient`INSERT INTO network_gateways (id, name, kind, tailscale_ip, port, state, latency_ms) VALUES ('gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '100.64.0.4', 8888, 'online', 8)`;
 }
 const legacyLeft = async () => ({
@@ -170,4 +170,34 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("demo seed res
     expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
     expect(await count("resources", demoSeedIds.resources)).toBe(0);
   });
+  it("keeps a legacy identity when a real account references one of its contacts", async () => {
+    await insertLegacySeedRows();
+    await queryClient`INSERT INTO provider_accounts (id, contact_id, kind, label, owner_email) VALUES ('demo-contact-reference', 'ct-operator-email-1', 'neon', 'Real', 'real@example.test')`;
+    try {
+      expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+      expect((await queryClient`SELECT contact_id FROM provider_accounts WHERE id = 'demo-contact-reference'`)[0].contact_id).toBe('ct-operator-email-1');
+      expect(await queryClient`SELECT id FROM identities WHERE id = 'ident-primary-operator'`).toHaveLength(1);
+    } finally { await queryClient`DELETE FROM provider_accounts WHERE id = 'demo-contact-reference'`; }
+  });
+
+  it("preserves an operator edit outside the legacy resource's name and account", async () => {
+    await insertLegacySeedRows();
+    await queryClient`UPDATE resources SET region = 'operator-region' WHERE id = 'borealis'`;
+    expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+    expect((await queryClient`SELECT region FROM resources WHERE id = 'borealis'`)[0].region).toBe('operator-region');
+  });
+
+  it("keeps project owners during both current and legacy cleanup", async () => {
+    expect((await call(POST, "demo-admin-fixture")).status).toBe(200);
+    await queryClient`INSERT INTO projects (id, slug, name, owner_identity_id) VALUES ('demo-owner-project', 'demo-owner-project', 'Owner fixture', ${demoSeedIds.identities[0]})`;
+    try {
+      expect((await call(DELETE, "demo-admin-fixture")).status).toBe(500);
+      expect(await queryClient`SELECT id FROM identities WHERE id = ${demoSeedIds.identities[0]}`).toHaveLength(1);
+      await insertLegacySeedRows();
+      await queryClient`UPDATE projects SET owner_identity_id = 'ident-primary-operator' WHERE id = 'demo-owner-project'`;
+      expect((await call(DELETE, "demo-admin-fixture")).status).toBe(200);
+      expect(await queryClient`SELECT id FROM identities WHERE id = 'ident-primary-operator'`).toHaveLength(1);
+    } finally { await queryClient`DELETE FROM projects WHERE id = 'demo-owner-project'`; }
+  });
+
 });

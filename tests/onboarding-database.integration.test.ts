@@ -122,7 +122,10 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("onboarding wi
   });
 
   it("retains connection settings and verification when an optional integration is skipped", async () => {
+    await saveSetupStep("cliproxy", { apiUrl: origin, consoleUrl: `${origin}/management.html` });
+    await verifySetupStep("cliproxy");
     const before = (await getSetupState()).steps.find(step => step.id === "cliproxy");
+    expect(before?.status).toBe("verified");
     await skipSetupStep("cliproxy");
     const after = (await getSetupState()).steps.find(step => step.id === "cliproxy");
     expect(after).toMatchObject({ skipped: true, config: before?.config, status: before?.status, verifiedAt: before?.verifiedAt });

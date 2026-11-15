@@ -677,19 +677,19 @@ const legacyDemoSeed = {
     { id: "acc-cf-partner", kind: "cloudflare", label: "Partner Staging CDN", owner_email: "alex.chen@example.org" },
   ],
   resources: [
-    { id: "atlas", name: "atlas (Docker Brain)", account_id: "acc-operator-main" },
-    { id: "borealis", name: "borealis (K3s Cluster 1)", account_id: "acc-operator-main" },
-    { id: "polar-night-owl", name: "polar-night-owl (K3s Cluster 2)", account_id: "acc-oracle-secondary" },
-    { id: "upstash-box", name: "upstash-box-ephemeral", account_id: "acc-upstash-main" },
-    { id: "github-runner", name: "github-hosted-runners", account_id: "acc-operator-main" },
-    { id: "r2-artifacts", name: "fleet-artifacts", account_id: "acc-cloudflare-main" },
-    { id: "cf-ephemeral-worker", name: "fleet-batch-worker", account_id: "acc-cloudflare-sandbox" },
-    { id: "oci-block", name: "oracle-block-volumes", account_id: "acc-operator-main" },
-    { id: "global-redis", name: "global-cache-db", account_id: "acc-upstash-main" },
-    { id: "nvidia-nim-llm", name: "nvidia-h100-nim", account_id: "acc-nvidia-inception" },
-    { id: "turso-edge", name: "fleethub-edge-db", account_id: "acc-operator-main" },
-    { id: "freellmapi-gateway", name: "freellmapi (Brain Router)", account_id: "acc-freellm-main" },
-    { id: "alex-dev-vm", name: "alex-dev-node", account_id: "acc-oracle-partner" },
+    {"id": "atlas", "name": "atlas (Docker Brain)", "category": "compute", "provider": "Oracle Cloud", "account_id": "acc-operator-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": true, "tags": ["arm64", "docker", "brain", "protected"], "attributes": {"ip": "100.64.0.1", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 6, "services": ["llm-gateway", "metrics-agent"]}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "borealis", "name": "borealis (K3s Cluster 1)", "category": "compute", "provider": "Oracle Cloud", "account_id": "acc-operator-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": true, "tags": ["arm64", "k3s", "protected"], "attributes": {"ip": "100.64.0.2", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 4, "version": "v1.33.0+k3s1"}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "polar-night-owl", "name": "polar-night-owl (K3s Cluster 2)", "category": "compute", "provider": "Oracle Cloud", "account_id": "acc-oracle-secondary", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": true, "tags": ["arm64", "k3s", "protected"], "attributes": {"ip": "100.64.0.3", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 5, "version": "v1.33.0+k3s1"}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "upstash-box", "name": "upstash-box-ephemeral", "category": "compute", "provider": "Upstash", "account_id": "acc-upstash-main", "account_email": "operator@fleethub.dev", "state": "idle", "is_protected": false, "tags": ["amd64", "ephemeral", "burst"], "attributes": {"ip": "Serverless", "vcpu": 2, "ram_gb": 4}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "github-runner", "name": "github-hosted-runners", "category": "compute", "provider": "GitHub", "account_id": "acc-operator-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": false, "tags": ["ci-runner", "amd64"], "attributes": {"ip": "Dynamic", "free_minutes_month": 2000}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "r2-artifacts", "name": "fleet-artifacts", "category": "storage", "provider": "Cloudflare R2", "account_id": "acc-cloudflare-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": true, "tags": ["s3", "zero-egress", "crypt", "protected"], "attributes": {"bucket": "fleet-artifacts", "cap_gb": 10, "used_gb": 4.2}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "cf-ephemeral-worker", "name": "fleet-batch-worker", "category": "serverless", "provider": "Cloudflare", "account_id": "acc-cloudflare-sandbox", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": false, "tags": ["worker", "ephemeral"], "attributes": {"routes": ["batch.fleethub.internal/*"]}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "oci-block", "name": "oracle-block-volumes", "category": "storage", "provider": "Oracle Cloud", "account_id": "acc-operator-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": false, "tags": ["boot-volume", "block"], "attributes": {"total_gb": 200, "used_gb": 147}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "global-redis", "name": "global-cache-db", "category": "database", "provider": "Upstash", "account_id": "acc-upstash-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": false, "tags": ["redis", "fast", "in-memory"], "attributes": {"host": "cache.example.upstash.io", "monthly_cap": 500000, "used": 148900}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "nvidia-nim-llm", "name": "nvidia-h100-nim", "category": "llm", "provider": "NVIDIA Inception", "account_id": "acc-nvidia-inception", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": true, "tags": ["h100", "nim", "protected", "cuda"], "attributes": {"accelerator": "H100 PCIe", "creditsRemaining": "$2,450.00"}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "turso-edge", "name": "fleethub-edge-db", "category": "database", "provider": "Turso", "account_id": "acc-operator-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": false, "tags": ["sqlite", "edge", "libsql"], "attributes": {"storage_cap_gb": 5, "used_gb": 0.85}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "freellmapi-gateway", "name": "freellmapi (Brain Router)", "category": "llm", "provider": "FreeLLM API", "account_id": "acc-freellm-main", "account_email": "operator@fleethub.dev", "state": "online", "is_protected": true, "tags": ["router", "tailnet-only", "mcp"], "attributes": {"ip": "127.0.0.1:3001", "port": 3001, "pools": ["Gemini", "Groq", "Cerebras", "OpenRouter"]}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null},
+    {"id": "alex-dev-vm", "name": "alex-dev-node", "category": "compute", "provider": "Oracle Cloud", "account_id": "acc-oracle-partner", "account_email": "alex.chen@example.org", "state": "idle", "is_protected": false, "tags": ["amd64", "sandbox"], "attributes": {"ip": "10.0.0.84", "ocpu": 1, "ram_gb": 1}, "native_id": null, "region": null, "source_url": null, "inventory_source": "manual", "scan_generation": null, "retired_at": null, "provider_state": null}
   ],
   gateways: [{ id: "gw-office", name: "Office Tailscale exit node", tailscale_ip: "100.64.0.4" }],
 };
@@ -707,6 +707,8 @@ type Sql = typeof queryClient;
  * Throws on a reference, causing the caller's transaction to roll back without deleting demo rows.
  */
 async function assertCurrentDemoRowsUnreferenced(sql: Sql): Promise<void> {
+  // Project ownership has no FK; serialize ownership/account edits with cleanup.
+  await sql`LOCK TABLE projects, provider_accounts IN SHARE ROW EXCLUSIVE MODE`;
   const ids = demoSeedIds;
 
   // Lock rows that can be deleted so a concurrent foreign-key insert cannot race the reference checks.
@@ -746,7 +748,8 @@ async function assertCurrentDemoRowsUnreferenced(sql: Sql): Promise<void> {
     SELECT i.id FROM identities i
     WHERE i.id IN ${sql(ids.identities)}
       AND (
-        EXISTS (
+        EXISTS (SELECT 1 FROM projects p WHERE p.owner_identity_id = i.id)
+        OR EXISTS (
           SELECT 1 FROM identity_contacts c
           WHERE c.identity_id = i.id AND c.id NOT IN ${sql(demoSeedContactIds)}
         )
@@ -766,6 +769,7 @@ async function assertCurrentDemoRowsUnreferenced(sql: Sql): Promise<void> {
 }
 
 async function removeLegacyDemoRows(sql: Sql): Promise<void> {
+  await sql`LOCK TABLE projects, provider_accounts IN SHARE ROW EXCLUSIVE MODE`;
   const seed = legacyDemoSeed;
   // Accounts that still match the seed and carry no credentials, collection, rotation or quota data of their own.
   const accounts = (await sql`
@@ -780,8 +784,8 @@ async function removeLegacyDemoRows(sql: Sql): Promise<void> {
     // Resources that still match the seed, on those accounts, with nothing real attached to them.
     await sql`
       DELETE FROM resources r
-      USING jsonb_to_recordset(${JSON.stringify(seed.resources)}::jsonb) AS s(id TEXT, name TEXT, account_id TEXT)
-      WHERE s.id = r.id AND s.name = r.name AND s.account_id = r.account_id AND r.account_id IN ${sql(accounts)}
+      USING jsonb_array_elements(${JSON.stringify(seed.resources)}::jsonb) AS s(fingerprint)
+      WHERE s.fingerprint->>'id' = r.id AND (to_jsonb(r) - 'last_seen_at') = s.fingerprint AND r.account_id IN ${sql(accounts)}
         AND NOT EXISTS (SELECT 1 FROM resource_profiles x WHERE x.resource_id = r.id)
         AND NOT EXISTS (SELECT 1 FROM external_observations x WHERE x.resource_id = r.id)
         AND NOT EXISTS (SELECT 1 FROM project_placements x WHERE x.host_resource_id = r.id)
@@ -799,6 +803,8 @@ async function removeLegacyDemoRows(sql: Sql): Promise<void> {
     DELETE FROM identities i
     USING jsonb_to_recordset(${JSON.stringify(seed.identities)}::jsonb) AS s(id TEXT, display_name TEXT)
     WHERE s.id = i.id AND s.display_name = i.display_name
+      AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.owner_identity_id = i.id)
+      AND NOT EXISTS (SELECT 1 FROM identity_contacts c JOIN provider_accounts a ON a.contact_id = c.id WHERE c.identity_id = i.id)
       AND NOT EXISTS (SELECT 1 FROM provider_accounts a WHERE a.identity_id = i.id)
       AND NOT EXISTS (
         SELECT 1 FROM identity_contacts c WHERE c.identity_id = i.id

@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { secureServiceUrl } from "@/lib/onboarding/transport";
+
 /**
  * Infisical Secrets Management Integration
  * Complies strictly with the Zero-Secret Rule:
@@ -61,20 +64,23 @@ function getCredentials() {
   };
 }
 
-let cachedToken: { token: string; expiresAt: number } | null = null;
+let cachedToken: { token: string; expiresAt: number; configHash: string } | null = null;
 
 export function _resetTokenCache() {
   cachedToken = null;
 }
 
-async function getUniversalAuthToken(): Promise<string | null> {
-  const { baseUrl, clientId, clientSecret } = getCredentials();
+async function getUniversalAuthToken(credentials: ReturnType<typeof getCredentials>): Promise<string | null> {
+  const { baseUrl, clientId, clientSecret } = credentials;
   if (!clientId || !clientSecret) {
     // Fail closed: Missing credentials must never use a hardcoded fallback
     return null;
   }
 
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60000) {
+  try { secureServiceUrl(baseUrl); } catch { return null; }
+
+  const configHash = createHash("sha256").update(JSON.stringify([baseUrl, clientId, clientSecret])).digest("hex");
+  if (cachedToken?.configHash === configHash && cachedToken.expiresAt > Date.now() + 60000) {
     return cachedToken.token;
   }
 
@@ -84,6 +90,7 @@ async function getUniversalAuthToken(): Promise<string | null> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, clientSecret }),
       signal: AbortSignal.timeout(5000),
+      redirect: "error",
     });
 
     if (!res.ok) {
@@ -95,6 +102,7 @@ async function getUniversalAuthToken(): Promise<string | null> {
     if (data.accessToken) {
       cachedToken = {
         token: data.accessToken,
+        configHash,
         expiresAt: Date.now() + (data.expiresIn ? data.expiresIn * 1000 : 3600000),
       };
       return data.accessToken;
@@ -121,9 +129,10 @@ export async function checkAgentVaultStatus(): Promise<"online" | "offline"> {
 }
 
 export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
-  const { baseUrl } = getCredentials();
+  const credentials = getCredentials();
+  const { baseUrl } = credentials;
   const agentVaultState = await checkAgentVaultStatus();
-  const token = await getUniversalAuthToken();
+  const token = await getUniversalAuthToken(credentials);
 
   let workspaces: InfisicalWorkspace[] = [];
   const secretReferences: SecretReferenceItem[] = [];
@@ -134,6 +143,7 @@ export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
       const wsRes = await fetch(`${baseUrl}/api/v1/workspace`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(5000),
+      redirect: "error",
       });
 
       if (wsRes.ok) {
@@ -150,6 +160,7 @@ export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
               {
                 headers: { Authorization: `Bearer ${token}` },
                 signal: AbortSignal.timeout(4000),
+                redirect: "error",
               }
             );
             if (secRes.ok) {
