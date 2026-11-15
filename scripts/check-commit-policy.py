@@ -27,13 +27,18 @@ def message(text):
     return True
 
 
-def check_commits(revision):
+def check_commits(revision, include_messages=False):
     commits = subprocess.check_output(['git', 'rev-list', revision], text=True).splitlines()
     for commit in commits:
         raw = subprocess.check_output(['git', 'show', '-s', '--format=%ae%x00%ce%x00%an%x00%cn', commit], text=True).strip().split('\0')
         if len(raw) != 4 or not identity(*raw):
             print(f'Commit identity rejected: {commit}. Use the configured exact noreply identity.')
             return 1
+        if include_messages:
+            body = subprocess.check_output(['git', 'show', '-s', '--format=%B', commit], text=True)
+            if not message(body):
+                print(f'Commit message or trailer rejected: {commit}. Use Conventional Commits and approved noreply trailers.')
+                return 1
     return 0
 
 
@@ -62,8 +67,8 @@ def main():
             return 1
         if sys.argv[1:] == ['--pre-push']:
             return prepush()
-        if len(sys.argv) == 3 and sys.argv[1] == '--range':
-            return check_commits(sys.argv[2])
+        if len(sys.argv) == 3 and sys.argv[1] in {'--range', '--pr-range'}:
+            return check_commits(sys.argv[2], include_messages=sys.argv[1] == '--pr-range')
     except (ValueError, OSError, subprocess.SubprocessError):
         print('Commit policy unavailable; fetch the base and check configuration.')
         return 2
