@@ -206,6 +206,18 @@ Current project recommendations rank basic category/provider/billing/state and
 sharing signals. They do not yet join workload requirements to allowance headroom,
 measured usage or host fit. They explicitly report unverified fit. The complete
 capacity-comparison model and generic AI connection described here are target work.
+The pure arithmetic module separates declared allocation budgets from measured pool
+headroom. Measured headroom requires fresh observations for every supplied member
+and an explicit complete-inventory assertion. Callers must derive freshness from
+source timestamps and verify membership for the account/provider/product scope.
+Conflicting duplicate resource records, incomplete inventory and ambiguous pools
+leave measured headroom unknown. Instantaneous storage and compute baselines are
+supported; time-window request accounting and narrower regional scopes are not.
+The object-storage helper checks explicitly recorded API support when requested.
+Its fit label describes capacity/API evidence only; entitlement, access/retention,
+request and egress evidence still require integration before complete suitability
+advice. This helper is not yet connected to production project recommendations.
+
 A provider-specific policy engine is explicitly out of scope.
 
 | Order | Scope | Acceptance |

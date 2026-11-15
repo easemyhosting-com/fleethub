@@ -14,6 +14,11 @@
 // 1. Storage unit normalization
 // ---------------------------------------------------------------------------
 
+function roundedBaseline(value: number): number | null {
+  const rounded = Math.round(value);
+  return Number.isSafeInteger(rounded) && rounded >= 0 ? rounded : null;
+}
+
 export type StorageBinaryUnit = "B" | "KiB" | "MiB" | "GiB" | "TiB";
 export type StorageDecimalUnit = "KB" | "MB" | "GB" | "TB";
 export type StorageUnit = StorageBinaryUnit | StorageDecimalUnit;
@@ -38,7 +43,7 @@ export function parseStorageBytes(value: string | number | null | undefined): nu
   if (value === null || value === undefined) return null;
   if (typeof value === "number") {
     if (!Number.isFinite(value) || value < 0) return null;
-    return Math.round(value);
+    return roundedBaseline(value);
   }
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -53,29 +58,29 @@ export function parseStorageBytes(value: string | number | null | undefined): nu
   const unitUpper = unitRaw.toUpperCase();
 
   if (unitUpper === "B" || unitUpper === "BYTES" || unitUpper === "BYTE") {
-    return Math.round(amount);
+    return roundedBaseline(amount);
   }
 
   // Check binary units
   for (const [unit, factor] of Object.entries(BINARY_FACTORS)) {
     if (unit.toLowerCase() === unitRaw.toLowerCase()) {
-      return Math.round(amount * factor);
+      return roundedBaseline(amount * factor);
     }
   }
 
   // Check decimal units
   for (const [unit, factor] of Object.entries(DECIMAL_FACTORS)) {
     if (unit.toLowerCase() === unitRaw.toLowerCase()) {
-      return Math.round(amount * factor);
+      return roundedBaseline(amount * factor);
     }
   }
 
   // Fallback for single letters like K, M, G, T (interpret as binary K=KiB, G=GiB)
-  const single = unitUpper[0];
-  if (single === "K") return Math.round(amount * BINARY_FACTORS.KiB);
-  if (single === "M") return Math.round(amount * BINARY_FACTORS.MiB);
-  if (single === "G") return Math.round(amount * BINARY_FACTORS.GiB);
-  if (single === "T") return Math.round(amount * BINARY_FACTORS.TiB);
+  const single = unitUpper;
+  if (single === "K") return roundedBaseline(amount * BINARY_FACTORS.KiB);
+  if (single === "M") return roundedBaseline(amount * BINARY_FACTORS.MiB);
+  if (single === "G") return roundedBaseline(amount * BINARY_FACTORS.GiB);
+  if (single === "T") return roundedBaseline(amount * BINARY_FACTORS.TiB);
 
   return null;
 }
@@ -113,7 +118,7 @@ export function parseComputeMilli(value: string | number | null | undefined): nu
   if (value === null || value === undefined) return null;
   if (typeof value === "number") {
     if (!Number.isFinite(value) || value < 0) return null;
-    return Math.round(value * 1000);
+    return roundedBaseline(value * 1000);
   }
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -125,11 +130,11 @@ export function parseComputeMilli(value: string | number | null | undefined): nu
   if (!Number.isFinite(num) || num < 0) return null;
 
   const unit = (match[2] ?? "").toLowerCase();
-  if (unit === "m" || unit === "milli") {
-    return Math.round(num);
+  if (unit === "m" || unit === "milli" || unit === "millicpu" || unit === "millicpus") {
+    return roundedBaseline(num);
   }
   if (!unit || unit === "core" || unit === "cores" || unit === "ocpu" || unit === "ocpus" || unit === "vcpu" || unit === "vcpus") {
-    return Math.round(num * 1000);
+    return roundedBaseline(num * 1000);
   }
   return null;
 }
@@ -161,10 +166,10 @@ export function evaluateFreshness(
 ): TelemetryFreshness {
   if (!measuredAt) return "unmeasured";
   const date = typeof measuredAt === "string" ? new Date(measuredAt) : measuredAt;
-  if (Number.isNaN(date.getTime())) return "unmeasured";
+  if (!Number.isFinite(now.getTime()) || Number.isNaN(date.getTime())) return "unmeasured";
 
   const ageMs = now.getTime() - date.getTime();
-  if (ageMs < 0) return "fresh"; // Clock skew tolerance
+  if (ageMs < -5 * 60 * 1000) return "unmeasured"; // At most five minutes of clock skew
   if (ageMs > TELEMETRY_MAX_AGE_MS) return "expired";
   if (ageMs > TELEMETRY_FRESH_MS) return "stale";
   return "fresh";
@@ -188,6 +193,10 @@ export interface ResourceItem {
   declaredMilliCpu?: number | null;
   declaredMemMi?: number | null;
   observedBytes?: number | null;
+  observedMilliCpu?: number | null;
+  observedMemMi?: number | null;
+  supportedApis?: Array<"s3_compatible" | "oci_native">;
+  /** Caller must evaluate the source timestamp; a value alone never implies freshness. */
   telemetryFreshness?: TelemetryFreshness;
 }
 
@@ -206,6 +215,8 @@ export interface SharedAllowancePool {
   totalAllowance: number; // in baseline units (e.g. bytes, milliCpu, etc.)
   unit: string;
   period: "month" | "day" | "pool" | "none";
+  /** True only when the caller verified that all resources in this scope are supplied. */
+  inventoryComplete?: boolean;
 }
 
 export interface DeduplicatedResourceUsage {
@@ -227,8 +238,10 @@ export interface PoolAccountingResult {
   totalAllowance: number;
   /** Deduplicated sum of all resource allocations in this pool. */
   totalAllocated: number;
-  /** Remaining allowance after subtracting deduplicated allocations. Never below 0. */
+  /** Declared budget only, not evidence of free space. Missing declarations contribute no budget. */
   remainingUnallocated: number;
+  /** Fresh measured headroom, distinct from declared allocation budgets. */
+  remainingObserved: number | null;
   utilizationPct: number | null;
   /** Deduplicated list of resources drawing from this pool. */
   resources: DeduplicatedResourceUsage[];
@@ -251,9 +264,16 @@ export function calculatePoolCapacity(
   resources: ResourceItem[],
   bindings: ProjectResourceBinding[] = []
 ): PoolAccountingResult {
+  // Only instantaneous capacity is supported. Monthly requests need separate usage evidence.
+  if (pool.metric === "requests_per_month" || !["none", "pool"].includes(pool.period)) {
+    throw new Error("Unsupported pool metric or period");
+  }
+  if (!Number.isSafeInteger(pool.totalAllowance) || pool.totalAllowance < 0) {
+    throw new Error("Invalid baseline allowance");
+  }
   // Filter resources that belong to this pool's account and product
   const matchingResources = resources.filter(
-    r => r.accountId === pool.accountId && r.product.toLowerCase() === pool.product.toLowerCase()
+    r => r.provider.toLowerCase() === pool.provider.toLowerCase() && r.accountId === pool.accountId && r.product.toLowerCase() === pool.product.toLowerCase()
   );
 
   // Group project bindings by resourceId to detect multi-project sharing
@@ -268,13 +288,19 @@ export function calculatePoolCapacity(
 
   const deduplicatedResources: DeduplicatedResourceUsage[] = [];
   let totalAllocated = 0;
-  let hasUnmeasuredOrStale = false;
+  let totalObserved = 0;
+  let hasUnmeasuredOrStale = pool.inventoryComplete !== true;
 
   // Track unique resource IDs to guarantee zero double-counting
   const seenResourceIds = new Set<string>();
 
   for (const r of matchingResources) {
-    if (seenResourceIds.has(r.resourceId)) continue;
+    if (seenResourceIds.has(r.resourceId)) {
+      const first = matchingResources.find(resource => resource.resourceId === r.resourceId);
+      // Identical join rows are harmless; conflicting evidence cannot establish headroom.
+      if (JSON.stringify(first) !== JSON.stringify(r)) hasUnmeasuredOrStale = true;
+      continue;
+    }
     seenResourceIds.add(r.resourceId);
 
     let baselineAllocated = 0;
@@ -285,11 +311,21 @@ export function calculatePoolCapacity(
       baselineObserved = r.observedBytes ?? null;
     } else if (pool.metric === "compute_milli_cpu") {
       baselineAllocated = r.declaredMilliCpu ?? 0;
+      baselineObserved = r.observedMilliCpu ?? null;
     } else if (pool.metric === "compute_mem_mi") {
       baselineAllocated = r.declaredMemMi ?? 0;
+      baselineObserved = r.observedMemMi ?? null;
     }
 
-    const freshness: TelemetryFreshness = r.telemetryFreshness ?? (baselineObserved !== null ? "fresh" : "unmeasured");
+    if (!Number.isSafeInteger(baselineAllocated) || baselineAllocated < 0) {
+      throw new Error("Invalid baseline allocation");
+    }
+    if (baselineObserved !== null && (!Number.isSafeInteger(baselineObserved) || baselineObserved < 0)) {
+      baselineObserved = null;
+    }
+    const freshness: TelemetryFreshness = baselineObserved === null
+      ? "unmeasured" : (r.telemetryFreshness ?? "unmeasured");
+    totalObserved += baselineObserved ?? 0;
     if (freshness !== "fresh") {
       hasUnmeasuredOrStale = true;
     }
@@ -307,6 +343,9 @@ export function calculatePoolCapacity(
     });
 
     totalAllocated += baselineAllocated;
+    if (!Number.isSafeInteger(totalAllocated) || !Number.isSafeInteger(totalObserved)) {
+      throw new Error("Pool total exceeds safe baseline range");
+    }
   }
 
   const remaining = Math.max(0, pool.totalAllowance - totalAllocated);
@@ -317,7 +356,7 @@ export function calculatePoolCapacity(
   const notes: string[] = [];
   notes.push(`Deduplicated ${deduplicatedResources.length} resource(s) drawing from pool ${pool.poolId}.`);
   if (hasUnmeasuredOrStale) {
-    notes.push("One or more resources lack fresh observed telemetry; capacity calculations rely on declared limits.");
+    notes.push("Pool membership is incomplete or observations are not fresh; measured headroom is unknown. Declared budgets are separate.");
   }
   if (totalAllocated > pool.totalAllowance) {
     notes.push(`Pool is over-allocated by ${totalAllocated - pool.totalAllowance} ${pool.unit}.`);
@@ -332,6 +371,7 @@ export function calculatePoolCapacity(
     totalAllowance: pool.totalAllowance,
     totalAllocated,
     remainingUnallocated: remaining,
+    remainingObserved: hasUnmeasuredOrStale || deduplicatedResources.length === 0 ? null : Math.max(0, pool.totalAllowance - totalObserved),
     utilizationPct,
     resources: deduplicatedResources,
     hasUnmeasuredOrStaleTelemetry: hasUnmeasuredOrStale,
@@ -375,49 +415,36 @@ export function compareObjectStorageCandidates(
   need: ObjectStorageNeed,
   bindings: ProjectResourceBinding[] = []
 ): ObjectStorageCandidate[] {
-  // Index pools by accountId and product
-  const poolMap = new Map<string, SharedAllowancePool>();
-  for (const pool of pools) {
-    if (pool.metric === "storage_bytes") {
-      poolMap.set(`${pool.accountId}:${pool.product.toLowerCase()}`, pool);
-    }
+  if (!Number.isSafeInteger(need.estimatedBytes) || need.estimatedBytes < 0) {
+    throw new Error("Invalid estimated storage demand");
   }
-
-  // Pre-calculate pool accountings
-  const poolAccountingMap = new Map<string, PoolAccountingResult>();
-  for (const pool of pools) {
-    if (pool.metric === "storage_bytes") {
-      const res = calculatePoolCapacity(pool, candidates, bindings);
-      poolAccountingMap.set(pool.poolId, res);
-    }
-  }
-
-  // Filter to object storage products (e.g. r2, bucket)
-  const objectStorageItems = candidates.filter(c =>
-    c.category === "storage" && ["r2", "bucket", "object_storage", "s3"].includes(c.product.toLowerCase())
-  );
+  const seen = new Set<string>();
+  const objectStorageItems = candidates.filter(c => {
+    const supported = c.category === "object_storage" ||
+      (c.category === "storage" && ["r2", "bucket", "object_storage", "s3"].includes(c.product.toLowerCase()));
+    if (!supported || seen.has(c.resourceId)) return false;
+    seen.add(c.resourceId);
+    return true;
+  });
 
   const results: ObjectStorageCandidate[] = [];
 
   for (const item of objectStorageItems) {
-    const poolKey = `${item.accountId}:${item.product.toLowerCase()}`;
-    const pool = poolMap.get(poolKey);
-    const accounting = pool ? poolAccountingMap.get(pool.poolId) : undefined;
-    const remainingPoolBytes = accounting ? accounting.remainingUnallocated : null;
-
-    const boundProjects = bindings
+    const matchingPools = pools.filter(p => p.accountId === item.accountId &&
+      p.provider.toLowerCase() === item.provider.toLowerCase() &&
+      p.product.toLowerCase() === item.product.toLowerCase() && p.metric === "storage_bytes");
+    const pool = matchingPools.length === 1 ? matchingPools[0] : undefined;
+    const accounting = pool && ["none", "pool"].includes(pool.period)
+      ? calculatePoolCapacity(pool, candidates, bindings) : undefined;
+    const remainingPoolBytes = accounting?.remainingObserved ?? null;
+    const boundProjects = [...new Set(bindings
       .filter(b => b.resourceId === item.resourceId && (b.status === "allocated" || b.status === "in_use"))
-      .map(b => b.projectId);
+      .map(b => b.projectId))];
 
     const reasons: string[] = [];
     let fitVerdict: ObjectStorageCandidate["fitVerdict"] = "unverified";
 
-    if (item.product.toLowerCase() === "r2") {
-      reasons.push("Zero egress fees (Cloudflare R2)");
-      reasons.push("S3-compatible API");
-    } else if (item.provider.toLowerCase() === "oracle" || item.product.toLowerCase() === "bucket") {
-      reasons.push("Oracle Object Storage (OCI Always Free tier eligible)");
-    }
+    reasons.push("Egress, request limits, entitlement and access/retention constraints require verification");
 
     if (item.region) {
       reasons.push(`Region: ${item.region}`);
@@ -429,16 +456,24 @@ export function compareObjectStorageCandidates(
     if (boundProjects.length > 0) {
       reasons.push(`Shared with ${boundProjects.length} existing project(s)`);
     } else {
-      reasons.push("Dedicated / unused by other projects");
+      reasons.push("No project consumers recorded; actual use is unknown");
     }
 
     const freshness = item.telemetryFreshness ?? "unmeasured";
-    if (freshness === "unmeasured" || freshness === "expired") {
+    // A known protocol mismatch remains a mismatch even without current usage evidence.
+    const apiUnknown = need.requiredApi && need.requiredApi !== "any" && !item.supportedApis;
+    const apiMismatch = need.requiredApi && need.requiredApi !== "any" &&
+      item.supportedApis && !item.supportedApis.includes(need.requiredApi);
+    if (apiMismatch) {
+      fitVerdict = "over";
+      reasons.push("Required API is not supported");
+    } else if (freshness !== "fresh") {
       reasons.push(`Telemetry is ${freshness}: capacity cannot be assumed free`);
-      fitVerdict = "unverified";
     } else {
-      // Evaluate based on remaining pool allowance
-      if (remainingPoolBytes !== null) {
+      // Evaluate based on fresh measured pool usage
+      if (apiUnknown) {
+        reasons.push("Required API compatibility is unknown");
+      } else if (remainingPoolBytes !== null) {
         if (remainingPoolBytes >= need.estimatedBytes) {
           fitVerdict = remainingPoolBytes <= need.estimatedBytes * 1.2 ? "tight" : "fits";
           reasons.push(`Remaining shared pool allowance: ${formatStorageBytes(remainingPoolBytes)}`);
@@ -448,7 +483,7 @@ export function compareObjectStorageCandidates(
         }
       } else {
         fitVerdict = "unverified";
-        reasons.push("No explicit shared allowance pool registered; fit unverified");
+        reasons.push("Shared pool usage, scope or allowance is unknown or ambiguous; fit unverified");
       }
     }
 
@@ -471,7 +506,7 @@ export function compareObjectStorageCandidates(
 
   // Sort order:
   // 1. "fits" > "tight" > "unverified" > "over"
-  // 2. Unused by other projects first
+  // 2. Fewer recorded project consumers first
   // 3. Name alphabetical
   const verdictRank: Record<ObjectStorageCandidate["fitVerdict"], number> = {
     fits: 3,
