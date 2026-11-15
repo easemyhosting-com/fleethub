@@ -15,8 +15,10 @@ this file; required CODEOWNERS review must also be enabled in repository rules.
       "severity": "HIGH",
       "owner": "@easemyhosting-com",
       "review_by": "2026-12-15",
-      "reason": "The optional upstream image has no non-root USER declaration. Its existing credential volume is mounted beneath the root home directory; changing identity without a reviewed volume migration can make credentials unreadable.",
-      "risk": "Provider credentials are held by a root-running optional gateway. Published ports bind to loopback, but container-network access still matters. No Docker socket is mounted; no capability-drop, no-new-privileges or read-only-rootfs controls are declared for this service."
+      "reason": "Owner accepts AVD-DS-0002 until 2026-12-15. The service is profile-gated by cliproxy and integrations. Both published ports bind to 127.0.0.1. No Docker socket, privileged mode, host network/pid/ipc namespaces, cap_add or devices are configured. Changing the root-home credential volume requires a tested migration.",
+      "risk": "The pinned image defaults to root and holds provider credentials. Its configuration bind mount is writable. No cap_drop, no-new-privileges or read_only is configured. Other containers on the Compose network can reach it despite loopback-only host port publication.",
+      "compose_path": "compose.yml",
+      "service": "cli-proxy-api"
     }
   ]
 }

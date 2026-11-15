@@ -16,12 +16,12 @@ export function readExceptions(text, today = new Date().toISOString().slice(0, 1
   if (!record(document) || Object.keys(document).join() !== 'exceptions' || !Array.isArray(document.exceptions)) throw new Error('Invalid exception policy');
   const seen = new Set();
   for (const e of document.exceptions) {
-    const fields = ['id', 'finding', 'path', 'severity', 'owner', 'review_by', 'reason', 'risk', ...(e.service === undefined ? [] : ['service']), ...(e.location === undefined ? [] : ['location'])];
+    const fields = ['id', 'finding', 'path', 'severity', 'owner', 'review_by', 'reason', 'risk', ...(e.service === undefined ? [] : ['service']), ...(e.compose_path === undefined ? [] : ['compose_path']), ...(e.location === undefined ? [] : ['location'])];
     if (!record(e) || Object.keys(e).length !== fields.length || !fields.every(k => typeof e[k] === 'string' && e[k].trim())) throw new Error('Incomplete exception');
     if (seen.has(e.id)) throw new Error('Duplicate exception');
     seen.add(e.id);
     if (e.owner !== owner || !safeDate(e.review_by) || e.review_by > deadline || e.review_by < today) throw new Error('Exception expired or requires owner review');
-    const image = e.id === 'EX-001' && e.finding === 'AVD-DS-0002' && e.path === 'cliproxy/Dockerfile' && e.severity === 'HIGH' && e.service === undefined;
+    const image = e.id === 'EX-001' && e.finding === 'AVD-DS-0002' && e.path === 'cliproxy/Dockerfile' && e.severity === 'HIGH' && e.service === 'cli-proxy-api' && e.compose_path === 'compose.yml';
     const compose = e.path === 'compose.yml' && rules.has(e.finding) && /^[a-zA-Z0-9_.-]+$/.test(e.service ?? '') && e.severity === 'HIGH' && typeof e.location === 'string' && e.location.startsWith(`services.${e.service}.`);
     if (!image && !compose) throw new Error('Exception scope is not approved');
   }
