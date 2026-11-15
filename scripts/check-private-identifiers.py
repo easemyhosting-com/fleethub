@@ -64,12 +64,14 @@ def approved_literals(root):
     return entries
 
 
-def scan(root, seeds):
+def scan(root, seeds, staged=False):
     rules = patterns(seeds)
     allowed = approved_literals(root)
     if not rules:
         return []
-    paths = subprocess.check_output(["git", "-C", str(root), "ls-files", "-z"]).split(b"\0")
+    command = ["git", "-C", str(root)]
+    selection = ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"] if staged else ["ls-files", "-z"]
+    paths = subprocess.check_output(command + selection).split(b"\0")
     hits = []
     for encoded in filter(None, paths):
         relative = encoded.decode("utf8")
@@ -80,7 +82,13 @@ def scan(root, seeds):
         if path.is_symlink():
             continue
         try:
-            text = path.read_text()
+            if staged:
+                mode = subprocess.check_output(command + ["ls-files", "-s", "--", relative]).split(b" ", 1)[0]
+                if mode == b"120000":
+                    continue
+                text = subprocess.check_output(command + ["show", ":" + relative]).decode("utf8")
+            else:
+                text = path.read_text()
         except UnicodeDecodeError:
             continue
         for line_number, line in enumerate(text.splitlines(), 1):
@@ -96,11 +104,12 @@ def scan(root, seeds):
 def main():
     parser = argparse.ArgumentParser(description="Check private identifier locations; never print values")
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--staged", action="store_true")
     args = parser.parse_args()
     seed = args.root / "security/.local-forbidden.txt"
     supplement = Path.home() / "fleethub-audit-private/seed/supplement.txt"
     try:
-        hits = scan(args.root, [seed, supplement])
+        hits = scan(args.root, [seed, supplement], staged=args.staged)
     except (OSError, ValueError, subprocess.SubprocessError):
         print("Private identifier check unavailable; check local seed permissions and format")
         return 2
