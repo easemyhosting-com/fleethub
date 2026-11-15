@@ -42,3 +42,5 @@ Numbered files are stable records, so numbering has gaps where earlier internal 
 Never put private host state, credentials or local environment exports in documentation. Use placeholders such as `example.com` and documentation IP ranges.
 
 - [Resource collection and evidence coverage](65-resource-coverage-matrix.md): implemented collectors, manual evidence, catalog-only references and unsupported measurements.
+
+- [Offline master-key rotation](66-offline-master-key-rotation.md): transactional maintenance, separate key files and interruption recovery.

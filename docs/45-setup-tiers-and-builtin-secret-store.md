@@ -40,7 +40,7 @@ cross-backend migration are follow-up work, not current capabilities.
 
 ## Limits and follow-ups
 
-- Key rotation for the built-in store is not implemented (re-encrypt all secrets under a new key); plan it before recommending the store for important credentials. Do not change the configured key in place: existing ciphertext would become unreadable. If the key is lost, restore its separate backup or re-enter credentials; if exposed, revoke/replace affected provider credentials and recover the store through a reviewed procedure.
+- Offline transactional master-key rotation is implemented through a separate maintenance runner. It requires a tested backup and all application/worker readers and writers stopped. There is no online rotation API or automatic runtime-key switch. Follow [the rotation procedure](66-offline-master-key-rotation.md); changing the configured key in place still makes existing ciphertext unreadable.
 - Moving existing credentials between Infisical and the built-in store is not implemented.
 - The setup verification still expires after 15 minutes (configurable, docs/38); for the built-in store a re-verify is one local click.
 - Cloudflare listings, entitlements/allowances, the read-only OCI collector, resource profiles and Fleet Map have since shipped. Use [the current plan](62-next-two-weeks.md) for follow-ups; do not rebuild them from the historical M1 proposal.
