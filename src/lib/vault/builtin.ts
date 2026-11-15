@@ -50,7 +50,7 @@ export function createBuiltinVault(rows: SecretRows = databaseSecretRows, env: R
   return {
     async write(name, value) {
       const nonce = randomBytes(12);
-      const cipher = createCipheriv("aes-256-gcm", builtinKey(env), nonce);
+      const cipher = createCipheriv("aes-256-gcm", builtinKey(env), nonce, { authTagLength: 16 });
       cipher.setAAD(Buffer.from(name));
       const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final(), cipher.getAuthTag()]);
       await rows.put(name, nonce, encrypted);
@@ -58,7 +58,7 @@ export function createBuiltinVault(rows: SecretRows = databaseSecretRows, env: R
     async read(name) {
       const row = await rows.get(name);
       if (!row || row.ciphertext.length < 16) throw new Error("Secret not found");
-      const decipher = createDecipheriv("aes-256-gcm", builtinKey(env), row.nonce);
+      const decipher = createDecipheriv("aes-256-gcm", builtinKey(env), row.nonce, { authTagLength: 16 });
       decipher.setAAD(Buffer.from(name));
       decipher.setAuthTag(row.ciphertext.subarray(row.ciphertext.length - 16));
       return Buffer.concat([decipher.update(row.ciphertext.subarray(0, row.ciphertext.length - 16)), decipher.final()]).toString("utf8");

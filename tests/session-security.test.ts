@@ -67,7 +67,7 @@ import {
 import { GET as beginGoogle } from "../src/app/api/auth/google/route";
 import { GET as finishGoogle } from "../src/app/api/auth/callback/google/route";
 
-const secret = "session-security-test-secret-32-bytes-minimum";
+const secret = crypto.randomBytes(32).toString("hex");
 const env = { ...process.env };
 const originalFetch = global.fetch;
 

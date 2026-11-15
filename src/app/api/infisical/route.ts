@@ -53,8 +53,8 @@ export async function POST(req: Request) {
               status = EXCLUDED.status;
           `;
           syncedCount++;
-        } catch (dbErr: any) {
-          console.warn(`[DB] Error syncing secret ref ${sec.id}:`, dbErr.message);
+        } catch {
+          console.warn("[DB] Secret reference sync failed");
         }
       }
 
