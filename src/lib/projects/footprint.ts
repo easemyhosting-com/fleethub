@@ -1,3 +1,4 @@
+import { dependencyEvidence, type DependencyEvidence } from "./dependency-evidence";
 import { readProjectMeasurements, type ProjectMeasurement } from "./measurements";
 import { readProjectFleetMatches } from "./fleet-scope";
 import { queryClient } from "@/lib/db/client";
@@ -7,7 +8,7 @@ const staleAfterMs = 7 * 86_400_000;
 
 export interface ProjectFootprint {
   id: string; slug: string; name: string; kind: string; kindManual: boolean; placements: Array<{ host: string; runtime: string; hostResourceId: string | null; evidence: string; status: string; declared: Record<string, number | null> }>; environment: string; criticality: string; repoUrl: string | null;
-  links: Array<{ resourceId: string; name: string; provider: string; category: string; billing: string; source: string; confidence: number | null; status: string; purpose: string | null; evidence: string | null; lastSeen: string }>;
+  links: Array<{ resourceId: string; name: string; provider: string; category: string; billing: string; source: string; confidence: number | null; status: string; purpose: string | null; evidence: string | null; lastSeen: string; dependencyEvidence?: DependencyEvidence }>;
   needs: Array<{ id: string; kind: string; purpose: string; status: string; topCandidate: string | null; createdAt: string }>;
   usage: Array<{ resourceRef: string; resourceId: string | null; matched: boolean; amount: number | null; unit: string | null; periodEnd: string; receivedAt: string }>;
   keys: Array<{ id: string; hint: string; expiresAt: string; status: "active" | "expired" | "revoked" }>;
@@ -24,8 +25,9 @@ export async function readFootprints(projectSlug?: string, confirmedOnly = false
   if (!projects.length) return [];
   const ids = projects.map(row => String(row.id));
   const [links, needs, usage, keys, placements, measured, scope] = await Promise.all([
-    queryClient`SELECT l.id, l.project_id, l.resource_id, l.source, l.confidence, l.status, l.purpose, l.evidence, l.last_seen, r.name, r.provider, r.category, COALESCE(r.attributes->>'billing', 'unknown') AS billing
-      FROM project_resource_links l JOIN resources r ON r.id = l.resource_id WHERE l.project_id = ANY(${ids}) ORDER BY l.last_seen DESC`,
+    queryClient`SELECT l.id, l.project_id, l.resource_id, l.source, l.confidence, l.status, l.purpose, l.evidence, l.last_seen, r.name, r.provider, r.category, r.account_id, a.label AS account_label, COALESCE(i.display_name, a.owner_email) AS owner_label, COALESCE(r.attributes->>'billing', 'unknown') AS billing,
+      (SELECT MAX(u.received_at) FROM project_usage_reports u WHERE u.project_id = l.project_id AND u.resource_id = r.id AND u.metrics->>'source' = 'prometheus') AS observed_at
+      FROM project_resource_links l JOIN resources r ON r.id = l.resource_id LEFT JOIN provider_accounts a ON a.id = r.account_id LEFT JOIN identities i ON i.id = a.identity_id WHERE l.project_id = ANY(${ids}) ORDER BY l.last_seen DESC`,
     queryClient`SELECT id, project_id, kind, purpose, status, recommendation, created_at FROM project_needs WHERE project_id = ANY(${ids}) ORDER BY created_at DESC`,
     queryClient`SELECT project_id, resource_id, resource_ref, amount, unit, period_end, received_at FROM project_usage_reports WHERE project_id = ANY(${ids}) ORDER BY received_at DESC`,
     queryClient`SELECT id, project_id, key_hint, expires_at, revoked_at FROM project_keys WHERE project_id = ANY(${ids}) ORDER BY created_at DESC`,
@@ -37,7 +39,9 @@ export async function readFootprints(projectSlug?: string, confirmedOnly = false
     const own = (rows: ReadonlyArray<Record<string, any>>) => rows.filter(row => row.project_id === project.id);
     const usageRows = own(usage);
     const last = usageRows[0]?.received_at ?? null;
-    const projectLinks = own(links).filter(row => !scope || scope.links.has(row.id)).map(row => ({ resourceId: String(row.resource_id), name: String(row.name), provider: String(row.provider), category: String(row.category), billing: String(row.billing), source: String(row.source), confidence: row.confidence as number | null, status: String(row.status), purpose: row.purpose as string | null, evidence: row.evidence as string | null, lastSeen: iso(row.last_seen)! }));
+    const projectLinks = own(links).filter(row => !scope || scope.links.has(row.id)).map(row => ({ resourceId: String(row.resource_id), name: String(row.name), provider: String(row.provider), category: String(row.category), billing: String(row.billing), source: String(row.source), confidence: row.confidence as number | null, status: String(row.status), purpose: row.purpose as string | null, evidence: row.evidence as string | null, lastSeen: iso(row.last_seen)!, dependencyEvidence: dependencyEvidence({ source: String(row.source), confidence: row.confidence as number | null, lastSeen: row.last_seen,
+      observedAt: row.observed_at ?? null,
+      accountId: row.account_id ?? null, accountLabel: row.account_label ?? null, ownerLabel: row.owner_label ?? null }) }));
     return {
       id: String(project.id), slug: String(project.slug), name: String(project.name), kind: String(project.kind), kindManual: Boolean(project.kind_manual),
       placements: own(placements).map(row => ({ host: String(row.host_name), runtime: String(row.runtime), hostResourceId: row.host_resource_id as string | null, evidence: String(row.evidence), status: String(row.status), declared: row.declared as Record<string, number | null> })), environment: String(project.environment), criticality: String(project.criticality), repoUrl: project.repo_url as string | null,
@@ -67,8 +71,16 @@ export async function readOrphans(limit = 100) {
 
 /** Resource id to the projects using it, for the "Used by" line in the resource drawer. */
 export async function readUsedBy() {
-  const rows = await queryClient`SELECT l.resource_id, p.slug, p.name, l.source, l.status FROM project_resource_links l JOIN projects p ON p.id = l.project_id WHERE p.archived_at IS NULL`;
-  const out: Record<string, Array<{ slug: string; name: string; source: string; status: string }>> = {};
-  for (const row of rows) (out[String(row.resource_id)] ??= []).push({ slug: String(row.slug), name: String(row.name), source: String(row.source), status: String(row.status) });
+  const rows = await queryClient`SELECT l.resource_id, p.slug, p.name, l.source, l.status, l.confidence, l.last_seen,
+    r.account_id, a.label AS account_label, COALESCE(i.display_name, a.owner_email) AS owner_label,
+    (SELECT MAX(u.received_at) FROM project_usage_reports u WHERE u.project_id = p.id AND u.resource_id = r.id AND u.metrics->>'source' = 'prometheus') AS observed_at
+    FROM project_resource_links l JOIN projects p ON p.id = l.project_id JOIN resources r ON r.id = l.resource_id
+    LEFT JOIN provider_accounts a ON a.id = r.account_id LEFT JOIN identities i ON i.id = a.identity_id
+    WHERE p.archived_at IS NULL AND r.retired_at IS NULL AND (a.id IS NULL OR a.archived_at IS NULL)
+    ORDER BY l.last_seen DESC LIMIT 2000`;
+  const out: Record<string, Array<{ slug: string; name: string; source: string; status: string; dependencyEvidence: DependencyEvidence }>> = {};
+  for (const row of rows) (out[String(row.resource_id)] ??= []).push({ slug: String(row.slug), name: String(row.name), source: String(row.source), status: String(row.status),
+    dependencyEvidence: dependencyEvidence({ source: String(row.source), confidence: row.confidence as number | null, lastSeen: row.last_seen, observedAt: row.observed_at ?? null,
+      ownerLabel: row.owner_label ?? null, accountId: row.account_id ?? null, accountLabel: row.account_label ?? null }) });
   return out;
 }

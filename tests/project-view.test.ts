@@ -35,7 +35,7 @@ describe("project link presentation helpers", () => {
     expect(confidenceLabel(0.49, "inferred")).toBe("guess");
     expect(confidenceLabel(0.5, "inferred")).toBe("likely");
     expect(confidenceLabel(0.99, "gitops")).toBe("likely");
-    expect(confidenceLabel(1, "inferred")).toBe("declared");
+    expect(confidenceLabel(1, "inferred")).toBe("likely");
     expect(confidenceLabel(null, "declared")).toBe("declared");
   });
 

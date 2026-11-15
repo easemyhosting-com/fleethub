@@ -325,3 +325,19 @@ compute evidence does not prevent returning unknown candidates. Disk requirement
 duration allowances and continuous availability are not verified by this compute
 slice. Storage/CDN recommendations remain unverified until their own evidence
 adapters exist. Advice reserves nothing and performs no allocation or failover.
+
+## Dependency evidence visibility
+
+Project links and the resource used-by drawer share a `dependencyEvidence` contract:
+owner/account labels, relationship kind, nullable confidence, link timestamp and
+freshness, and a separate source-marked usage observation timestamp/freshness.
+Declared links remain declarations. GitOps configuration and inferred matches are
+inferred relationships, even at full confidence. Unknown confidence stays unknown.
+An observation timestamp records source-marked telemetry, not independent verification
+of its measurement values or permission to share the resource.
+
+Missing usage does not establish free space or unused capacity. Each relationship
+keeps `headroom` and `sharingPermission` unverified. Stale links and observations
+remain visible with their timestamps; account ownership is not inferred from a key.
+Archived projects/accounts and retired resources are excluded from the global
+used-by read. Its bounded result is not an authoritative proof of all dependencies.

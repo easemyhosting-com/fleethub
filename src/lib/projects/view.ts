@@ -21,7 +21,7 @@ export function filterProjectsByKind<T extends { kind: string }>(projects: T[], 
 }
 
 export function confidenceLabel(confidence: number | null, source: string): string {
-  if (source === "declared" || confidence === 1) return "declared";
+  if (source === "declared") return "declared";
   if (confidence === null || confidence < 0.5) return "guess";
   return "likely";
 }

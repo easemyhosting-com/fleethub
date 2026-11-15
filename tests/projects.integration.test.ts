@@ -76,6 +76,9 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
       expect(graph.nodes.filter(node => node.type === "resource").map(node => node.data.resourceId).sort()).toEqual(expected);
       const [footprint] = await readFootprints(slug, true);
       expect(footprint.links.map(link => link.resourceId).sort()).toEqual(expected);
+      const declaredEvidence = footprint.links.find(link => link.resourceId === "scope-declared")?.dependencyEvidence;
+      expect(declaredEvidence).toMatchObject({ ownerLabel: "Scope fixture", accountId: account, accountLabel: "Scope account", kind: "declared", confidence: null, observationFreshness: "unmeasured", headroom: "unverified", sharingPermission: "unverified" });
+      expect((await readUsedBy())["scope-declared"][0].dependencyEvidence).toEqual(declaredEvidence);
       expect((await readFootprints(slug))[0].links.length).toBeGreaterThan(expected.length);
 
       await decideLink(linked.id, "scope-confirmed", "clear", "fixture");
