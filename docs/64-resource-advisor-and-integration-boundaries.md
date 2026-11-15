@@ -257,3 +257,46 @@ system temporary directories. They must not contain secret values. Keep a curren
 handoff/index so future sessions can find them. Before removing an existing repo doc,
 classify its stable contract content, preserve anything needed, import work items,
 verify tracker links, and record the mapping. No automatic bulk deletion or archival.
+
+## Manual object-storage comparison API
+
+`POST /api/capacity/object-storage` accepts bounded manual snapshots from an
+operator session or admin API credential. It reads no database inventory and makes
+no provider calls or writes. Read-only and project-scoped credentials cannot submit
+snapshots. Responses use `Cache-Control: no-store`. Maximum request body is 64 KiB,
+with 20 pools, 100 resources and 50 recorded consumers per resource.
+
+The JSON body has `need`, `pools` and `resources`:
+
+- `need`: `estimatedBytes` and optional `preferredRegion`, `requiredApi`
+  (`s3_compatible`, `oci_native`, or `any`).
+- Each pool: `poolId`, `accountId`, `provider`, `product`, `allowanceBytes`,
+  `inventoryComplete`, and `evidence`.
+- Each resource: `resourceId`, `name`, `poolId`, nullable `region`, `observedBytes`
+  and `declaredBytes`, `evidence`, optional `supportedApis`, `consumers` containing
+  project/service labels, and nullable `egressNote` and `requestNote`.
+- Each evidence record: `source` and nullable ISO `measuredAt` with timezone.
+  Numeric amounts are nonnegative safe integers in bytes. Unknown fields, duplicate
+  IDs, missing pool references and ambiguous account/provider/product pools reject.
+
+Two or more manual sources can be compared in one request by supplying separate
+pools and their members. Pool allowance must describe an instantaneous storage
+entitlement; monthly byte-hours, request quotas and regional sub-pools are unsupported.
+`inventoryComplete` is an operator assertion that all pool members are included.
+Missing members must be represented or the assertion left false. Manual evidence
+is not independently verified against a provider. Source labels must contain metadata
+only, never credentials.
+
+Results retain source timestamps, allowance freshness, usage freshness, measured
+headroom, declared budgets, distinct consumers and explicit unknowns. Stale allowance
+or member usage prevents a positive capacity verdict; separate accounts stay separate.
+API mismatch is an exclusion even if usage is unknown. Egress/request notes are
+operator notes, not validated price or quota calculations. Region is a preference,
+not a hard placement constraint. `fits`/`tight` describe capacity and the requested
+API only; they do not establish complete suitability or a guaranteed free balance.
+`allocated` is always false. The operator chooses placement outside this endpoint.
+
+The Limits panel links to `/compare/object-storage`, a form comparing two manual
+single-bucket scopes. It requires the operator to affirm that each bucket is the
+only member before showing measured headroom. Multi-bucket pools use the API.
+Saved inventory integration and live usage adapters are not implemented by this slice.
