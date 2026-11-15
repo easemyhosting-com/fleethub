@@ -6,3 +6,4 @@ private-key	-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----
 aws-key	AKIA[0-9A-Z]{16}
 github-token	ghp_|github_pat_
 api-token	sk-[A-Za-z0-9]{20,}
+shared-network-ip	(?<![\d.])100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}(?![\d.])

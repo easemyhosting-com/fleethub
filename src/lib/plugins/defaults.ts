@@ -886,7 +886,7 @@ export const tailscalePlugin: ProviderPlugin = {
   async collect(ctx: CollectContext): Promise<CollectResult> {
     if (ctx.isMock !== true) return unavailableCollection();
     const start = Date.now();
-    const ip = ctx.credentials?.tailscaleIp || "100.64.0.1";
+    const ip = ctx.credentials?.tailscaleIp || "192.0.2.1";
     return {
       resources: [
         {
