@@ -8,15 +8,15 @@ import { fleetSnapshotSchema } from "../src/lib/inventory/model";
 const accounts = [
   { id: "a1", identityId: "p1", ownerEmail: "Owner@example.com", kind: "cloudflare", plan: "free" },
   { id: "a2", identityId: "p1", ownerEmail: "alex@example.com", kind: "cloudflare", plan: "paid" },
-  { id: "a3", identityId: "p2", ownerEmail: "k@x.co", kind: "oracle" },
+  { id: "a3", identityId: "p2", ownerEmail: "k@fixture7.example.com", kind: "oracle" },
 ];
 const resources = [{ accountId: "a1" }, { accountId: "a2" }, { accountId: "a3" }, { accountId: null }];
 
 describe("fleet filters", () => {
   it("parses, ignores 'all' and bad plans, and round-trips", () => {
-    expect(parseFilter(new URLSearchParams("person=p1&email=a@b.co&provider=all&plan=free"))).toEqual({ person: "p1", email: "a@b.co", plan: "free" });
+    expect(parseFilter(new URLSearchParams("person=p1&email=a@fixture3.example.com&provider=all&plan=free"))).toEqual({ person: "p1", email: "a@fixture3.example.com", plan: "free" });
     expect(parseFilter(new URLSearchParams("plan=gold&person=%20"))).toEqual({});
-    const params = filterToParams({ person: "p1", plan: "paid" }, new URLSearchParams("email=old@x.co&keep=1"));
+    const params = filterToParams({ person: "p1", plan: "paid" }, new URLSearchParams("email=old@fixture7.example.com&keep=1"));
     expect(params.toString()).toBe("keep=1&person=p1&plan=paid");
     expect(parseFilter(new URLSearchParams("project=all"))).toEqual({ project: "all" });
     expect(parseFilter(new URLSearchParams("project=INVALID"))).toEqual({});
@@ -25,14 +25,14 @@ describe("fleet filters", () => {
     expect(hasFilter({ plan: "free" })).toBe(true);
   });
   it("matches accounts on every given field, case-insensitively for email", () => {
-    expect(accountMatches(accounts[0], { email: "owner@EXAMPLE.com", provider: "Cloudflare", plan: "free", person: "p1" })).toBe(true);
+    expect(accountMatches(accounts[0], { email: "owner@example.com", provider: "Cloudflare", plan: "free", person: "p1" })).toBe(true);
     expect(accountMatches(accounts[0], { person: "p2" })).toBe(false);
-    expect(accountMatches(accounts[0], { email: "other@x.co" })).toBe(false);
+    expect(accountMatches(accounts[0], { email: "other@fixture7.example.com" })).toBe(false);
     expect(accountMatches(accounts[0], { provider: "oracle" })).toBe(false);
     expect(accountMatches(accounts[0], { plan: "paid" })).toBe(false);
     expect(accountMatches(accounts[2], { plan: "unknown" })).toBe(true);
-    expect(accountMatches({ ownerEmail: "a@b.co", provider: "neon" }, { provider: "neon" })).toBe(true);
-    expect(accountMatches({ ownerEmail: "a@b.co" }, { provider: "neon" })).toBe(false);
+    expect(accountMatches({ ownerEmail: "a@fixture3.example.com", provider: "neon" }, { provider: "neon" })).toBe(true);
+    expect(accountMatches({ ownerEmail: "a@fixture3.example.com" }, { provider: "neon" })).toBe(false);
   });
   it("narrows a snapshot to matching accounts and their resources", () => {
     const snapshot = { accounts, resources, extra: 1 };

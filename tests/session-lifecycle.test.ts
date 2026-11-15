@@ -35,7 +35,7 @@ describe("server-side session lifecycle in the auth route", () => {
   fixture.revoke.mockClear(); expect(await (await post({ action: "logout" })).json()).toEqual({ success: true, serverRevoked: true }); expect(fixture.revoke).not.toHaveBeenCalled();
  });
  it("signs in from an additional allowed origin with a cookie suited to that origin, and refuses other origins", async () => {
-  const canonical = "https://fleet.tailnet.ts.net:8443";
+  const canonical = "https://your-tailnet.ts.net:8443";
   vi.stubEnv("FLEETHUB_APP_URL", canonical); vi.stubEnv("FLEETHUB_ALLOWED_ORIGINS", "http://localhost:3060");
   const login = (from: string) => POST(new Request(`${canonical}/api/auth`, { method: "POST", headers: { origin: from, "content-type": "application/json" }, body: JSON.stringify({ action: "login", email: "op@example.test", password: "correct-horse-battery" }) }));
   const local = await login("http://localhost:3060"); expect(local.status).toBe(200); expect(local.headers.get("set-cookie")).not.toContain("Secure");

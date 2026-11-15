@@ -249,7 +249,7 @@ describe("API Security, Authentication & Rate Limiting Guard", async () => {
     const { createSessionToken, verifySessionToken, createSessionCookie, createClearSessionCookie } = await import("../src/lib/auth/session");
     const user = {
       id: "u123",
-      email: "admin@fleethub.internal",
+      email: "admin@fixture4.example.com",
       name: "Admin User",
       provider: "local" as const,
       createdAt: Date.now(),
@@ -407,7 +407,7 @@ describe("API Security, Authentication & Rate Limiting Guard", async () => {
     const { createSessionToken } = await import("../src/lib/auth/session");
     const user = {
       id: "u456",
-      email: "operator@fleethub.internal",
+      email: "operator@fixture4.example.com",
       name: "Fleet Operator",
       provider: "google" as const,
       createdAt: Date.now(),

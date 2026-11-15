@@ -111,7 +111,7 @@ export function discoverConfiguredAccounts(): AccountConfig[] {
     {
       id: "cf-primary-dns",
       label: "Production DNS & Core Gateway",
-      ownerEmail: "operator@fleethub.dev",
+      ownerEmail: "operator@example.com",
       token: process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_DNS_TOKEN,
       role: "dns_control",
       isProtected: true, // Primary DNS must NEVER run arbitrary untrusted batch workers
@@ -119,7 +119,7 @@ export function discoverConfiguredAccounts(): AccountConfig[] {
     {
       id: "cf-worker-sandbox-1",
       label: "Staging account (cron and sync workers)",
-      ownerEmail: "staging@fleethub.dev",
+      ownerEmail: "staging@example.com",
       token: process.env.CLOUDFLARE_WORKER_TOKEN_1,
       role: "worker_ephemeral",
       isProtected: true,
@@ -127,7 +127,7 @@ export function discoverConfiguredAccounts(): AccountConfig[] {
     {
       id: "cf-worker-sandbox-2",
       label: "Client project account (edge services)",
-      ownerEmail: "client-project@fleethub.dev",
+      ownerEmail: "client-project@example.com",
       token: process.env.CLOUDFLARE_WORKER_TOKEN_2,
       role: "worker_ephemeral",
       isProtected: true,
@@ -135,7 +135,7 @@ export function discoverConfiguredAccounts(): AccountConfig[] {
     {
       id: "cf-r2-storage-pool",
       label: "R2 Zero-Egress Storage Vault",
-      ownerEmail: "storage-vault@fleethub.dev",
+      ownerEmail: "storage-vault@example.com",
       token: process.env.CLOUDFLARE_R2_TOKEN,
       role: "r2_storage",
       isProtected: true,

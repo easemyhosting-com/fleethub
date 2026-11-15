@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { getAllowedOrigins, isAllowedOrigin, isSecureRequest } from "../src/lib/auth/session";
-const tailnet = "https://fleet.tailnet.ts.net:8443";
+const tailnet = "https://your-tailnet.ts.net:8443";
 const req = (origin?: string) => new Request(`${tailnet}/api/auth`, { method: "POST", headers: origin ? { origin } : {} });
 beforeEach(() => { vi.stubEnv("FLEETHUB_APP_URL", tailnet); });
 afterEach(() => vi.unstubAllEnvs());

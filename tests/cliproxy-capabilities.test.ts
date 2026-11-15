@@ -38,7 +38,7 @@ const inspect = () => inspectCliProxy({ apiUrl: base, consoleUrl: base });
 describe("CLIProxy v8 capability adapter over HTTP", () => {
   it("keeps authentication, enablement, reported availability and quota independent and redacts upstream metadata", async () => {
     credentials = { files: [
-      { auth_index: "private-index", name: "private@example.test.json", provider: "codex", disabled: true, unavailable: false, status_message: "Bearer PRIVATE_TOKEN", access_token: "PRIVATE_TOKEN" },
+      { auth_index: "private-index", name: "private@fixture6.example.com", provider: "codex", disabled: true, unavailable: false, status_message: "Bearer PRIVATE_TOKEN", access_token: "PRIVATE_TOKEN" },
       { id: "private@example.test", provider: "secret-plugin-name", unavailable: true },
     ] };
     const result = await inspect();

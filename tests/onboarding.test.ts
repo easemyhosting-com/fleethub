@@ -18,7 +18,7 @@ const infisical = {
   secretPath: "/fleet",
 };
 const cliproxy = { apiUrl: "https://gateway.example.test", consoleUrl: "https://gateway.example.test" };
-const tailscale = { tailnet: "example.ts.net", deviceId: "device_1" };
+const tailscale = { tailnet: "your-tailnet.ts.net", deviceId: "device_1" };
 const freshDevice = () => ({ id: "device_1", nodeId: "node_1", authorized: true, addresses: ["100.101.102.103"], lastSeen: new Date().toISOString() });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const fetchMock = vi.fn<typeof fetch>();
@@ -198,7 +198,7 @@ describe("service verification", () => {
   it("verifies an authorized recent selected Tailscale device on a local interface", async () => {
     fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] }));
     await verifyStep("tailscale", tailscale);
-    expect(String(fetchMock.mock.calls[0][0])).toContain("/tailnet/example.ts.net/devices");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/tailnet/your-tailnet.ts.net/devices");
     expect(fetchMock.mock.calls[0][1]?.headers).toEqual({ Authorization: `Basic ${Buffer.from("tailscale-token:").toString("base64")}` });
   });
   it("rejects missing token, malformed devices, unauthorized or stale selection", async () => {

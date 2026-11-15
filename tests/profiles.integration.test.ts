@@ -64,7 +64,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("resource prof
     await queryClient`UPDATE provider_accounts SET login_email = 'sso@example.test' WHERE id = ${accountId}`;
     await setAccountOwner(accountId, "other@example.com", "owner@example.test");
     expect((await readSnapshot({ accountId })).accounts[0]).toMatchObject({ ownerEmail: "other@example.com", loginEmail: "sso@example.test" });
-    await expect(setAccountOwner("missing-account", "a@b.co", "o")).rejects.toMatchObject({ message: "Account not found" });
+    await expect(setAccountOwner("missing-account", "a@fixture3.example.com", "o")).rejects.toMatchObject({ message: "Account not found" });
     await queryClient`DELETE FROM capacity_events WHERE subject = ${accountId}`;
   });
 
@@ -113,7 +113,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("resource prof
       await setAccountIdentity(accountId, identityId, "o", "SECOND@example.com");
       const [picked] = await queryClient`SELECT contact_id, owner_email FROM provider_accounts WHERE id = ${accountId}`;
       expect(picked).toMatchObject({ contact_id: `ct-a-${identityId}`, owner_email: "second@example.com" });
-      await expect(setAccountIdentity(accountId, identityId, "o", "stranger@x.co")).rejects.toMatchObject({ message: "Account not found" });
+      await expect(setAccountIdentity(accountId, identityId, "o", "stranger@fixture7.example.com")).rejects.toMatchObject({ message: "Account not found" });
       const byEmail = await readSnapshot({ email: "Second@example.com", provider: "cloudflare", person: identityId });
       expect(byEmail.accounts.map(account => account.id)).toEqual([accountId]);
       expect(byEmail.accounts[0].identityId).toBe(identityId);

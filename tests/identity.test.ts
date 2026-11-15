@@ -32,11 +32,11 @@ describe("Identity & Accounts Architecture", () => {
       expect(operator?.contacts.length).toBeGreaterThanOrEqual(3);
 
       const primaryEmail = operator?.contacts.find((c) => c.kind === "email" && c.isPrimary);
-      expect(primaryEmail?.value).toBe("operator@fleethub.dev");
+      expect(primaryEmail?.value).toBe("operator@example.com");
       expect(primaryEmail?.isVerified).toBe(true);
 
       const secondaryEmail = operator?.contacts.find((c) => c.kind === "email" && !c.isPrimary);
-      expect(secondaryEmail?.value).toBe("operator.backup@fleethub.dev");
+      expect(secondaryEmail?.value).toBe("operator.backup@example.com");
       expect(secondaryEmail?.isVerified).toBe(true);
 
       const phone = operator?.contacts.find((c) => c.kind === "phone");
@@ -71,8 +71,8 @@ describe("Identity & Accounts Architecture", () => {
 
       const [oci1, oci2] = oracleAccounts;
       expect(oci1.id).not.toBe(oci2.id);
-      expect(oci1.loginEmail).toBe("operator@fleethub.dev");
-      expect(oci2.loginEmail).toBe("partner@fleethub.dev");
+      expect(oci1.loginEmail).toBe("operator@example.com");
+      expect(oci2.loginEmail).toBe("partner@example.com");
       expect(oci1.label).toContain("Tenancy 1");
       expect(oci2.label).toContain("Tenancy 2");
 
@@ -249,7 +249,7 @@ describe("Identity & Accounts Architecture", () => {
       const validEmail = AddContactSchema.safeParse({
         identityId: "ident-1",
         kind: "email",
-        value: "operator@fleethub.internal",
+        value: "operator@fixture4.example.com",
       });
       expect(validEmail.success).toBe(true);
 
