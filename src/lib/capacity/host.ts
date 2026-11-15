@@ -9,7 +9,7 @@ export interface PlacementInput { projectId: string; slug: string; name: string;
 export interface ProjectLoad { projectId: string; slug: string; name: string; kind: string; runtime: string; cpuRequestMilli: number; memRequestMi: number; cpuLimitMilli: number; memLimitMi: number; pvcGi: number; declaresRequests: boolean; measuredUsage: ProjectMeasurement[] }
 export type HostStatus = "ok" | "tight" | "over" | "unknown_size" | "no_data";
 export interface HostCapacity {
-  hostId: string; name: string; state: string; region: string | null; shape: string | null;
+  hostId: string; name: string; state: string; region: string | null; arch?: string | null; shape: string | null;
   totalCpuMilli: number | null; totalMemMi: number | null;
   requestedCpuMilli: number; requestedMemMi: number; limitCpuMilli: number; limitMemMi: number; pvcGi: number;
   freeCpuMilli: number | null; freeMemMi: number | null;
@@ -51,7 +51,7 @@ export function hostCapacity(host: HostInput, placements: PlacementInput[]): Hos
   const cpuPct = pct(requestedCpu, totalCpu), memPct = pct(requestedMem, totalMem);
   const status: HostStatus = totalCpu === null || totalMem === null ? "unknown_size" : projects.length === 0 ? "no_data" : freeCpu! < 0 || freeMem! < 0 ? "over" : freeCpu! <= totalCpu * 0.2 || freeMem! <= totalMem * 0.2 ? "tight" : "ok";
   return {
-    hostId: host.id, name: host.name, state: host.state, region: host.region, shape: host.specs.shape ?? null,
+    hostId: host.id, name: host.name, state: host.state, region: host.region, arch: host.specs.arch ?? null, shape: host.specs.shape ?? null,
     totalCpuMilli: totalCpu, totalMemMi: totalMem, requestedCpuMilli: requestedCpu, requestedMemMi: requestedMem, limitCpuMilli: sum("cpuLimitMilli"), limitMemMi: sum("memLimitMi"), pvcGi: Math.round(sum("pvcGi") * 10) / 10,
     freeCpuMilli: freeCpu, freeMemMi: freeMem, cpuRequestPct: cpuPct, memRequestPct: memPct, cpuLimitPct: pct(sum("cpuLimitMilli"), totalCpu), memLimitPct: pct(sum("memLimitMi"), totalMem),
     status, projects, withoutRequests: projects.filter(p => !p.declaresRequests).map(p => p.slug),
