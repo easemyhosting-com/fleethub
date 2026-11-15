@@ -28,7 +28,8 @@ def message(text):
 
 
 def check_commits(revision, include_messages=False):
-    commits = subprocess.check_output(['git', 'rev-list', revision], text=True).splitlines()
+    revisions = [revision] if isinstance(revision, str) else revision
+    commits = subprocess.check_output(['git', 'rev-list', *revisions], text=True).splitlines()
     for commit in commits:
         raw = subprocess.check_output(['git', 'show', '-s', '--format=%ae%x00%ce%x00%an%x00%cn', commit], text=True).strip().split('\0')
         if len(raw) != 4 or not identity(*raw):
@@ -52,7 +53,9 @@ def prepush():
                 return 1
         if local_sha == zero:
             continue
-        revision = local_sha if remote_sha == zero else f'{remote_sha}..{local_sha}'
+        # A new remote branch is checked only for commits no remote-tracking ref already holds;
+        # published history (such as GitHub web merges on main) cannot be changed by the pusher.
+        revision = [local_sha, '--not', '--remotes'] if remote_sha == zero else f'{remote_sha}..{local_sha}'
         if check_commits(revision):
             return 1
     return 0

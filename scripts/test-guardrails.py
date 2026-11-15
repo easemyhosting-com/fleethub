@@ -127,6 +127,18 @@ class Guardrails(unittest.TestCase):
             deletion = f'refs/heads/main {"0" * 40} refs/heads/main {sha}\n'
             self.assertNotEqual(run(['bash', '.githooks/pre-push'], input=deletion).returncode, 0)
 
+            # A new branch skips commits already published on a remote, but not its own unpublished ones.
+            published = wrong.stdout.strip()
+            new_branch = lambda tip: f'refs/heads/feature {tip} refs/heads/feature ' + '0' * 40 + '\n'
+            self.assertNotEqual(run(['bash', '.githooks/pre-push'], input=new_branch(published)).returncode, 0)
+            self.assertEqual(run(['git', 'update-ref', 'refs/remotes/origin/main', published]).returncode, 0)
+            child = run(['git', 'commit-tree', tree, '-p', published, '-m', 'test: synthetic work on published base'])
+            self.assertEqual(child.returncode, 0)
+            self.assertEqual(run(['bash', '.githooks/pre-push'], input=new_branch(child.stdout.strip())).returncode, 0)
+            unpublished = subprocess.run(['git', 'commit-tree', tree, '-p', child.stdout.strip(), '-m', 'test: synthetic unpublished rejection'], cwd=root, env=wrong_env, capture_output=True, text=True)
+            self.assertEqual(unpublished.returncode, 0)
+            self.assertNotEqual(run(['bash', '.githooks/pre-push'], input=new_branch(unpublished.stdout.strip())).returncode, 0)
+
 
 if __name__ == '__main__':
     unittest.main()
