@@ -1,0 +1,59 @@
+name: Configuration security
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '19 4 * * 1'
+permissions: {}
+concurrency:
+  group: configuration-security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  configuration-security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate exception scope and review deadline
+        run: |
+          python3 scripts/check-security-exceptions.py
+          python3 scripts/test-security-exceptions.py
+      - name: Gate Compose configuration with the YAML policy checker
+        run: |
+          node --test scripts/test-compose-policy.mjs
+          node scripts/check-compose-policy.mjs compose.yml
+      - name: Gate main application Dockerfile configuration
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.1
+          scan-type: config
+          scan-ref: Dockerfile
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: json
+          output: ${{ runner.temp }}/trivy-dockerfile.json
+      - name: Reject a silent Dockerfile no-scan
+        if: always()
+        env:
+          TRIVY_REPORT: ${{ runner.temp }}/trivy-dockerfile.json
+        run: |
+          python3 scripts/test-trivy-targets.py
+          python3 scripts/assert-trivy-targets.py "$TRIVY_REPORT"
+      - name: Report optional gateway configuration (EX-001)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.1
+          scan-type: config
+          scan-ref: cliproxy/Dockerfile
+          severity: HIGH,CRITICAL
+          exit-code: '1'
