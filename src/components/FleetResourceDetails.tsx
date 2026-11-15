@@ -11,6 +11,7 @@ import type { FleetAccount, FleetResource } from "@/lib/inventory/model";
 
 const footprintSchema = z.object({
   usedBy: z.record(z.string(), z.array(z.object({ name: z.string(), source: z.string(), status: z.string(), dependencyEvidence: dependencyEvidenceSchema.optional() }))),
+  truncated: z.boolean(),
 });
 
 type ProjectLink = z.infer<typeof footprintSchema>["usedBy"][string][number];
@@ -23,14 +24,17 @@ export function FleetResourceDetails({ resource, account, onClose, onSaved }: {
 }) {
   const [projectLinks, setProjectLinks] = useState<ProjectLink[] | null>(null);
   const [linksUnavailable, setLinksUnavailable] = useState(false);
+  const [linksTruncated, setLinksTruncated] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/projects/footprint", { cache: "no-store", signal: controller.signal })
+    fetch(`/api/projects/footprint?resource=${encodeURIComponent(resource.id)}`, { cache: "no-store", signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error("Project links unavailable");
         const body: unknown = await response.json();
         const parsed = footprintSchema.parse(body);
-        if (!controller.signal.aborted) setProjectLinks(parsed.usedBy[resource.id] ?? []);
+        if (controller.signal.aborted) return;
+        setLinksTruncated(parsed.truncated);
+        setProjectLinks(parsed.usedBy[resource.id] ?? []);
       })
       .catch(() => { if (!controller.signal.aborted) setLinksUnavailable(true); });
     return () => controller.abort();
@@ -65,7 +69,7 @@ export function FleetResourceDetails({ resource, account, onClose, onSaved }: {
     <p className={`mt-3 inline-block rounded border px-2 py-1 text-xs ${style.className}`}><span aria-hidden="true">{style.symbol}</span> {style.label}{resource.isProtected ? " · protected" : ""}{resource.freshness === "stale" ? " · stale data" : ""}</p>
     <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] [overflow-wrap:anywhere] gap-x-4 gap-y-1 text-xs"><dt className="text-zinc-400">Provider state</dt><dd className="text-zinc-200">{resource.state}</dd><dt className="text-zinc-400">Region</dt><dd className="text-zinc-200">{resource.region ?? "-"}</dd><dt className="text-zinc-400">Last seen</dt><dd className="text-zinc-200">{resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : "Never"}</dd><dt className="text-zinc-400">Source</dt><dd className="text-zinc-200">{resource.inventorySource}</dd>{Object.entries(resource.specs).filter(([key]) => key !== "product").map(([key, value]) => <Fragment key={key}><dt className="text-zinc-400">{key}</dt><dd className="text-zinc-200">{String(value)}</dd></Fragment>)}</dl>
     {resource.sourceUrl && <a href={resource.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs text-cyan-300 hover:underline">Open in provider console</a>}
-    <div className="mt-3 text-xs text-zinc-400"><h3 className="font-medium text-zinc-200">Used-by evidence</h3>{projectLinks ? projectLinks.length ? <ul className="mt-2 space-y-3">{projectLinks.map((item, index) => <li key={index} className="rounded-lg border border-zinc-800 p-3">{item.name} ({item.source}, {item.status}){item.dependencyEvidence && <DependencyEvidence evidence={item.dependencyEvidence} />}</li>)}</ul> : <p className="mt-1">No project links recorded. Actual use and free capacity are unknown.</p> : <p>{linksUnavailable ? "Project links unavailable" : "Checking project links..."}</p>}</div>
+    <div className="mt-3 text-xs text-zinc-400"><h3 className="font-medium text-zinc-200">Used-by evidence</h3>{linksTruncated && <p className="mt-1">Showing the most recently seen links only; older links exist.</p>}{projectLinks ? projectLinks.length ? <ul className="mt-2 space-y-3">{projectLinks.map((item, index) => <li key={index} className="rounded-lg border border-zinc-800 p-3">{item.name} ({item.source}, {item.status}){item.dependencyEvidence && <DependencyEvidence evidence={item.dependencyEvidence} />}</li>)}</ul> : <p className="mt-1">No project links recorded. Actual use and free capacity are unknown.</p> : <p>{linksUnavailable ? "Project links unavailable" : "Checking project links..."}</p>}</div>
     {account && <section aria-label="Provider account" className="mt-5 space-y-2 border-t border-zinc-800 pt-4">
       <h4 className="text-sm font-semibold text-white">Provider account</h4>
       <FleetAccountFacts account={account} />

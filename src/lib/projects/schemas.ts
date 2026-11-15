@@ -5,6 +5,8 @@ const ref = z.string().regex(/^[A-Za-z0-9_.:\/-]{1,256}$/);
 const text = (max: number) => z.string().trim().min(1).max(max);
 
 export const projectSlug = slug;
+/** Any stored inventory id; used only as a bound query parameter. */
+export const resourceIdParam = z.string().min(1).max(512).regex(/^[^\u0000-\u001f\u007f]+$/);
 export const createProjectInput = z.strictObject({
   slug, name: text(80),
   repoUrl: z.url({ protocol: /^https$/ }).max(300).optional(),

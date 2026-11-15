@@ -78,7 +78,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
       expect(footprint.links.map(link => link.resourceId).sort()).toEqual(expected);
       const declaredEvidence = footprint.links.find(link => link.resourceId === "scope-declared")?.dependencyEvidence;
       expect(declaredEvidence).toMatchObject({ ownerLabel: "Scope fixture", accountId: account, accountLabel: "Scope account", kind: "declared", confidence: null, observationFreshness: "unmeasured", headroom: "unverified", sharingPermission: "unverified" });
-      expect((await readUsedBy())["scope-declared"][0].dependencyEvidence).toEqual(declaredEvidence);
+      expect((await readUsedBy()).usedBy["scope-declared"][0].dependencyEvidence).toEqual(declaredEvidence);
       expect((await readFootprints(slug))[0].links.length).toBeGreaterThan(expected.length);
 
       await decideLink(linked.id, "scope-confirmed", "clear", "fixture");
@@ -156,7 +156,24 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
     expect(footprint.needs[0]).toMatchObject({ kind: "database", topCandidate: "Free DB" });
     const orphans = (await readOrphans()).map(item => item.resourceId);
     expect(orphans).toContain("proj-paid-db"); expect(orphans).not.toContain("proj-free-db");
-    expect((await readUsedBy())["proj-free-db"]).toEqual([expect.objectContaining({ slug: "integration-app" })]);
+    expect((await readUsedBy()).usedBy["proj-free-db"]).toEqual([expect.objectContaining({ slug: "integration-app" })]);
+  });
+
+  it("reads one resource's links past the fleet cap and reports truncation instead of absence", async () => {
+    const ids = ["proj-cap-old", "proj-cap-new"];
+    await queryClient`INSERT INTO resources (id,name,category,provider,account_email,state) VALUES ('proj-cap-old','Cap old','database','neon','a@x.test','online'), ('proj-cap-new','Cap new','database','neon','a@x.test','online')`;
+    try {
+      await queryClient`INSERT INTO project_resource_links (id, project_id, resource_id, source, last_seen) VALUES
+        (${randomUUID()}, ${projectId}, 'proj-cap-old', 'declared', NOW() + INTERVAL '1 day'), (${randomUUID()}, ${projectId}, 'proj-cap-new', 'declared', NOW() + INTERVAL '2 days')`;
+      const capped = await readUsedBy(undefined, 1);
+      expect(capped.truncated).toBe(true);
+      expect(Object.keys(capped.usedBy)).toEqual(["proj-cap-new"]);
+      const single = await readUsedBy("proj-cap-old", 1);
+      expect(single).toEqual({ usedBy: { "proj-cap-old": [expect.objectContaining({ slug: "integration-app" })] }, truncated: false });
+      expect(await readUsedBy("proj-cap-missing")).toEqual({ usedBy: {}, truncated: false });
+    } finally {
+      await queryClient`DELETE FROM resources WHERE id = ANY(${ids})`;
+    }
   });
 
   it("syncs gitops links, remembers rejections and confirmations, and marks unseen links stale", async () => {
