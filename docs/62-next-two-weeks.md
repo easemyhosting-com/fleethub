@@ -1,5 +1,7 @@
 # FleetHub execution plan, 16-29 November 2026
 
+> Personal-use clarification: prioritize compute, storage, object storage and CDN across personal and authorized family accounts. The user decides; FleetHub collates and compares. Company-specific terms approval and compliance workflows are out of scope.
+
 > Direction update, 2026-11-15: [resource advisor and replaceable integrations](64-resource-advisor-and-integration-boundaries.md) takes precedence over conflicting priorities below. Prove the core account/resource/capacity/service-relationship journey first. Generic AI endpoints and retirement of bundled gateway profiles are target work, not implemented behavior. Existing security and migration gates remain unchanged.
 
 The public-main SHA and PR references below are historical planning evidence, not this checkout’s current release checkpoint. N4/N5 outbound delivery now follows the core comparison/evidence work in docs/64. No remote refresh or release acceptance is implied.

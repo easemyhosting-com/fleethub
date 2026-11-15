@@ -1,5 +1,7 @@
 # Reuse-first onboarding and FleetHub UX plan
 
+> Personal-use clarification: prioritize compute, storage, object storage and CDN across personal and authorized family accounts. The user decides; FleetHub collates and compares. Company-specific terms approval and compliance workflows are out of scope.
+
 > Direction update, 2026-11-15: [resource advisor and replaceable integrations](64-resource-advisor-and-integration-boundaries.md) takes precedence over conflicting priorities below. Prove the core account/resource/capacity/service-relationship journey first. Generic AI endpoints and retirement of bundled gateway profiles are target work, not implemented behavior. Existing security and migration gates remain unchanged.
 
 The earlier decision to retain the bundled CLIProxy profile is superseded as a distribution target. Current profiles remain available until a separately tested compatibility release; never stop services or delete volumes as part of this documentation change.

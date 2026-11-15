@@ -1,16 +1,35 @@
-# 01 — Scope and provider-account guardrails
+# Scope and personal-use boundaries
 
-FleetHub is a self-hosted inventory and capacity advisor for cloud and AI resources you legitimately hold. It records accounts, resources, allowances, measured usage, resets, expiry and billing exposure, and tells you or your agents where capacity remains. Current product scope and milestones are in [product scope and onboarding tiers](44-product-scope-and-onboarding-tiers.md).
+FleetHub is a local, self-hosted inventory and decision aid, built first for personal
+use. It brings together compute, storage, object storage and CDN resources from
+accounts the operator owns or has permission to view, including family accounts.
+See the [current product direction](64-resource-advisor-and-integration-boundaries.md).
 
-The [current product direction](64-resource-advisor-and-integration-boundaries.md) defines integration boundaries and the target policy-aware recommendation model. These guardrails reduce avoidable account risk; they cannot guarantee a provider will never restrict an account. They bind contributions to this project.
+The operator decides which resource to use for a task or project and is responsible
+for its permitted use. FleetHub supplies inventory, usage, capacity evidence,
+relationships and comparisons. It does not grant provider permissions or guarantee
+free capacity, zero costs or availability.
 
-1. **Multiple accounts.** Using several accounts to multiply free quotas may violate provider terms. Several services allow one free tier per person or prohibit multi-accounting, and a ban can take down everything tied to that identity. **Design rule:** FleetHub treats accounts as plain data and works identically with one or ten. Use only accounts you legitimately own and use, such as personal, work, client and project organizations.
-2. **Notebook platforms** (Colab, Kaggle, Paperspace, Lightning) are meant for interactive and ML use. Run legitimate workloads only: no mining, no proxying, no scraping that breaks a target's terms. Expect termination at any time and never keep the only copy of anything there.
-3. **GitHub Actions** is for CI-type workloads. Using it as general-purpose compute is risky; keep dispatch to build, test and scheduled repository jobs.
-4. **Oracle:** the free tier is subject to idle reclamation and capacity limits. Verify product, region, allowance scope and all charge dimensions, including egress and operations. A budget alert is not a hard spending cap; do not promise zero billing from a storage or compute allowance alone.
-5. **Rate limits.** Respect each provider's per-user and per-project API quotas; never hammer an API.
-6. FleetHub must **never** auto-create accounts, solve CAPTCHAs or bypass verification. Onboarding is manual by design.
-7. **Provider-specific eligibility.** Review current official terms for the exact product, plan and identity/organization scope. Do not infer independent free allowances from separate login accounts or organizations. Policy metadata needs sources, review dates and unknown/stale states; catalog entries are not proof of permission. Detailed policy-aware recommendation enforcement remains target work in docs/64.
-8. **Positioning rule:** FleetHub tracks the accounts you *legitimately* have. It does not use, and will not accept contributions that add, "quota arbitrage", "multi-account multiplication" or "ban bypass" language or features.
-9. **Never build:** automated signup, IP rotation, fingerprint spoofing, traffic routing that disguises where requests originate, rotation across several personal accounts at the *same* provider to extend limits, or scraping of provider dashboards that have no API. Collectors use official APIs only, with an honest `User-Agent` and polite intervals.
-10. **AI integrations:** FleetHub does not operate an AI router or own third-party OAuth, token refresh or credential pooling. Connect only authorized APIs or supported external integrations. A compatible endpoint does not establish permission to reuse subscription credentials. Native-agent access, commercial API use and consumer subscription access are different arrangements; verify the applicable official terms and methods. No scraping of agent credential files or spoofing an official client. AI remains optional, and missing AI must not block inventory or deterministic comparisons.
+## Product boundaries
+
+- Keep the actual account owner and service/resource relationships visible.
+- Preserve allowance scope, units and periods so shared limits are not double counted.
+- Distinguish observed usage, manual estimates, catalog limits and unknown data.
+- Do not require company-specific terms review or legal eligibility approval for
+  setup, inventory, comparisons or suggestions. A provider-policy engine is out of scope.
+- Allow optional user notes and constraints without making them onboarding gates.
+- Keep AI providers, proxies, external vaults and network vendors optional and replaceable.
+- FleetHub is an information and advice tool. It does not route workloads or AI
+  traffic, provision resources, create accounts or perform automatic failover.
+
+## Engineering boundaries
+
+- Access only accounts and resources the operator is authorized to inspect.
+- Use documented APIs, narrow credentials, bounded requests and polite polling.
+- Do not harvest credential files, bypass authentication or add signup/limit-evasion features.
+- Protect secrets, authenticate access and preserve resource-protection controls.
+- Missing optional integrations must not block unrelated inventory capabilities.
+- New integrations and migration steps must preserve stored inventory and user data.
+
+These boundaries do not replace the repository's security instructions or authorize
+runtime changes. Current implementation and proposed work are distinguished in docs/64.

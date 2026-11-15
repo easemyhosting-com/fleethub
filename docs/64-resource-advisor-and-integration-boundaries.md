@@ -1,20 +1,24 @@
 # Resource advisor and replaceable integrations
 
-Decision date: 2026-11-15. This is the current product direction. It supersedes
+Decision date: 2026-11-15, clarified for personal/local use. This is the current product direction. It supersedes
 conflicting product priorities in docs/44, docs/60 and docs/62. Source and tests
 still define implemented behavior. Target capabilities below are not release claims.
 Existing security, credential, data-retention and release gates remain in force.
 
 ## Product purpose
 
-FleetHub helps an operator answer: what resources do my authorized accounts have,
+FleetHub is built first for an individual running it locally for their own use.
+It helps an operator answer: what resources do my authorized accounts have,
 what is used, what remains, which services depend on them, and which resource is
 suitable for a new need? Free allowances are the focus; paid resources and expired
 trials remain visible so advice does not conceal costs or dependencies.
 
 The core journey is account -> provider/project -> resource -> allowance and usage
 -> service relationships -> explained placement advice. An account can represent a
-personal, work or client scope only where the operator has permission to manage it.
+personal or family scope where the account holder has authorized access. Work and
+client scopes can also be recorded with permission. Recording several owners does
+not require a team SaaS product or shared credentials. The user decides where to
+place a workload; FleetHub supplies facts, comparisons and optional suggestions.
 
 FleetHub collates information. It is not an AI router, storage gateway, credential
 pool, quota multiplier or infrastructure executor. A unified view does not make
@@ -74,7 +78,7 @@ Protocol compatibility does not establish permission to use subscription credent
 
 No inventory leaves FleetHub for AI by default. An optional assistant needs explicit
 opt-in, a visible destination and minimum redacted context; never send credentials.
-Model output cannot override eligibility, billing or protection rules or execute actions.
+Model output cannot override user constraints, billing or protection rules or execute actions.
 
 ### Simple alternatives and packaging
 
@@ -114,43 +118,57 @@ them. Only derive remaining capacity from compatible units, scope, period and fr
 observations; absent or stale measurements remain unknown. No cross-provider total
 may be presented as a single deployable resource or a guaranteed free balance.
 
-Recommendations apply eligibility and workload constraints before ranking. Include
-region, protocol, security/privacy requirements, expected growth, operational limits,
+Recommendations compare workload requirements and the operator's own constraints.
+Include region, protocol, security/privacy needs, expected growth, operational limits,
 reset/expiry, egress and cost exposure. Explain matches, exclusions and unknowns with
-source timestamps. A result is a candidate, not an allocation, reservation or guarantee.
-Keep unknown-policy and unknown-capacity entries visible for review, outside the
-verified-suitable result set. No automatic failover around provider limits.
+source timestamps. A result is advice, not an allocation, reservation or guarantee.
+Missing usage or unverified limits must remain visible; they do not prevent viewing
+or comparing an account. Distinguish known technical mismatch from missing evidence.
+The user makes the final decision. No provider-policy approval is required to browse,
+compare or request suggestions, and no automatic failover is performed.
 
 Each resource should show which services use it and why that relationship is believed:
 manual declaration, observed telemetry or inferred configuration. Preserve source,
 confidence and freshness; absence of an observed link does not prove a resource unused.
 Do not infer permission to share a resource from possession of its API credential.
 
-## Provider terms and account safety
+## Personal-use boundary
 
-Record policy at the provider/product/plan and relevant person, organization, billing
-account, project or region scope. Policy facts need an official source, reviewed date,
-reviewer and review-expiry rule. Distinguish confirmed restrictions, operator-specific
-permission, unknown and stale policy. An acknowledgement is not provider permission.
+FleetHub organizes information about accounts the operator owns or has permission
+to view, including family members' accounts. Keep account ownership visible instead
+of treating every login as the same owner. The operator is responsible for the use
+of each account and decides what is permissible for the intended workload.
 
-Inventory may describe restricted resources, but recommendations must not present
-prohibited use as suitable. Unknown or stale material policy needs review before a
-verified-suitable recommendation. Terms can change; no ban-proof or legally certified
-claim is possible. Provider enforcement decisions remain outside FleetHub's control.
+Do not build a company-specific terms database, compliance engine, mandatory policy
+review queue, terms-expiry gate or legal eligibility score. Unknown provider policy
+must not block setup, inventory, comparison or suggestions. Optional account notes
+can capture the user's own restrictions without a compulsory approval workflow.
+Capacity scope and shared allowances still matter for accurate arithmetic; they are
+inventory facts, not a legal judgement about whether the user may use an account.
 
-Never create accounts, multiply free quotas through identities, rotate credentials
-or networks to bypass limits, spoof official clients, scrape protected dashboards,
-resell restricted credentials or generate traffic merely to avoid idle reclamation.
-On quota exhaustion, advise waiting, reducing usage, permitted alternatives or a paid
-plan. Do not rotate to another prohibited account or promise that owning it suffices.
-Different authorized organizations are not automatically interchangeable capacity pools.
+Keep a short acceptable-use statement: FleetHub provides visibility and advice,
+does not grant provider permissions, and does not guarantee free capacity or cost.
+Do not build automated signup, access-control bypass, credential harvesting or
+features intended to evade limits. Existing authentication, secret protection,
+request budgets and resource protection remain engineering requirements.
 
-API protocol compatibility, an open-source license and a successful login are each
-separate from provider permission. Learn interface boundaries from other projects;
-do not inherit a proxy's supported authentication methods as FleetHub policy approval.
-Consumer subscriptions, commercial APIs and approved native-agent use need distinct
-reviews. Preserve official restrictions even when an intermediary can technically
-forward a request. Do not label a whole provider prohibited when only a method is.
+## First-use priorities
+
+Focus on compute, storage, object storage and CDN for personal projects. These are
+comparison categories, not claims that all providers support every capability.
+
+| Category | Questions FleetHub should answer |
+| --- | --- |
+| Compute | Which machines/services are available? CPU, RAM, architecture, region, power/health state, declared and observed load, remaining allowance, and existing workloads |
+| Storage | Which disks, volumes and file stores have usable space? Capacity, used/free evidence, attachments, access method, performance constraints and backup role |
+| Object storage | Which buckets/products fit? Storage, object/API compatibility, request and egress allowances, region, access/retention settings and consuming services |
+| CDN | Which zones/distributions serve which origins and services? Hostnames, cache/health status, bandwidth/request usage where available, configuration limits and cost exposure |
+
+Do not add unlike storage types together as interchangeable capacity. CDN cache
+capacity is not durable object storage. Show unsupported or unknown measurements
+honestly, and allow manual values with source/date when live collection is absent.
+For a new project, compare relevant candidates across authorized accounts, explain
+tradeoffs and dependencies, and leave selection and deployment to the user.
 
 ## Current implementation and next work
 
@@ -162,15 +180,16 @@ secrets and optional Infisical. CLIProxy inspection is optional and has no quota
 Current project recommendations rank basic category/provider/billing/state and
 sharing signals. They do not yet join workload requirements to allowance headroom,
 measured usage or host fit. They explicitly report unverified fit. The complete
-policy model and generic AI connection described here are target work.
+capacity-comparison model and generic AI connection described here are target work.
+A provider-specific policy engine is explicitly out of scope.
 
 | Order | Scope | Acceptance |
 | --- | --- | --- |
 | 1 | Prove the existing core journey | Disposable authenticated install with manual inventory and built-in secrets; skip external integrations; inventory and agent reads still work |
-| 2 | Define capacity and policy evidence | Reviewed scope/units/freshness model and shared-quota fixtures; known restrictions exclude candidates; unknown stays unknown |
-| 3 | Deliver one storage comparison slice | Supported object-storage products from at least two verified adapters/manual sources; requirements, use, remaining evidence, service links and exclusions; no deployment |
+| 2 | Define capacity and usage evidence | Scope/units/freshness model and shared-allowance fixtures; no double counting; unknown stays unknown; no terms-review gate |
+| 3 | Deliver the first personal comparison slice | Start with object storage using two supported adapters/manual sources; requirements, use, remaining evidence and service links; no deployment. Follow with compute, disk/file storage and CDN |
 | 4 | Decouple optional integrations | Generic capability contract, isolated failure checks and endpoint safety tests; separate metadata from inference; tested compatibility retirement for bundled profiles |
-| 5 | Extend coverage from demand | Add usage collectors and products with official API/terms evidence; never count catalog entries as implemented collectors |
+| 5 | Extend coverage from demand | Add usage collectors and products through documented APIs; never count catalog entries as implemented collectors |
 
 Outbound delivery, new provider breadth, an actuator and runner automation do not
 displace this order. Existing safety defects still take priority. Runtime changes
