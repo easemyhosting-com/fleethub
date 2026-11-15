@@ -72,9 +72,17 @@ export type SessionUser = z.infer<typeof sessionUserSchema>;
 
 export const isProxyIdentity = (user: SessionUser) => user.id.startsWith("proxy:");
 
+const passwordIterations = 220000;
+
+/** Only call after verifyPassword has accepted the stored hash. */
+export function passwordHashNeedsUpgrade(storedHash: string): boolean {
+  return Number(storedHash.split(":")[1]) < passwordIterations;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.randomBytes(16).toString("hex");
-  const iterations = 100000;
+  // Work factor for newly created PBKDF2-HMAC-SHA512 password hashes.
+  const iterations = passwordIterations;
   const hash = (await pbkdf2(password, salt, iterations, 64, "sha512")).toString("hex");
   return `${salt}:${iterations}:${hash}`;
 }
