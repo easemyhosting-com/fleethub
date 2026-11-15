@@ -74,6 +74,8 @@ class Guardrails(unittest.TestCase):
         self.assertTrue(commits.identity(commits.EMAIL, 'noreply@github.com'))
         self.assertFalse(commits.identity('synthetic@example.com', commits.EMAIL))
         self.assertFalse(commits.identity(commits.EMAIL, 'synthetic@example.com'))
+        self.assertFalse(commits.identity(commits.EMAIL, commits.EMAIL, 'Synthetic Personal Name', commits.NAME))
+        self.assertFalse(commits.identity(commits.EMAIL, 'noreply@github.com', commits.NAME, 'Synthetic Personal Name'))
 
     def test_commit_messages(self):
         self.assertTrue(commits.message('fix(auth): reject invalid input'))
@@ -87,7 +89,7 @@ class Guardrails(unittest.TestCase):
             for folder in ['scripts', 'security', '.githooks']:
                 shutil.copytree(ROOT / folder, root / folder, ignore=shutil.ignore_patterns('.local-forbidden*', '__pycache__'))
             shutil.copyfile(ROOT / '.gitleaks.toml', root / '.gitleaks.toml')
-            env = {'PATH': os.environ['PATH'], 'HOME': str(root / 'empty-home'), 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': 'Example', 'GIT_COMMITTER_NAME': 'Example', 'GIT_AUTHOR_EMAIL': commits.EMAIL, 'GIT_COMMITTER_EMAIL': commits.EMAIL}
+            env = {'PATH': os.environ['PATH'], 'HOME': str(root / 'empty-home'), 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': commits.NAME, 'GIT_COMMITTER_NAME': commits.NAME, 'GIT_AUTHOR_EMAIL': commits.EMAIL, 'GIT_COMMITTER_EMAIL': commits.EMAIL}
             def run(args, **kwargs):
                 return subprocess.run(args, cwd=root, env=env, capture_output=True, text=True, **kwargs)
             self.assertEqual(run(['git', 'init', '--quiet']).returncode, 0)
@@ -102,7 +104,7 @@ class Guardrails(unittest.TestCase):
             sha = run(['git', 'rev-parse', 'HEAD']).stdout.strip()
             record = f'refs/heads/sample {sha} refs/heads/sample ' + '0' * 40 + '\n'
             self.assertEqual(run(['bash', '.githooks/pre-push'], input=record).returncode, 0)
-            github_env = {**env, 'GIT_COMMITTER_EMAIL': 'noreply@github.com'}
+            github_env = {**env, 'GIT_COMMITTER_EMAIL': 'noreply@github.com', 'GIT_COMMITTER_NAME': 'GitHub'}
             github = subprocess.run(['git', 'commit-tree', run(['git', 'rev-parse', 'HEAD^{tree}']).stdout.strip(), '-p', sha, '-m', 'test: synthetic web committer'], cwd=root, env=github_env, capture_output=True, text=True)
             self.assertEqual(github.returncode, 0)
             accepted = f'refs/heads/sample {github.stdout.strip()} refs/heads/sample {sha}\n'
