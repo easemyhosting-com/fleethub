@@ -11,10 +11,14 @@ test('no SARIF fails and findings never print diagnostic content', () => {
     const run = () => spawnSync(process.execPath, [resolve('scripts/codeql-summary.mjs'), directory], { encoding: 'utf8' });
     assert.notEqual(run().status, 0);
     const diagnostic = 'synthetic-private-diagnostic';
-    writeFileSync(join(directory, 'result.sarif'), JSON.stringify({ runs: [{ results: [{ ruleId: 'synthetic/rule', message: { text: diagnostic } }] }] }));
+    writeFileSync(join(directory, 'result.sarif'), JSON.stringify({ version: '2.1.0', runs: [{ results: [{ ruleId: 'synthetic/rule', message: { text: diagnostic } }] }] }));
     const result = run();
     assert.equal(result.status, 0);
     assert.ok(result.stdout.includes('synthetic/rule'));
     assert.equal(result.stdout.includes(diagnostic), false);
+    for (const invalid of [{}, { version: '2.1.0', runs: [] }]) {
+      writeFileSync(join(directory, 'result.sarif'), JSON.stringify(invalid));
+      assert.notEqual(run().status, 0);
+    }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

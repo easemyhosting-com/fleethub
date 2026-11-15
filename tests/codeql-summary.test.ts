@@ -79,6 +79,7 @@ it("fails loudly on a corrupt result file instead of hiding it", async () => {
     await writeFile(join(root, "results", "javascript.sarif"), "{not json");
     const { code, stderr } = await run(join(root, "results"));
     expect(code).not.toBe(0);
-    expect(stderr).toContain("SyntaxError");
+    expect(stderr).toContain("CodeQL SARIF result is invalid or unreadable");
+    expect(stderr).not.toContain("{not json");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

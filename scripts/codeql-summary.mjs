@@ -32,7 +32,14 @@ if (sarifFiles.length === 0) {
 
 const findings = [];
 for (const file of sarifFiles) {
-  const sarif = JSON.parse(await fs.readFile(file, 'utf8'));
+  let sarif;
+  try {
+    sarif = JSON.parse(await fs.readFile(file, 'utf8'));
+    if (sarif.version !== '2.1.0' || !Array.isArray(sarif.runs) || sarif.runs.length === 0) throw new Error('Invalid analysis schema');
+  } catch {
+    console.error('CodeQL SARIF result is invalid or unreadable.');
+    process.exit(1);
+  }
   for (const run of sarif.runs ?? []) {
     const rules = new Map((run.tool?.driver?.rules ?? []).map(rule => [rule.id, rule]));
     for (const result of run.results ?? []) {
