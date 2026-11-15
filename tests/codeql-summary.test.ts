@@ -27,17 +27,17 @@ const sarif = (results: unknown[]) => JSON.stringify({
 
 const finding = { ruleId: "js/xss", level: "error", message: { text: "Reflected  cross-site\nscripting" }, locations: [{ physicalLocation: { artifactLocation: { uri: "src/app/page.tsx" }, region: { startLine: 12 } } }] };
 
-it("reports that there is nothing to summarize when CodeQL wrote no results", async () => {
+it("fails closed when CodeQL wrote no analysis results", async () => {
   const root = await mkdtemp(join(tmpdir(), "fleethub-codeql-empty-"));
   try {
     const missing = await run(join(root, "missing"));
-    expect(missing.code).toBe(0);
-    expect(missing.stdout).toContain("No SARIF results found");
+    expect(missing.code).not.toBe(0);
+    expect(missing.stderr).toContain("CodeQL produced no SARIF analysis results");
 
     await mkdir(join(root, "results", "javascript"), { recursive: true });
     const empty = await run(join(root, "results"));
-    expect(empty.code).toBe(0);
-    expect(empty.stdout).toContain("No SARIF results found");
+    expect(empty.code).not.toBe(0);
+    expect(empty.stderr).toContain("CodeQL produced no SARIF analysis results");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
@@ -52,8 +52,10 @@ it("prints findings from every analysis result file and states that they were no
     const { code, stdout } = await run(join(root, "results"));
     expect(code).toBe(0);
     expect(stdout).toContain("CodeQL reported 2 finding(s) across 2 analysis result file(s):");
-    expect(stdout).toContain("[error] js/xss (security-severity 7.8) src/app/page.tsx:12 :: Reflected cross-site scripting");
-    expect(stdout).toContain("[warning] actions/unpinned-tag (security-severity n/a) (unknown):? ::");
+    expect(stdout).toContain("[error] js/xss (security-severity 7.8) src/app/page.tsx:12");
+    expect(stdout).toContain("[warning] actions/unpinned-tag (security-severity n/a) (unknown):?");
+    expect(stdout).not.toContain("Reflected");
+    expect(stdout).not.toContain("cross-site");
     expect(stdout).toContain("Results were not uploaded");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
