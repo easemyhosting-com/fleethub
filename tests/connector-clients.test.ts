@@ -1,7 +1,8 @@
+import type { lookup } from "node:dns";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { checkUrl, ConnectorError, connectorConfig, fetchClusterSnapshot, fetchDockerSnapshot, getJson, queryPrometheus } from "../src/lib/connectors/clients";
+import { blockedAddress, checkUrl, ConnectorError, connectorConfig, createPinnedLookup, fetchClusterSnapshot, fetchDockerSnapshot, getJson, queryPrometheus } from "../src/lib/connectors/clients";
 
 const seen: Array<{ method?: string; url?: string; auth?: string }> = [];
 let server: Server; let base = "";
@@ -35,6 +36,27 @@ describe("connector URL policy", () => {
     expect(() => checkUrl("file:///etc/passwd", true)).toThrow(ConnectorError);
     expect(checkUrl("http://100.64.0.1:2375", true).port).toBe("2375");
   });
+  it("refuses metadata hosts and addresses in every spelling, but keeps ordinary hosts reachable", () => {
+    for (const raw of ["http://0xa9fea9fe/", "http://2852039166/", "http://0251.0376.0251.0376/", "http://[::ffff:169.254.169.254]/", "http://[fe80::1]/",
+      "http://[fd00:ec2::254]/", "http://0.0.0.0:2375/", "http://metadata.google.internal./", "http://METADATA.GOOG/", "http://224.0.0.1/"]) {
+      expect(() => checkUrl(raw, true), raw).toThrow(ConnectorError);
+    }
+    for (const raw of ["http://192.0.2.10:9090/", "http://198.51.100.7:2375/", "http://[fd12:3456::1]:6443/", "http://127.0.0.1:9090/", "https://cluster.example.test:6443/"]) {
+      expect(checkUrl(raw, true).href, raw).toBe(new URL(raw).href);
+    }
+    expect(blockedAddress("not-an-address")).toBe(true);
+  });
+  it("pins DNS: refuses a name if any answer is blocked and hands back only validated answers", async () => {
+    const answers = (list: Array<{ address: string; family: number }>) => ((_host: string, _options: unknown, done: (error: null, addresses: typeof list) => void) => done(null, list)) as unknown as typeof lookup;
+    const run = (lookupFn: ReturnType<typeof createPinnedLookup>, all: boolean) => new Promise<{ error: NodeJS.ErrnoException | null; address: unknown }>(resolve => lookupFn("cluster.example.test", { all }, (error, address) => resolve({ error, address })));
+    const rebinding = createPinnedLookup(answers([{ address: "192.0.2.10", family: 4 }, { address: "169.254.169.254", family: 4 }]));
+    expect((await run(rebinding, false)).error?.code).toBe("EADDRREFUSED");
+    expect((await run(rebinding, true)).error?.code).toBe("EADDRREFUSED");
+    expect((await run(createPinnedLookup(answers([])), false)).error?.code).toBe("EADDRREFUSED");
+    const safe = createPinnedLookup(answers([{ address: "192.0.2.10", family: 4 }, { address: "fd12::1", family: 6 }]));
+    expect(await run(safe, false)).toEqual({ error: null, address: "192.0.2.10" });
+    expect((await run(safe, true)).address).toEqual([{ address: "192.0.2.10", family: 4 }, { address: "fd12::1", family: 6 }]);
+  });
   it("rejects unknown fields and bad CA text in the config", () => {
     expect(connectorConfig.safeParse({ kind: "kubernetes", label: "t", hostName: "h", url: "https://x.test", extra: 1 }).success).toBe(false);
     expect(connectorConfig.safeParse({ kind: "kubernetes", label: "t", hostName: "h", url: "https://x.test", caPem: "not a cert" }).success).toBe(false);
@@ -42,6 +64,10 @@ describe("connector URL policy", () => {
 });
 
 describe("read-only clients", () => {
+  it("connects through the pinned resolver when the URL names a host", async () => {
+    const port = new URL(base).port;
+    await expect(getJson(new URL(`http://localhost:${port}`), "/containers/json", {})).resolves.toEqual(expect.any(Array));
+  });
   it("lists Kubernetes workloads with pagination, tolerates missing or forbidden CD CRDs, and only ever sends GET with the bearer token", async () => {
     seen.length = 0;
     const snapshot = await fetchClusterSnapshot(cfg(), "tok-123");

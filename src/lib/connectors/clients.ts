@@ -1,5 +1,7 @@
+import { lookup as dnsLookup } from "node:dns";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
+import { BlockList, isIP, type LookupFunction } from "node:net";
 import { z } from "zod";
 import type { ClusterSnapshot } from "./kubernetes";
 import type { DockerSnapshot } from "./docker";
@@ -21,15 +23,59 @@ export const connectorConfig = z.strictObject({
 export type ConnectorConfig = z.infer<typeof connectorConfig>;
 
 const maxBytes = 8 * 1024 * 1024;
-/** Operator-supplied URLs only; refuse non-http(s), credentials in the URL, and cloud metadata addresses. */
+/**
+ * Connectors may target private networks, so only addresses that are never a cluster API are
+ * refused: link-local (cloud instance metadata lives there), unspecified, multicast, AWS IMDS
+ * over IPv6, and the same ranges written as IPv4-mapped IPv6.
+ */
+const blocked = new BlockList();
+blocked.addSubnet("0.0.0.0", 8, "ipv4");
+blocked.addSubnet("169.254.0.0", 16, "ipv4");
+blocked.addSubnet("224.0.0.0", 4, "ipv4");
+blocked.addAddress("::", "ipv6");
+blocked.addSubnet("fe80::", 10, "ipv6");
+blocked.addSubnet("ff00::", 8, "ipv6");
+blocked.addAddress("fd00:ec2::254", "ipv6");
+const metadataHosts = new Set(["metadata.google.internal", "metadata.goog", "metadata", "instance-data", "instance-data.ec2.internal"]);
+
+export function blockedAddress(address: string): boolean {
+  const family = isIP(address);
+  if (family === 4) return blocked.check(address, "ipv4");
+  if (family !== 6) return true;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+  return mapped ? blocked.check(mapped[1], "ipv4") : blocked.check(address, "ipv6");
+}
+
+/** Operator-supplied URLs only; refuse non-http(s), credentials in the URL, and metadata hosts or addresses. */
 export function checkUrl(raw: string, allowHttp: boolean): URL {
   let url: URL;
   try { url = new URL(raw); } catch { throw new ConnectorError("invalid_url"); }
   if (url.username || url.password) throw new ConnectorError("invalid_url");
   if (url.protocol !== "https:" && !(url.protocol === "http:" && allowHttp)) throw new ConnectorError("invalid_url");
-  if (/^169\.254\./.test(url.hostname) || url.hostname === "metadata.google.internal") throw new ConnectorError("invalid_url");
+  // WHATWG URL has already normalized hex, octal and integer IPv4 spellings.
+  const host = url.hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
+  if (metadataHosts.has(host) || (isIP(host) && blockedAddress(host))) throw new ConnectorError("invalid_url");
   return url;
 }
+
+/**
+ * DNS pinning: resolve once, refuse the connection if any answer is blocked, and hand Node only the
+ * validated answers. The socket connects to those exact addresses, so a rebinding resolver cannot
+ * swap in a metadata address between the check and the connection.
+ */
+export function createPinnedLookup(resolve: typeof dnsLookup = dnsLookup): LookupFunction {
+  return (hostname, options, callback) => {
+    resolve(hostname, { all: true, family: options.family === "IPv4" ? 4 : options.family === "IPv6" ? 6 : typeof options.family === "number" ? options.family : 0 }, (error, addresses) => {
+      if (error) return callback(error, options.all ? [] : "");
+      if (!addresses.length || addresses.some(entry => blockedAddress(entry.address))) {
+        return callback(Object.assign(new Error("Connector address refused"), { code: "EADDRREFUSED" }), options.all ? [] : "");
+      }
+      if (options.all) return callback(null, addresses);
+      callback(null, addresses[0].address, addresses[0].family);
+    });
+  };
+}
+export const pinnedLookup = createPinnedLookup();
 
 /** GET only. Redirects are not followed, the body is size-bounded, and a self-signed cluster CA can be supplied instead of disabling verification. */
 export function getJson(base: URL, path: string, init: { token?: string; basicUser?: string; ca?: string; timeoutMs?: number }): Promise<unknown> {
@@ -38,7 +84,7 @@ export function getJson(base: URL, path: string, init: { token?: string; basicUs
     if (url.origin !== base.origin) return reject(new ConnectorError("invalid_url"));
     const headers: Record<string, string> = { Accept: "application/json" };
     if (init.token) headers.Authorization = init.basicUser ? `Basic ${Buffer.from(`${init.basicUser}:${init.token}`).toString("base64")}` : `Bearer ${init.token}`;
-    const req = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, { method: "GET", headers, ca: init.ca || undefined, timeout: init.timeoutMs ?? 10_000 }, res => {
+    const req = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, { method: "GET", headers, ca: init.ca || undefined, timeout: init.timeoutMs ?? 10_000, lookup: pinnedLookup }, res => {
       const status = res.statusCode ?? 0;
       if (status === 401) { res.resume(); return reject(new ConnectorError("unauthorized")); }
       if (status === 403) { res.resume(); return reject(new ConnectorError("forbidden")); }
