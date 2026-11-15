@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "no-store" };
 const input = z.strictObject({ text: z.string().max(20_000).default(""), includeKnown: z.boolean().default(true) });
 
-/** Operator-only. TCP connect checks against a fixed port list on Tailscale (100.64.0.0/10) addresses only. Nothing is sent to the ports. */
+/** Operator-only. TCP connect checks against a fixed port list on Tailscale CGNAT addresses only. Nothing is sent to the ports. */
 export async function POST(req: Request) {
   const auth = await verifyApiAccess(req, { requireWrite: true });
   if (!auth.authorized) return createUnauthorizedResponse(auth);
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       }
     } catch { /* known hosts are a convenience; typed addresses still work */ }
   }
-  if (peers.size === 0) return NextResponse.json({ error: "No Tailscale addresses found. They look like 100.x.y.z (100.64.0.0 to 100.127.255.255)." }, { status: 400, headers });
+  if (peers.size === 0) return NextResponse.json({ error: "No Tailscale addresses found. Provide addresses assigned by your Tailscale network." }, { status: 400, headers });
   const hosts = await probeHosts([...peers.values()]);
   try {
     // Remember an address only when its name points at one machine: not shared by two FleetHub resources (web-1, web1) or by two peers in this run.

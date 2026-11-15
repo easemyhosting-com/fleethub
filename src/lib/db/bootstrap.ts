@@ -801,11 +801,11 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
     INSERT INTO resources (id, name, category, provider, account_id, account_email, state, is_protected, tags, attributes)
     VALUES
       ('demo-atlas', 'atlas (Docker Brain)', 'compute', 'Oracle Cloud', 'demo-acc-operator-main', 'operator@example.com', 'online', true,
-       '["arm64", "docker", "brain", "protected"]', '{"ip": "100.64.0.1", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 6, "services": ["llm-gateway", "metrics-agent"]}'),
+       '["arm64", "docker", "brain", "protected"]', '{"ip": "192.0.2.1", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 6, "services": ["llm-gateway", "metrics-agent"]}'),
       ('demo-borealis', 'borealis (K3s Cluster 1)', 'compute', 'Oracle Cloud', 'demo-acc-operator-main', 'operator@example.com', 'online', true,
-       '["arm64", "k3s", "protected"]', '{"ip": "100.64.0.2", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 4, "version": "v1.33.0+k3s1"}'),
+       '["arm64", "k3s", "protected"]', '{"ip": "192.0.2.2", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 4, "version": "v1.33.0+k3s1"}'),
       ('demo-polar-night-owl', 'polar-night-owl (K3s Cluster 2)', 'compute', 'Oracle Cloud', 'demo-acc-oracle-secondary', 'operator@example.com', 'online', true,
-       '["arm64", "k3s", "protected"]', '{"ip": "100.64.0.3", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 5, "version": "v1.33.0+k3s1"}'),
+       '["arm64", "k3s", "protected"]', '{"ip": "192.0.2.3", "ocpu": 2, "ram_gb": 12, "free_ram_gb": 5, "version": "v1.33.0+k3s1"}'),
       ('demo-upstash-box', 'upstash-box-ephemeral', 'compute', 'Upstash', 'demo-acc-upstash-main', 'operator@example.com', 'idle', false,
        '["amd64", "ephemeral", "burst"]', '{"ip": "Serverless", "vcpu": 2, "ram_gb": 4}'),
       ('demo-github-runner', 'github-hosted-runners', 'compute', 'GitHub', 'demo-acc-operator-main', 'operator@example.com', 'online', false,
@@ -813,11 +813,11 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
       ('demo-r2-artifacts', 'fleet-artifacts', 'storage', 'Cloudflare R2', 'demo-acc-cloudflare-main', 'operator@example.com', 'online', true,
        '["s3", "zero-egress", "crypt", "protected"]', '{"bucket": "fleet-artifacts", "cap_gb": 10, "used_gb": 4.2}'),
       ('demo-cf-ephemeral-worker', 'fleet-batch-worker', 'serverless', 'Cloudflare', 'demo-acc-cloudflare-sandbox', 'operator@example.com', 'online', false,
-       '["worker", "ephemeral"]', '{"routes": ["batch.fleethub.internal/*"]}'),
+       '["worker", "ephemeral"]', '{"routes": ["batch.example.com/*"]}'),
       ('demo-oci-block', 'oracle-block-volumes', 'storage', 'Oracle Cloud', 'demo-acc-operator-main', 'operator@example.com', 'online', false,
        '["boot-volume", "block"]', '{"total_gb": 200, "used_gb": 147}'),
       ('demo-global-redis', 'global-cache-db', 'database', 'Upstash', 'demo-acc-upstash-main', 'operator@example.com', 'online', false,
-       '["redis", "fast", "in-memory"]', '{"host": "cache.example.upstash.io", "monthly_cap": 500000, "used": 148900}'),
+       '["redis", "fast", "in-memory"]', '{"host": "cache.example.com", "monthly_cap": 500000, "used": 148900}'),
       ('demo-nvidia-nim-llm', 'nvidia-h100-nim', 'llm', 'NVIDIA Inception', 'demo-acc-nvidia-inception', 'operator@example.com', 'online', true,
        '["h100", "nim", "protected", "cuda"]', '{"accelerator": "H100 PCIe", "creditsRemaining": "$2,450.00"}'),
       ('demo-turso-edge', 'fleethub-edge-db', 'database', 'Turso', 'demo-acc-operator-main', 'operator@example.com', 'online', false,
@@ -833,7 +833,7 @@ export async function seedInitialIdentitiesAndAccounts(): Promise<void> {
   await queryClient`
     INSERT INTO network_gateways (id, name, kind, tailscale_ip, port, state, latency_ms)
     VALUES
-      ('demo-gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '100.64.0.4', 8888, 'online', 8)
+      ('demo-gw-office', 'Office Tailscale exit node', 'tailscale_exit_node', '192.0.2.4', 8888, 'online', 8)
     ON CONFLICT (id) DO NOTHING;
   `;
 }

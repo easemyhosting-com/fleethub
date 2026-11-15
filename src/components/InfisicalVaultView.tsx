@@ -81,8 +81,8 @@ export function InfisicalVaultView({ onOpenOnboard, consoleUrl }: InfisicalVault
   };
 
   const agentVaultConfig = `# Agent Vault Forward Credential Proxy (running on local controller):
-export HTTP_PROXY="http://100.64.0.1:14321"
-export HTTPS_PROXY="http://100.64.0.1:14321"
+export HTTP_PROXY="http://127.0.0.1:14321"
+export HTTPS_PROXY="http://127.0.0.1:14321"
 # Node 22+ requirement to respect environment proxies:
 export NODE_USE_ENV_PROXY=1`;
 

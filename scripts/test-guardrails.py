@@ -25,7 +25,7 @@ commits = module('commit_policy', 'check-commit-policy.py')
 
 class Guardrails(unittest.TestCase):
     def test_forbidden_examples(self):
-        samples = ['/'.join(['', 'Users', 'x']), 'gh' + 'p_' + 'A' * 36, 'person@' + 'unapproved.invalid', 'person@' + 'private-host', '10.' + '1.2.3', 'node.private.ts.' + 'net']
+        samples = ['/'.join(['', 'Users', 'x']), 'gh' + 'p_' + 'A' * 36, 'person@' + 'unapproved.invalid', 'person@' + 'private-host', '10.' + '1.2.3', '100.' + '99.1.1', 'node.private.ts.' + 'net']
         for sample in samples:
             with self.subTest(sample_kind=samples.index(sample)):
                 self.assertTrue(policy.forbidden_hits(sample, 'sample.txt'))

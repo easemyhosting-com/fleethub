@@ -27,3 +27,16 @@ localhost	Loopback service endpoints
 10.9.9.9	Synthetic private-network classification fixture	tests/connectors.test.ts
 172.18.0.2	Synthetic private-network classification fixture	tests/onboarding.test.ts
 10.0.0.1	Synthetic private-network classification fixture	tests/scoped-usage.test.ts
+100.101.50.7	Synthetic Tailscale address classification fixture	tests/addresses.test.ts
+100.64.0.1	Synthetic Tailscale address classification fixture	tests/connector-clients.test.ts
+100.101.50.7	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.64.0.1	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.127.255.255	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.101.50.256	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.64.1.2	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.70.0.1	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.70.0.2	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.70.0.3	Synthetic Tailscale address classification fixture	tests/connector-probe.test.ts
+100.99.99.99	Synthetic Tailscale address classification fixture	tests/onboarding-database.integration.test.ts
+100.101.102.103	Synthetic Tailscale address classification fixture	tests/onboarding.test.ts
+100.64.0.1	Synthetic Tailscale address classification fixture	tests/plugins.test.ts

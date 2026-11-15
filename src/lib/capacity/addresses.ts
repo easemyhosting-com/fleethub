@@ -1,7 +1,7 @@
 /** One key for a machine however it is spelled: polar-night-owl, polar_night_owl and Polar Night Owl are the same host. */
 export const hostKey = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** Tailscale assigns addresses from the CGNAT block 100.64.0.0/10. Probing is limited to it so this can never be aimed at the public internet or the local LAN. */
+/** Tailscale assigns addresses from the CGNAT block. Probing is limited to it so this can never be aimed at the public internet or the local LAN. */
 export function isTailscaleIp(value: string): boolean {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value.trim());
   if (!match) return false;
