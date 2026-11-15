@@ -4,7 +4,7 @@
 
 - [Current product direction](64-resource-advisor-and-integration-boundaries.md): resource comparisons, evidence-backed advice, replaceable integrations and personal-use boundaries.
 
-- [Next two weeks](62-next-two-weeks.md): current baseline, ordered tasks, acceptance cases and briefs for smaller models.
+- [Historical execution plan](62-next-two-weeks.md): input for Linear onboarding; not a second live backlog. Current priorities are in docs/64 until tracker onboarding is verified.
 - [Repository and release workflow](63-repository-and-release-workflow.md): canonical public repository, history boundary and merge gates.
 
 - [Self-onboarding runbook](23-self-onboarding.md): installation commands and connection checks. Connect existing Infisical and CLIProxyAPI instances, or install either locally through its own optional Compose profile.
@@ -14,7 +14,7 @@
 
 ## Product and interface
 
-- [Scope and guardrails](01-scope-and-guardrails.md): what FleetHub will and will not do, including provider account rules.
+- [Scope and guardrails](01-scope-and-guardrails.md): what FleetHub will and will not do, including personal-use and security boundaries.
 - [Product scope and onboarding tiers](44-product-scope-and-onboarding-tiers.md)
 - [Fleet Map and resource profiles](48-fleet-map-and-resource-profiles.md)
 - [Person, email and account hierarchy](51-person-email-account-hierarchy.md)

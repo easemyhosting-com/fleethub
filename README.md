@@ -66,7 +66,7 @@ The [operating model](docs/25-safe-orchestration-operating-model.md) defines gui
 
 ## Contributing and next work
 
-The canonical product repository is [easemyhosting-com/fleethub](https://github.com/easemyhosting-com/fleethub). Use a clean checkout of its public main for new work. The original private development history is retained separately, not merged into public contributions. See [repository workflow](docs/63-repository-and-release-workflow.md), [the next two weeks](docs/62-next-two-weeks.md), and the [documentation audit](docs/planning/2026-11-15-plan-audit.md).
+The canonical product repository is [easemyhosting-com/fleethub](https://github.com/easemyhosting-com/fleethub). Use a clean checkout of its public main for new work. The original private development history is retained separately, not merged into public contributions. See [repository workflow](docs/63-repository-and-release-workflow.md) and [current direction](docs/64-resource-advisor-and-integration-boundaries.md). Linear is the intended home for planning and work status; the dated [execution plan](docs/62-next-two-weeks.md) is onboarding input until that migration is verified. GitHub retains code and durable user/technical documentation.
 
 ## Maintenance
 

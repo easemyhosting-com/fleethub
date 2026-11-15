@@ -24,6 +24,29 @@ FleetHub collates information. It is not an AI router, storage gateway, credenti
 pool, quota multiplier or infrastructure executor. A unified view does not make
 separate services interchangeable or combine their quotas into one usable allowance.
 
+## Related app accounts and credential consumers
+
+The primary focus remains compute, storage, object storage and CDN. A secondary
+use case records supporting app/SaaS accounts such as Linear without pretending
+they provide cloud capacity or requiring a live integration for every service.
+
+Example target relationship: person/contact -> Linear account -> workspace, with a
+credential reference linked to the FleetHub project/app that consumes it. Account
+owner, credential issuer and consuming service are distinct roles. A user may have
+several accounts/workspaces and several keys; one key may have multiple consumers.
+
+Show non-secret metadata: account/workspace label, purpose, granted scopes, environment,
+expiry/revocation status when known, and which project/service/app uses the credential.
+Store actual API keys only through an encrypted backend; never in graph attributes,
+project descriptions, GitHub docs, Linear issues, logs or handoffs. Prefer separate
+least-privilege keys per consumer where supported. Unknown validity stays unknown;
+removing a local reference is not proof the upstream key has been revoked.
+
+Start with manual account/workspace/consumer relationships. A dedicated Linear
+collector, arbitrary-key storage flow and automatic key rotation are not implemented
+or prerequisites. Reuse the account, credential-reference and project-link concepts
+where they fit; verify schema gaps before building a parallel account system.
+
 ## Minimum useful installation
 
 FleetHub owns its web application, worker and PostgreSQL data. Keep PostgreSQL as
@@ -143,6 +166,8 @@ Do not build a company-specific terms database, compliance engine, mandatory pol
 review queue, terms-expiry gate or legal eligibility score. Unknown provider policy
 must not block setup, inventory, comparison or suggestions. Optional account notes
 can capture the user's own restrictions without a compulsory approval workflow.
+Optional provider terms links are reference material only; no acknowledgement or
+policy verification is required to use inventory, comparisons or suggestions.
 Capacity scope and shared allowances still matter for accurate arithmetic; they are
 inventory facts, not a legal judgement about whether the user may use an account.
 
@@ -199,3 +224,24 @@ Prepared means a documented contract. Customer-usable additionally means impleme
 tested with disposable evidence, documented limitations and safe upgrade behavior.
 Track future slices as small issues using the repository's existing workflow; this
 decision creates no remote issues and authorizes no deployment or migration.
+
+
+## Documentation and project management
+
+Linear is the intended home for user journeys, epics, stories, priorities, dependencies,
+acceptance criteria and work status. Tracker onboarding is a separate task; no Linear
+project or issue is implied to exist by this decision. Avoid parallel GitHub issue
+backlogs and dated sprint plans after migration. Existing historical plans are inputs,
+not an instruction to re-create already implemented work as new tickets.
+
+GitHub retains only durable public product/architecture decisions, setup and operations,
+security, contribution guidance and supported API/integration contracts alongside code,
+tests and release notes. Link tracker items to relevant code/docs instead of copying
+whole documents into issues. Keep implementation docs correct as work ships.
+
+Private handoffs, audit findings, raw verification output, migration mappings and
+operator-specific notes live in durable storage outside the repository, never in
+system temporary directories. They must not contain secret values. Keep a current
+handoff/index so future sessions can find them. Before removing an existing repo doc,
+classify its stable contract content, preserve anything needed, import work items,
+verify tracker links, and record the mapping. No automatic bulk deletion or archival.
