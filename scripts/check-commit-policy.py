@@ -4,11 +4,15 @@ import re
 import subprocess
 import sys
 
+NAME = 'easemyhosting-com'
 EMAIL = '347839428+easemyhosting-com@users.noreply.github.com'
 
 
-def identity(author, committer):
-    return author == EMAIL and committer in {EMAIL, 'noreply@github.com'}
+def identity(author, committer, author_name=NAME, committer_name=None):
+    expected_committer = 'GitHub' if committer == 'noreply@github.com' else NAME
+    if committer_name is None:
+        committer_name = expected_committer
+    return author == EMAIL and committer in {EMAIL, 'noreply@github.com'} and author_name == NAME and committer_name == expected_committer
 
 
 def message(text):
@@ -26,8 +30,8 @@ def message(text):
 def check_commits(revision):
     commits = subprocess.check_output(['git', 'rev-list', revision], text=True).splitlines()
     for commit in commits:
-        raw = subprocess.check_output(['git', 'show', '-s', '--format=%ae%x00%ce', commit], text=True).strip().split('\0')
-        if len(raw) != 2 or not identity(*raw):
+        raw = subprocess.check_output(['git', 'show', '-s', '--format=%ae%x00%ce%x00%an%x00%cn', commit], text=True).strip().split('\0')
+        if len(raw) != 4 or not identity(*raw):
             print(f'Commit identity rejected: {commit}. Use the configured exact noreply identity.')
             return 1
     return 0

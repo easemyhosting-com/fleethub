@@ -38,8 +38,8 @@ CI cannot know private seeds that are absent from its checkout. The generic gate
 continues to work without them; this does not prove all private identifiers absent.
 
 Commit messages use Conventional Commits. Commit authors must use the exact
-configured project noreply address; GitHub's web committer address is also allowed
-for committers. Additional agent coauthor addresses require deliberate owner
+configured project name and noreply address; the exact GitHub web committer
+identity is also allowed for committers. Additional agent coauthor addresses require deliberate owner
 approval in `security/allowed-trailer-emails.txt`. Hooks can be bypassed by Git,
 so CI independently enforces the policies. Agents must never bypass hooks.
 
