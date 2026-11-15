@@ -58,3 +58,50 @@ expiry and consumers, never plaintext values. General app-account credentials an
 many-to-many consumer links are target work in docs/64; do not assume every arbitrary
 SaaS API key can already use the provider-specific registration and rotation paths.
 Provider credential replacement is distinct from rotating the store's master key.
+
+## Master-key backup and recovery
+
+Treat the generated master secret as irreplaceable recovery material. Generate it
+locally with the setup helper or a cryptographic random generator; retain its exact
+bytes. Do not print it in support output, put it in a shell command argument, paste
+it into a ticket, or commit it. Store the runtime configuration with restrictive
+permissions. The master secret is not hot-reloadable.
+
+Keep an encrypted, access-controlled key backup in a different protection domain
+from database backups, such as an independently protected password manager or an
+offline encrypted medium. A copy beside a database dump, in the same unprotected
+archive or under the same backup credentials defeats database-only separation.
+Record the deployment label, key-generation date and which database-backup range
+it unlocks, without recording the secret in that index. Limit recovery access and
+test retrieval. Losing both the runtime secret and its separate backup makes the
+ciphertext unrecoverable. A new random key cannot recover old ciphertext.
+
+Recovery procedure:
+
+1. Stop writes from the web app, worker and any credential automation. Preserve the
+   damaged database/configuration for diagnosis. Do not overwrite the only backup.
+2. Restore a database backup to a separate disposable PostgreSQL instance. Restore
+   the matching key through the private configuration channel, never SQL, logs,
+   command arguments or a browser response. Keep provider networking disabled.
+3. Verify AES-GCM decryption of synthetic or deliberately selected test references
+   in that isolated instance. Emit only success/failure/counts. Never display the
+   plaintext or the master secret. Wrong-key or tamper failures must stop recovery;
+   do not replace ciphertext or reset verification to hide them.
+4. Check expected reference counts and metadata relationships. Verify that account
+   records still point to the intended encrypted backend. Restoring a database alone
+   does not restore external Infisical contents or provider-side credentials.
+5. After verification, switch the application and worker together to the recovered
+   database and matching runtime key, then restart and verify the built-in store.
+   Keep the original database and matching key available until rollback is no longer
+   required. Revert both database and runtime key together if validation fails.
+
+If a key was exposed, database recovery does not revoke any provider credentials.
+Revoke/replace affected provider keys using their own lifecycle process. Do not
+change the master secret in place as an improvised rotation.
+
+The disposable PostgreSQL restore test backs up encrypted row bytes, removes and
+restores them, and verifies decryption with a separately retained in-memory key.
+It rejects wrong-key and tampered backups and checks that no key/plaintext is logged.
+It does not certify a particular backup service, a production dump, or a disaster
+recovery across PostgreSQL versions. Test the chosen backup tooling separately
+before relying on it. No production credentials are needed for this proof.
