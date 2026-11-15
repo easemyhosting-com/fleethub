@@ -10,6 +10,7 @@ import {
   getGoogleRedirectUri,
   hashPassword,
   verifyPassword,
+  passwordHashNeedsUpgrade,
   createSessionToken,
   createSessionCookie,
   createClearSessionCookie,
@@ -166,6 +167,12 @@ export async function POST(req: Request) {
     `;
     if (dbUser?.auth_provider === "local" && typeof dbUser.password_hash === "string" &&
         await verifyPassword(body.password, dbUser.password_hash)) {
+      if (passwordHashNeedsUpgrade(dbUser.password_hash)) {
+        const upgradedHash = await hashPassword(body.password);
+        const updated = await queryClient`UPDATE app_users SET password_hash = ${upgradedHash}, updated_at = NOW()
+          WHERE id = ${dbUser.id} AND password_hash = ${dbUser.password_hash} RETURNING id`;
+        if (updated.length !== 1) return error("Authentication temporarily unavailable", 503);
+      }
       const user: SessionUser = {
         id: dbUser.id,
         email: dbUser.email,

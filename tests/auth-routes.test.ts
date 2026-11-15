@@ -1,9 +1,11 @@
+import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const database = vi.hoisted(() => ({
   users: [] as Array<{ id: string; email: string; password_hash: string; name: string; auth_provider: string }>,
   statements: [] as string[],
   fail: false,
+  rejectHashUpgrade: false,
   bootstrapSuccess: true,
   bootstrapThrows: false,
   limit: "allow" as "allow" | "deny" | "fail",
@@ -32,6 +34,12 @@ vi.mock("@/lib/db/client", () => {
     if (sql.startsWith("INSERT INTO app_users")) {
       database.users.push({ id: String(values[0]), email: String(values[1]), password_hash: String(values[2]), name: String(values[3]), auth_provider: "local" });
       return [];
+    }
+    if (sql.startsWith("UPDATE app_users SET password_hash")) {
+      const user = database.users.find(user => user.id === values[1] && user.password_hash === values[2]);
+      if (!user || database.rejectHashUpgrade) return [];
+      user.password_hash = String(values[0]);
+      return [{ id: user.id }];
     }
     if (sql.startsWith("SELECT id, email")) return database.users.filter((user) => user.email === values[0]).slice(0, 1);
     throw new Error(`Unexpected SQL: ${sql}`);
@@ -66,6 +74,7 @@ beforeEach(() => {
   database.users.length = 0;
   database.statements.length = 0;
   database.fail = false;
+  database.rejectHashUpgrade = false;
   database.bootstrapSuccess = true;
   database.bootstrapThrows = false;
   database.limit = "allow";
@@ -198,6 +207,29 @@ describe("auth route", () => {
     expect(response.status).toBe(200);
     expect((await response.json()).user.id).toBe("owner-id");
     expect(response.headers.get("set-cookie")).toContain("fleethub_session=");
+  });
+
+  it("upgrades a legacy hash only after a correct password", async () => {
+    const password = "synthetic-legacy-password";
+    const salt = "02".repeat(16);
+    const hash = `${salt}:100000:${crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex")}`;
+    const user = { id: "legacy-user", email: "user@example.com", password_hash: hash, name: "Example", auth_provider: "local" };
+    database.users.push(user);
+    expect((await post({ action: "login", email: user.email, password: "incorrect" })).status).toBe(401);
+    expect(user.password_hash).toBe(hash);
+    expect((await post({ action: "login", email: user.email, password })).status).toBe(200);
+    expect(Number(user.password_hash.split(":")[1])).toBeGreaterThanOrEqual(220000);
+  });
+
+  it("does not issue a session when a concurrent hash change prevents upgrading", async () => {
+    const password = "synthetic-legacy-password";
+    const salt = "03".repeat(16);
+    const hash = `${salt}:100000:${crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex")}`;
+    database.users.push({ id: "legacy-user", email: "user@example.com", password_hash: hash, name: "Example", auth_provider: "local" });
+    database.rejectHashUpgrade = true;
+    const response = await post({ action: "login", email: "user@example.com", password });
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("reports a valid session and canonical Google redirect URI", async () => {

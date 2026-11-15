@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { queryClient } from "../src/lib/db/client";
 import { bootstrapDatabase } from "../src/lib/db/bootstrap";
@@ -68,4 +69,25 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("authenticatio
     expect(verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(await consumeGoogleOAuthFlow(callback(), state)).toBeNull();
   });
+
+  it("upgrades verified legacy password hashes in PostgreSQL without changing incorrect-password attempts", async () => {
+    const id = "usr-legacy-upgrade-fixture";
+    const email = "legacy@example.com";
+    const salt = "04".repeat(16);
+    const legacy = `${salt}:100000:${crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex")}`;
+    await queryClient`INSERT INTO app_users (id, email, password_hash, name, auth_provider) VALUES (${id}, ${email}, ${legacy}, 'Example', 'local')`;
+    try {
+      expect((await POST(request({ action: "login", email, password: "incorrect" }))).status).toBe(401);
+      const [unchanged] = await queryClient`SELECT password_hash FROM app_users WHERE id = ${id}`;
+      expect(unchanged.password_hash).toBe(legacy);
+      expect((await POST(request({ action: "login", email, password }))).status).toBe(200);
+      const [upgraded] = await queryClient`SELECT password_hash FROM app_users WHERE id = ${id}`;
+      expect(Number(upgraded.password_hash.split(":")[1])).toBeGreaterThanOrEqual(220000);
+      expect(upgraded.password_hash.split(":")[0]).not.toBe(salt);
+    } finally {
+      await queryClient`DELETE FROM auth_sessions WHERE user_id = ${id}`;
+      await queryClient`DELETE FROM app_users WHERE id = ${id}`;
+    }
+  });
+
 });

@@ -100,6 +100,19 @@ afterEach(() => {
 describe("session token boundary", () => {
   const user = () => ({ id: "usr-1", email: "operator@example.com", name: "Operator", provider: "local" as const, createdAt: Date.now() });
 
+  it("uses the password work factor floor, unique salts and compatible legacy verification", async () => {
+    const password = "synthetic-password-for-regression";
+    const first = await hashPassword(password);
+    const second = await hashPassword(password);
+    expect(Number(first.split(":")[1])).toBeGreaterThanOrEqual(220000);
+    expect(first.split(":")[0]).not.toBe(second.split(":")[0]);
+    expect(await verifyPassword(password, first)).toBe(true);
+    expect(await verifyPassword("incorrect-password", first)).toBe(false);
+    const salt = "01".repeat(16);
+    const legacy = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+    expect(await verifyPassword(password, `${salt}:100000:${legacy}`)).toBe(true);
+  });
+
   it("requires a dedicated 32-byte secret and fails verification closed", () => {
     const token = createSessionToken(user());
     delete process.env.FLEETHUB_AUTH_SECRET;
