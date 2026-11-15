@@ -111,8 +111,8 @@ def forbidden_hits(text, path):
                 continue
             if expression.search(line):
                 result.append((name, number))
-        for match in re.finditer(r'[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)', line):
-            if match[1].lower() not in domains:
+        for match in re.finditer(r'(?<![\w/.:+-])[A-Za-z0-9][A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)', line):
+            if any(character.isalpha() for character in match[1]) and match[1].lower() not in domains:
                 result.append(('email-domain', number))
     return result
 
