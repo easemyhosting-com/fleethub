@@ -1,0 +1,58 @@
+name: Monthly full-history audit
+on:
+  schedule:
+    - cron: '11 6 1 * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: audit-monthly-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  reaudit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install checksum-pinned scanner
+        run: |
+          python3 scripts/install-security-tools.py "$RUNNER_TEMP/security-bin"
+          echo "$RUNNER_TEMP/security-bin" >> "$GITHUB_PATH"
+      - name: Full-history secret audit
+        if: always()
+        run: gitleaks git --redact --no-banner --ignore-gitleaks-allow --log-opts=--all .
+      - name: Full-history identifiers
+        if: always()
+        run: python3 scripts/check-history-policy.py
+      - name: Full-history commit identity policy
+        if: always()
+        run: python3 scripts/check-commit-policy.py --range --all
+  summary:
+    needs: reaudit
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open a counts-free status issue without scanner snippets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_RESULT: ${{ needs.reaudit.result }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          result = os.environ['AUDIT_RESULT']
+          if result not in {'success', 'failure', 'cancelled', 'skipped'}:
+              raise SystemExit('Invalid audit status')
+          body = json.dumps({'title': 'Monthly security audit: ' + result, 'body': 'Full-history audit status: ' + result + '. Review the audit workflow and private findings. No secret values or scanner snippets are included.'}).encode()
+          request = urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/issues', data=body, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Content-Type': 'application/json'}, method='POST')
+          with urllib.request.urlopen(request, timeout=30) as response:
+              if response.status != 201:
+                  raise SystemExit('Audit summary issue was not created')
+          print('Created status-only audit summary issue')
+          PY
