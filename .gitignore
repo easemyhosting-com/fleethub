@@ -59,3 +59,6 @@ cliproxy/config.yaml
 
 # Private planning journal: owner-specific fleet and operations records, kept out of the public repository
 docs/archive/
+
+# Local private identifier seeds and supplements (never commit)
+/security/.local-forbidden*
