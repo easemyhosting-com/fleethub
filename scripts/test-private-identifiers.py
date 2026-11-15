@@ -45,6 +45,9 @@ class PrivateIdentifierTests(unittest.TestCase):
         self.assertEqual(checker.scan(self.root, [self.seed]), [])
         hits = checker.scan(self.root, [self.seed], staged=True)
         self.assertEqual(hits, [("ID-1", "full", "sample.txt", 1)])
+        (self.root / "sample.txt").unlink()
+        (self.root / "sample.txt").symlink_to("untracked-missing-target")
+        self.assertEqual(checker.scan(self.root, [self.seed], staged=True), hits)
 
     def test_optional_supplement_is_scanned_without_seed(self):
         supplement = self.root / "supplement.txt"

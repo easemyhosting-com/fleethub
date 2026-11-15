@@ -79,7 +79,7 @@ def scan(root, seeds, staged=False):
         # Private sources are never scanned or disclosed, even if added by mistake.
         if path.name.startswith(".env") or relative.startswith("security/.local-forbidden"):
             continue
-        if path.is_symlink():
+        if not staged and path.is_symlink():
             continue
         try:
             if staged:
