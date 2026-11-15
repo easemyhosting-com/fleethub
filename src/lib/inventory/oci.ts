@@ -3,7 +3,11 @@ import { z } from "zod";
 import { CollectionError, type ResourceFact } from "./model";
 import { ociPlan, ociShapeBilling, type DetectedPlan } from "./plans";
 
-const ocid = (kind: string) => z.string().regex(new RegExp(`^ocid1\\.${kind}\\.[A-Za-z0-9._-]{1,200}$`));
+const ocidPatterns = {
+  tenancy: /^ocid1\.tenancy\.[A-Za-z0-9._-]{1,200}$/,
+  user: /^ocid1\.user\.[A-Za-z0-9._-]{1,200}$/,
+};
+const ocid = (kind: keyof typeof ocidPatterns) => z.string().regex(ocidPatterns[kind]);
 export const ociConfigSchema = z.strictObject({
   tenancyId: ocid("tenancy"),
   userId: ocid("user"),
