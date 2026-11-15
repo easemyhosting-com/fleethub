@@ -494,7 +494,7 @@ export function AuthModal({ isOpen, onClose, onSessionChange }: AuthModalProps) 
 GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="your-client-secret"
 # Required: allow only your operator Google emails:
-FLEETHUB_ALLOWED_EMAILS="operator@gmail.com"`}
+FLEETHUB_ALLOWED_EMAILS="operator@example.com"`}
                     </pre>
                   </div>
                 </div>

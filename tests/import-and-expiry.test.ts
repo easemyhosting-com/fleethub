@@ -59,7 +59,7 @@ describe("OCI config import", () => {
 describe("owner email from key file names", () => {
   it("reads the email the OCI console puts in downloaded key names", () => {
     expect(guessOwnerEmail("alex@example.com_2025-02-02T04_54_45.641Z.pem")).toBe("alex@example.com");
-    expect(guessOwnerEmail(undefined, "/Users/x/.oci/Sam.Lee@gmail.com_2025-03-03T12_15_47.528Z.pem")).toBe("sam.lee@gmail.com");
+    expect(guessOwnerEmail(undefined, "/Users/x/.oci/Sam.Lee@example.com_2025-03-03T12_15_47.528Z.pem")).toBe("sam.lee@example.com");
     expect(guessOwnerEmail("foo@bar.com.pem")).toBe("foo@bar.com");
     expect(guessOwnerEmail("personal.pem", null)).toBeNull();
   });
@@ -111,7 +111,7 @@ describe("identity picker model", () => {
   it("preselects the matching person or proposes a new one named after the email", () => {
     expect(suggestIdentity(people, "alex@example.com")).toEqual({ mode: "existing", identityId: "i-1", email: "Alex@example.com" });
     expect(suggestIdentity(people, "k@a.co")).toEqual({ mode: "existing", identityId: "i-2", email: "k@a.co" });
-    expect(suggestIdentity(people, "jamie.lee@gmail.com")).toEqual({ mode: "new", name: "Jamie Lee", email: "jamie.lee@gmail.com" });
+    expect(suggestIdentity(people, "jamie.lee@example.com")).toEqual({ mode: "new", name: "Jamie Lee", email: "jamie.lee@example.com" });
     expect(suggestIdentity(people, null)).toBeNull();
     expect(nameFromEmail("a@b.co")).toBe("A");
     expect(nameFromEmail("@b.co")).toBe("");
