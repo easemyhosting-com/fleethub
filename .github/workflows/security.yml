@@ -85,12 +85,12 @@ jobs:
           bash scripts/check-forbidden.sh
           bash scripts/test-guardrails.sh
           node --test scripts/test-owner-review.mjs
-      - name: Verify all PR commit identities
+      - name: Verify all PR commit identities, messages and trailers
         if: github.event.pull_request != null
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python3 scripts/check-commit-policy.py --range "$BASE_SHA..$HEAD_SHA"
+        run: python3 scripts/check-commit-policy.py --pr-range "$BASE_SHA..$HEAD_SHA"
       - name: Reject added suppression directives independently
         run: python3 scripts/check-repository-policy.py --suppressions-only
       - name: Scan PR commit history or all history on push and schedule

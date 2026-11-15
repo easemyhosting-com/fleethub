@@ -109,6 +109,12 @@ class Guardrails(unittest.TestCase):
             self.assertEqual(github.returncode, 0)
             accepted = f'refs/heads/sample {github.stdout.strip()} refs/heads/sample {sha}\n'
             self.assertEqual(run(['bash', '.githooks/pre-push'], input=accepted).returncode, 0)
+            self.assertEqual(run(['python3', 'scripts/check-commit-policy.py', '--pr-range', sha + '..' + github.stdout.strip()]).returncode, 0)
+            for bad_message in ['misc changes', 'test: synthetic trailer\n\nSigned-off-by: Example <synthetic@example.com>']:
+                bad = run(['git', 'commit-tree', run(['git', 'rev-parse', 'HEAD^{tree}']).stdout.strip(), '-p', sha, '-m', bad_message])
+                self.assertEqual(bad.returncode, 0)
+                self.assertNotEqual(run(['python3', 'scripts/check-commit-policy.py', '--pr-range', sha + '..' + bad.stdout.strip()]).returncode, 0)
+
             rewind = f'refs/heads/main {sha} refs/heads/main {github.stdout.strip()}\n'
             self.assertNotEqual(run(['bash', '.githooks/pre-push'], input=rewind).returncode, 0)
 
