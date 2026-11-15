@@ -59,7 +59,10 @@ class PrivateIdentifierTests(unittest.TestCase):
     def test_shell_entry_point_with_and_without_ignored_seed(self):
         (self.root / "scripts").mkdir()
         shutil.copyfile(MODULE, self.root / "scripts/check-private-identifiers.py")
+        shutil.copyfile(MODULE.with_name("check-repository-policy.py"), self.root / "scripts/check-repository-policy.py")
         (self.root / "security").mkdir()
+        for policy_file in ["forbidden-patterns.txt", "suppression-patterns.txt", "allowed-email-domains.txt", "allowed-identifiers.txt"]:
+            shutil.copyfile(MODULE.parent.parent / "security" / policy_file, self.root / "security" / policy_file)
         (self.root / ".gitignore").write_text("security/.local-forbidden*\n")
         environment = {"PATH": os.environ.get("PATH", os.defpath), "HOME": str(self.root / "empty-home")}
         command = ["bash", str(MODULE.with_name("check-forbidden.sh"))]

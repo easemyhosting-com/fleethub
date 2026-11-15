@@ -1,10 +1,11 @@
+import { invalidPrivateKey } from "./fixtures/invalid-key";
 import { describe, expect, it } from "vitest";
 import { guessOwnerEmail, matchOciKeys, ociRegistration, parseOciConfig } from "../src/lib/providers/oci-config";
 import { bulkLineHelp, parseBulkLines } from "../src/lib/providers/bulk-import";
 import { choiceEmail, choiceIsValid, nameFromEmail, pickerIdentities, suggestIdentity } from "../src/lib/identity/picker";
 import { describeNotice, expiryNotices } from "../src/lib/rotation/expiry";
 
-const pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7\n-----END PRIVATE KEY-----"; // gitleaks:allow (truncated fixture, not a usable key)
+const pem = invalidPrivateKey();
 const fp = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99";
 const config = `# comment
 [DEFAULT]
@@ -19,7 +20,7 @@ user=ocid1.user.oc1..ccc
 fingerprint=${fp}
 tenancy=ocid1.tenancy.oc1..dddddddd
 region=ap-mumbai-1
-key_file=C:\\Users\\m\\alex.pem
+key_file=C:\\path\\to\\project\\alex.pem
 pass_phrase=secret
 
 [BROKEN]
@@ -59,8 +60,8 @@ describe("OCI config import", () => {
 describe("owner email from key file names", () => {
   it("reads the email the OCI console puts in downloaded key names", () => {
     expect(guessOwnerEmail("alex@example.com_2025-02-02T04_54_45.641Z.pem")).toBe("alex@example.com");
-    expect(guessOwnerEmail(undefined, "/Users/x/.oci/Sam.Lee@example.com_2025-03-03T12_15_47.528Z.pem")).toBe("sam.lee@example.com");
-    expect(guessOwnerEmail("foo@bar.com.pem")).toBe("foo@bar.com");
+    expect(guessOwnerEmail(undefined, "/path/to/project/Sam.Lee@example.com_2025-03-03T12_15_47.528Z.pem")).toBe("sam.lee@example.com");
+    expect(guessOwnerEmail("foo@fixture10.example.com" + ".pem")).toBe("foo@fixture10.example.com");
     expect(guessOwnerEmail("personal.pem", null)).toBeNull();
   });
 });
@@ -102,7 +103,7 @@ describe("credential expiry notices", () => {
 describe("identity picker model", () => {
   const people = pickerIdentities([
     { id: "i-1", displayName: "Alex", contacts: [{ kind: "phone", value: "123", isPrimary: true }, { kind: "email", value: "Alex@example.com", isPrimary: false }] },
-    { id: "i-2", displayName: "Sam", contacts: [{ kind: "email", value: "k@a.co", isPrimary: false }, { kind: "email", value: "sam@example.com", isPrimary: true }] },
+    { id: "i-2", displayName: "Sam", contacts: [{ kind: "email", value: "k@fixture11.example.com", isPrimary: false }, { kind: "email", value: "sam@example.com", isPrimary: true }] },
     { id: "i-3", displayName: "No email" },
   ]);
   it("uses the primary email, falling back to the first", () => {
@@ -110,27 +111,27 @@ describe("identity picker model", () => {
   });
   it("preselects the matching person or proposes a new one named after the email", () => {
     expect(suggestIdentity(people, "alex@example.com")).toEqual({ mode: "existing", identityId: "i-1", email: "Alex@example.com" });
-    expect(suggestIdentity(people, "k@a.co")).toEqual({ mode: "existing", identityId: "i-2", email: "k@a.co" });
+    expect(suggestIdentity(people, "k@fixture11.example.com")).toEqual({ mode: "existing", identityId: "i-2", email: "k@fixture11.example.com" });
     expect(suggestIdentity(people, "jamie.lee@example.com")).toEqual({ mode: "new", name: "Jamie Lee", email: "jamie.lee@example.com" });
     expect(suggestIdentity(people, null)).toBeNull();
-    expect(nameFromEmail("a@b.co")).toBe("A");
-    expect(nameFromEmail("@b.co")).toBe("");
+    expect(nameFromEmail("a@fixture3.example.com")).toBe("A");
+    expect(nameFromEmail("@fixture3.example.com")).toBe("");
   });
   it("resolves the email a choice will use", () => {
     expect(choiceEmail(people, null)).toBeNull();
-    expect(choiceEmail(people, { mode: "new", name: "X", email: " x@a.co " })).toBe("x@a.co");
+    expect(choiceEmail(people, { mode: "new", name: "X", email: " x@fixture11.example.com " })).toBe("x@fixture11.example.com");
     expect(choiceEmail(people, { mode: "new", name: "X", email: " " })).toBeNull();
     expect(choiceEmail(people, { mode: "existing", identityId: "i-2" })).toBe("sam@example.com");
-    expect(choiceEmail(people, { mode: "existing", identityId: "i-2", email: "k@a.co" })).toBe("k@a.co");
-    expect(choiceEmail(people, { mode: "existing", identityId: "i-2", email: "other@a.co" })).toBe("sam@example.com");
+    expect(choiceEmail(people, { mode: "existing", identityId: "i-2", email: "k@fixture11.example.com" })).toBe("k@fixture11.example.com");
+    expect(choiceEmail(people, { mode: "existing", identityId: "i-2", email: "other@fixture11.example.com" })).toBe("sam@example.com");
     expect(choiceEmail(people, { mode: "existing", identityId: "gone" })).toBeNull();
   });
   it("validates a choice", () => {
     expect(choiceIsValid(null)).toBe(false);
     expect(choiceIsValid({ mode: "existing", identityId: "i-1" })).toBe(true);
     expect(choiceIsValid({ mode: "existing", identityId: "" })).toBe(false);
-    expect(choiceIsValid({ mode: "new", name: "Ma", email: "m@a.co" })).toBe(true);
-    expect(choiceIsValid({ mode: "new", name: "M", email: "m@a.co" })).toBe(false);
+    expect(choiceIsValid({ mode: "new", name: "Ma", email: "m@fixture11.example.com" })).toBe(true);
+    expect(choiceIsValid({ mode: "new", name: "M", email: "m@fixture11.example.com" })).toBe(false);
     expect(choiceIsValid({ mode: "new", name: "Alex", email: "nope" })).toBe(false);
   });
 });

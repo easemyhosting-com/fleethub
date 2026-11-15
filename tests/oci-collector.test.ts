@@ -1,3 +1,4 @@
+import { invalidPrivateKey } from "./fixtures/invalid-key";
 import { createPublicKey, createVerify, generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { collectOci, computeSpec, ociBudget, ociConfigSchema, signGet } from "../src/lib/inventory/oci";
@@ -31,7 +32,7 @@ const base = { "/20160918/compartments": { body: [] }, "/20160918/availabilityDo
 describe("OCI configuration and signing", () => {
   it("accepts a complete key and rejects malformed or encrypted ones without echoing them", () => {
     expect(() => validateInventoryConfig("oracle", config)).not.toThrow();
-    for (const bad of [{ ...config, tenancyId: "ocid1.user.x" }, { ...config, region: "Mumbai" }, { ...config, fingerprint: "nope" }, { ...config, privateKey: "short" }, { ...config, privateKey: `-----BEGIN ENCRYPTED PRIVATE KEY-----\n${"A".repeat(200)}\n-----END ENCRYPTED PRIVATE KEY-----` }, { ...config, extra: "x" }]) {
+    for (const bad of [{ ...config, tenancyId: "ocid1.user.x" }, { ...config, region: "Mumbai" }, { ...config, fingerprint: "nope" }, { ...config, privateKey: "short" }, { ...config, privateKey: invalidPrivateKey("ENCRYPTED") }, { ...config, extra: "x" }]) {
       const error = (() => { try { validateInventoryConfig("oracle", bad); } catch (cause) { return cause as CollectionError; } })();
       expect(error).toBeInstanceOf(CollectionError);
       expect(JSON.stringify(error?.fields)).not.toContain("BEGIN");
@@ -143,6 +144,6 @@ describe("OCI inventory", () => {
 
   it("fails closed when signing is impossible", async () => {
     mockOci(base);
-    await expect(collectOci({ ...config, privateKey: `-----BEGIN PRIVATE KEY-----\n${"A".repeat(200)}\n-----END PRIVATE KEY-----` }, signal)).rejects.toMatchObject({ code: "invalid_config" });
+    await expect(collectOci({ ...config, privateKey: invalidPrivateKey() }, signal)).rejects.toMatchObject({ code: "invalid_config" });
   });
 });

@@ -12,3 +12,20 @@
 !public/**
 !scripts/
 !scripts/build-worker.mjs
+
+# Final exclusions also protect secrets nested beneath allowed source directories.
+**/.env*
+**/*.env
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.log
+**/.ssh
+**/.aws
+**/.claude
+**/.codex
+**/.cursor
+**/.journal
+**/journals
+**/fleethub-audit-private

@@ -113,6 +113,9 @@ test('pre-commit checks staged Compose content rather than the working copy', as
     symlinkSync(resolve('node_modules'), join(directory, 'node_modules'));
     mkdirSync(join(directory, 'security'));
     copyFileSync(resolve('security/known-exceptions.md'), join(directory, 'security/known-exceptions.md'));
+    for (const name of ['check-forbidden.sh', 'check-repository-policy.py', 'check-private-identifiers.py']) copyFileSync(resolve('scripts', name), join(directory, 'scripts', name));
+    for (const name of ['forbidden-patterns.txt', 'suppression-patterns.txt', 'allowed-identifiers.txt', 'allowed-email-domains.txt']) copyFileSync(resolve('security', name), join(directory, 'security', name));
+    copyFileSync(resolve('.gitleaks.toml'), join(directory, '.gitleaks.toml'));
     writeFileSync(join(directory, 'compose.yml'), service('privileged: true')); git(['add', 'compose.yml']);
     writeFileSync(join(directory, 'compose.yml'), service('privileged: false'));
     const command = ['bash', resolve('.githooks/pre-commit')];

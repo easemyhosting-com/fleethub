@@ -20,7 +20,10 @@
     "verify:setup-ui": "node scripts/verify-setup-ui.mjs",
     "verify:fleet-ui": "node scripts/verify-fleet-ui.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",
-    "mcp": "node build/mcp-stdio.mjs"
+    "mcp": "node build/mcp-stdio.mjs",
+    "prepare": "bash scripts/install-hooks.sh",
+    "check:security": "bash scripts/check-forbidden.sh",
+    "test:guardrails": "python3 scripts/test-guardrails.py"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

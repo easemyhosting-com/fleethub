@@ -1,0 +1,6 @@
+gitleaks:allow
+nosemgrep
+nosec
+codeql[
+codeql-ignore
+eslint-disable
