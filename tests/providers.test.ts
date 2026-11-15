@@ -90,17 +90,12 @@ describe("Cloud Providers Discovery & Live Telemetry", () => {
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (new URL(url).hostname === "api.cloudflare.com") {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              result: [{ id: "zone-live-1", name: "example.com", status: "active" }],
-            }),
-        } as any);
+        return Promise.resolve(Response.json({
+          success: true,
+          result: [{ id: "zone-live-1", name: "example.com", status: "active" }],
+        }));
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as any);
+      return Promise.resolve(Response.json({}));
     });
 
     try {

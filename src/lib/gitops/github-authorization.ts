@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { readBoundedJson } from "@/lib/http/bounded";
 import type { TransactionSql } from "postgres";
 import { z } from "zod";
 import { queryClient } from "@/lib/db/client";
@@ -76,7 +77,7 @@ async function exchange(app: App, params: Record<string, string>): Promise<Crede
     body: new URLSearchParams({ client_id: app.id, client_secret: app.secret, ...params }),
     signal: AbortSignal.timeout(8000),
   }).catch(() => { throw new GithubAuthorizationError("unavailable"); });
-  const body: unknown = await response.json().catch(() => null);
+  const body: unknown = await readBoundedJson(response, 64 * 1024).catch(() => null);
   if (!response.ok && (response.status === 429 || response.status >= 500)) throw new GithubAuthorizationError("unavailable");
   const refreshing = params.grant_type === "refresh_token";
   if (refreshing && z.object({ error: z.literal("bad_refresh_token") }).safeParse(body).success) {

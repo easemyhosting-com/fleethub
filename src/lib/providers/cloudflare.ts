@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readBoundedJson } from "@/lib/http/bounded";
 
 /**
  * Cloudflare provider integration for separately owned accounts (personal, staging, client)
@@ -164,8 +165,8 @@ async function verifyLiveToken(token: string): Promise<{
       return { ok: false, zones: [] };
     }
 
-    const data = await res.json();
-    if (data.success && Array.isArray(data.result)) {
+    const data = (await readBoundedJson(res, 1024 * 1024)) as { success?: boolean; result?: any[] } | null;
+    if (data?.success && Array.isArray(data.result)) {
       return {
         ok: true,
         zones: data.result.map((z: any) => ({

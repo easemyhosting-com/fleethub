@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readBoundedJson } from "@/lib/http/bounded";
 import { secureServiceUrl } from "@/lib/onboarding/transport";
 
 /**
@@ -98,8 +99,8 @@ async function getUniversalAuthToken(credentials: ReturnType<typeof getCredentia
       return null;
     }
 
-    const data = await res.json();
-    if (data.accessToken) {
+    const data = (await readBoundedJson(res, 64 * 1024)) as { accessToken?: string; expiresIn?: number } | null;
+    if (data?.accessToken) {
       cachedToken = {
         token: data.accessToken,
         configHash,
@@ -147,8 +148,8 @@ export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
       });
 
       if (wsRes.ok) {
-        const wsData = await wsRes.json();
-        const rawWorkspaces = wsData.workspaces || [];
+        const wsData = (await readBoundedJson(wsRes, 1024 * 1024)) as { workspaces?: any[] } | null;
+        const rawWorkspaces = wsData?.workspaces || [];
 
         // For each workspace, fetch secret keys for prod environment
         for (const ws of rawWorkspaces) {
@@ -164,11 +165,11 @@ export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
               }
             );
             if (secRes.ok) {
-              const secData = await secRes.json();
-              if (Array.isArray(secData.secrets)) {
+              const secData = (await readBoundedJson(secRes, 4 * 1024 * 1024)) as { secrets?: unknown } | null;
+              if (Array.isArray(secData?.secrets)) {
                 secretsVerified = true;
                 // Metadata only: map keys, never store or inspect plaintext values
-                secretKeys = secData.secrets
+                secretKeys = (secData.secrets as any[])
                   .map((s: any) => s.secretKey || s.key || s.name)
                   .filter(Boolean);
               }

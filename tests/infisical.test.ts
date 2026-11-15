@@ -102,18 +102,10 @@ describe("Infisical Secrets Management & Agent Vault Security", () => {
     global.fetch = vi.fn().mockImplementation((url: string, init: RequestInit) => {
       if (url.includes("/universal-auth/login")) {
         expect(init.redirect).toBe("error");
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ accessToken: "mock-token-xyz", expiresIn: 3600 }),
-        } as any);
+        return Promise.resolve(Response.json({ accessToken: "mock-token-xyz", expiresIn: 3600 }));
       }
       if (url.includes("/api/v1/workspace")) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve({
+        return Promise.resolve(Response.json({
               workspaces: [
                 {
                   id: "ws-test-1",
@@ -123,19 +115,13 @@ describe("Infisical Secrets Management & Agent Vault Security", () => {
                   environments: [{ id: "env-prod", name: "Production", slug: "prod" }],
                 },
               ],
-            }),
-        } as any);
+            }));
       }
       if (url.includes("/api/v3/secrets/raw")) {
         expect(new URL(url).searchParams.get("viewSecretValue")).toBe("false");
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve({
+        return Promise.resolve(Response.json({
               secrets: [{ secretKey: "KEY_ONE" }, { secretKey: "KEY_TWO" }],
-            }),
-        } as any);
+            }));
       }
       return Promise.resolve({ status: 200 } as any);
     });
