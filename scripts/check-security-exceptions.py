@@ -13,8 +13,10 @@ def validate(text, today):
     if set(document) != {"exceptions"} or not isinstance(document["exceptions"], list):
         raise ValueError("Invalid exception policy")
     entries = document["exceptions"]
+    if not entries:
+        return
     if len(entries) != 1:
-        raise ValueError("Expected exactly the owner-approved optional-image exception")
+        raise ValueError("Expected at most the owner-approved optional-image exception")
     entry = entries[0]
     required = {"id", "finding", "path", "severity", "owner", "review_by", "reason", "risk", "compose_path", "service"}
     if set(entry) != required or not all(isinstance(v, str) and v.strip() for v in entry.values()):

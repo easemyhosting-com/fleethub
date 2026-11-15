@@ -54,9 +54,8 @@ jobs:
         run: |
           python3 scripts/test-trivy-targets.py
           python3 scripts/assert-trivy-targets.py "$TRIVY_REPORT"
-      - name: Report optional gateway configuration (EX-001)
+      - name: Gate optional gateway Dockerfile configuration
         if: always()
-        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.76.1

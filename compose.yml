@@ -110,6 +110,39 @@ services:
         condition: service_healthy
     mem_limit: 256m
 
+  # One-shot: hands the gateway volumes to the non-root runtime user, including volumes
+  # written by the earlier root-run image. No network; only CHOWN and directory traversal.
+  cli-proxy-api-volumes:
+    profiles: [cliproxy, integrations]
+    build:
+      context: ./cliproxy
+      dockerfile: Dockerfile
+      args:
+        CLIPROXY_IMAGE: ${CLIPROXY_IMAGE:-eceasy/cli-proxy-api:latest@sha256:3f74ca56cba8bea2a2a096a215bb774482d87d257da04c5047e6046493bfd644}
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
+    logging: *logging
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        for id in "$$0" "$$1"; do
+        case "$$id" in ''|*[!0-9]*) echo "CLIPROXY_UID and CLIPROXY_GID must be numeric" >&2; exit 64;; esac;
+        [ "$$id" -ne 0 ] || { echo "CLIPROXY_UID and CLIPROXY_GID must not be root" >&2; exit 64; };
+        done;
+        find /volumes/auth /volumes/logs /volumes/plugins -xdev \( ! -user "$$0" -o ! -group "$$1" \) -exec chown -h "$$0:$$1" {} +
+    command: ["${CLIPROXY_UID:-10001}", "${CLIPROXY_GID:-10001}"]
+    volumes:
+      - cliproxy_auth:/volumes/auth
+      - cliproxy_logs:/volumes/logs
+      - cliproxy_plugins:/volumes/plugins
+    mem_limit: 64m
+
   cli-proxy-api:
     # integrations is the explicit legacy option for starting both service stacks.
     profiles: [cliproxy, integrations]
@@ -118,6 +151,14 @@ services:
       dockerfile: Dockerfile
       args:
         CLIPROXY_IMAGE: ${CLIPROXY_IMAGE:-eceasy/cli-proxy-api:latest@sha256:3f74ca56cba8bea2a2a096a215bb774482d87d257da04c5047e6046493bfd644}
+    # Run as the owner of the config file: the proxy reads it and rewrites hashed keys into it.
+    user: "${CLIPROXY_UID:-10001}:${CLIPROXY_GID:-10001}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      cli-proxy-api-volumes:
+        condition: service_completed_successfully
     restart: unless-stopped
     logging: *logging
     ports:

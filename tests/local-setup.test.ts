@@ -7,7 +7,7 @@ import { expect, it } from "vitest";
 import { z } from "zod";
 
 const composeSchema = z.object({
-  services: z.record(z.string(), z.object({ environment: z.record(z.string(), z.string()).optional(), depends_on: z.record(z.string(), z.unknown()).optional(), ports: z.array(z.unknown()).optional() })),
+  services: z.record(z.string(), z.object({ environment: z.record(z.string(), z.string()).optional(), depends_on: z.record(z.string(), z.unknown()).optional(), ports: z.array(z.unknown()).optional(), user: z.string().optional(), read_only: z.boolean().optional(), cap_add: z.array(z.string()).optional(), network_mode: z.string().optional(), volumes: z.array(z.object({ source: z.string().optional(), target: z.string() })).optional() })),
   volumes: z.record(z.string(), z.object({ name: z.string() })),
 });
 
@@ -48,7 +48,7 @@ it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status
       const args = ["compose", "-f", resolve("compose.yml"), "--project-name", "fleethub-profile-test", "--env-file", join(target, ".env"), ...profiles.flatMap(profile => ["--profile", profile]), "config", "--format", "json"];
       const { stdout } = await execute("docker", args, { env: { ...process.env, COMPOSE_PROFILES: "" } });
       const config = composeSchema.parse(JSON.parse(stdout));
-      const expected = [...core, ...(profiles.includes("infisical") || profiles.includes("integrations") ? vault : []), ...(profiles.includes("cliproxy") || profiles.includes("integrations") ? ["cli-proxy-api"] : [])];
+      const expected = [...core, ...(profiles.includes("infisical") || profiles.includes("integrations") ? vault : []), ...(profiles.includes("cliproxy") || profiles.includes("integrations") ? ["cli-proxy-api", "cli-proxy-api-volumes"] : [])];
       expect(Object.keys(config.services).sort()).toEqual(expected.sort());
       for (const service of ["fleetdeck", "inventory-worker"]) expect(config.services[service].environment?.FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP).toBe("false");
       expect(config.services.fleetdeck.depends_on).toHaveProperty("fleetdeck-db");
@@ -59,7 +59,17 @@ it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status
         expect(config.services["infisical-db"].ports).toBeUndefined();
         expect(config.services["infisical-redis"].ports).toBeUndefined();
       }
-      if (config.services["cli-proxy-api"]) expect(config.volumes.cliproxy_auth.name).toBe("fleethub-profile-test_cliproxy_auth");
+      const gateway = config.services["cli-proxy-api"], adopt = config.services["cli-proxy-api-volumes"];
+      if (gateway && adopt) {
+        expect(config.volumes.cliproxy_auth.name).toBe("fleethub-profile-test_cliproxy_auth");
+        expect(gateway.user).toBe(`${process.getuid?.() ?? 10001}:${process.getgid?.() ?? 10001}`);
+        expect(gateway.read_only).toBe(true);
+        expect(gateway.depends_on).toHaveProperty("cli-proxy-api-volumes");
+        expect(adopt.network_mode).toBe("none");
+        expect(adopt.cap_add?.sort()).toEqual(["CHOWN", "DAC_READ_SEARCH"]);
+        const sources = (service: typeof gateway) => (service.volumes ?? []).filter(volume => volume.source?.startsWith("cliproxy_")).map(volume => volume.source).sort();
+        expect(sources(adopt)).toEqual(sources(gateway));
+      }
     }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
