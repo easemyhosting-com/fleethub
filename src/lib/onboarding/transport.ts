@@ -1,4 +1,5 @@
 import { SetupError } from "./model";
+import { readBoundedJson, ResponseTooLargeError } from "@/lib/http/bounded";
 /** Contains only transport status, never the upstream response body or destination. */
 export class ServiceRequestError extends SetupError {
   constructor(readonly status: number) {
@@ -32,22 +33,9 @@ export async function requestJson(url: string, init: RequestInit = {}): Promise<
     await response.body?.cancel();
     throw new ServiceRequestError(response.status);
   }
-  if (!response.body) return {};
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > 1024 * 1024) {
-        await reader.cancel();
-        throw new SetupError("Service response is too large");
-      }
-      chunks.push(chunk.value);
-    }
-  } finally { reader.releaseLock(); }
-  const text = Buffer.concat(chunks).toString("utf8");
-  return text ? JSON.parse(text) : {};
+  try { return (await readBoundedJson(response, 1024 * 1024)) ?? {}; }
+  catch (error) {
+    if (error instanceof ResponseTooLargeError) throw new SetupError("Service response is too large");
+    throw error;
+  }
 }
