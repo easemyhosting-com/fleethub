@@ -5,14 +5,14 @@ Every credential change goes through one write path, `replaceCredentials` in `sr
 ## What happens on a change
 
 1. The new credential is validated against the provider's schema. Non-secret fields (for Cloudflare, `accountId`) must equal the registered account's; otherwise register a new account.
-2. The new secret is written to Infisical under a fresh name and read back byte for byte.
+2. The new secret is written to the account reference's selected backend, built-in or Infisical, under a fresh name and read back byte for byte.
 3. In one transaction (taking the same setup lock as registration) the account's `secret_refs` reference is swapped, the collection row is queued with the new credential digest, and no scan may hold a live lease. If any step fails, the new secret is removed and the old credential stays active.
-4. Only then is the old Infisical secret removed and its reference row deleted. If removal fails the change still stands; the event is flagged `old_secret_not_removed` so it can be cleaned up in the vault.
+4. Only then is the old backend secret removed and its reference row deleted. If removal fails the change still stands; the event is flagged `old_secret_not_removed` so it can be cleaned up in the vault.
 5. A `credential_events` row records action, outcome, error code and actor (never a value).
 
 ## Rotation without manual steps
 
-Infisical's own secret rotation is a paid feature on self-hosted installs, so rotation is implemented in FleetHub using provider APIs. Each provider is a `CredentialRotator` registered in `src/lib/rotation/defaults.ts`:
+Provider credential rotation is implemented through provider-specific APIs and is independent of the selected secret backend. It is not rotation of the built-in encryption master key. Each provider is a `CredentialRotator` registered in `src/lib/rotation/defaults.ts`:
 
 ```ts
 registerRotator({ providerId, label, rotatorHint, rotate({ current, rotatorSecret, signal }), checkRotatorSecret(secret, signal, scope) })
@@ -20,7 +20,7 @@ registerRotator({ providerId, label, rotatorHint, rotate({ current, rotatorSecre
 
 Adding a provider means one file implementing that interface plus one line in `defaults.ts` (and its secret field names in `scope.ts` / form fields in `fields.ts`). Nothing in the pipeline, API, worker or UI changes.
 
-Cloudflare is built in. It uses a **separate rotation credential** (a Cloudflare token allowed to edit API tokens) stored in Infisical beside the account secret. It is never given to the inventory scan. To rotate, FleetHub finds the scan token's own id (`/user/tokens/verify`, or the account-owned equivalent), rolls its value with the rotation credential, then runs the common write path with the returned value.
+Cloudflare is built in. It uses a **separate rotation credential** (a Cloudflare token allowed to edit API tokens) stored in the account's selected backend beside its scan credential. It is never given to the inventory scan. To rotate, FleetHub finds the scan token's own id (`/user/tokens/verify`, or the account-owned equivalent), rolls its value with the rotation credential, then runs the common write path with the returned value.
 
 Safety rules specific to rolling, because the provider invalidates the old value immediately:
 

@@ -1,5 +1,7 @@
 # FleetHub execution plan, 16-29 November 2026
 
+> Planning destination: move verified remaining journeys, epics and stories into Linear. This dated plan is migration input, not a parallel live backlog. Preserve stable contracts and verify imported issue links before pruning planning prose. See docs/64.
+
 > Personal-use clarification: prioritize compute, storage, object storage and CDN across personal and authorized family accounts. The user decides; FleetHub collates and compares. Company-specific terms approval and compliance workflows are out of scope.
 
 > Direction update, 2026-11-15: [resource advisor and replaceable integrations](64-resource-advisor-and-integration-boundaries.md) takes precedence over conflicting priorities below. Prove the core account/resource/capacity/service-relationship journey first. Generic AI endpoints and retirement of bundled gateway profiles are target work, not implemented behavior. Existing security and migration gates remain unchanged.

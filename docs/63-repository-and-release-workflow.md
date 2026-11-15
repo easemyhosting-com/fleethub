@@ -1,10 +1,16 @@
 # Repository and release workflow
 
+> Current local migration boundary: earlier publication, protection and PR snapshots
+> below are historical evidence. They do not establish current remote state or authorize
+> pushes, merges or repository migration. Follow the current session's migration gates.
+> Linear is the intended planning/status source; GitHub remains the code, review, release
+> and durable technical-documentation source. Tracker onboarding has not been verified.
+
 Verified 2026-11-15 against GitHub repository metadata and public main `b7e032b`.
 
 ## Canonical repository
 
-Product development, issues, documentation, reviews and releases belong to
+Code, durable technical documentation, reviews and releases belong to
 [easemyhosting-com/fleethub](https://github.com/easemyhosting-com/fleethub).
 It is public. It was published with fresh audited history, rather than transferring
 or making the original private development repository public. The two repositories
