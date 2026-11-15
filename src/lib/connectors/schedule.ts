@@ -1,4 +1,5 @@
 import { queryClient } from "@/lib/db/client";
+import { errorSummary } from "@/lib/log/safe-error";
 import { scanConnector } from "./service";
 import { createHash, randomBytes } from "node:crypto";
 import { nextDue, scanIntervalChoices } from "./schedule-rules";
@@ -23,8 +24,7 @@ export async function runDueConnectorScans(now = new Date()): Promise<boolean> {
     await scanConnector(due.id, due.kind === "prometheus" ? { apply: true, select: [] } : { apply: false, select: [], refreshRegistered: true });
   } catch (error) {
     // Class and code only: messages can carry target responses. The connector row keeps the status.
-    const code = error && typeof error === "object" && "code" in error ? ` ${String((error as { code: unknown }).code)}` : "";
-    console.error(`Scheduled connector scan failed (${error instanceof Error ? error.name : typeof error}${code}); its status is recorded on the connector`);
+    console.error(`Scheduled connector scan failed (${errorSummary(error)}); its status is recorded on the connector`);
   } finally {
     // A request that arrived while this scan ran stays set, so it gets its own scan.
     await queryClient`UPDATE connectors SET scan_lease_until = NULL, scan_requested_at = CASE WHEN scan_requested_at <= ${new Date(claimed[0].claimed_at).toISOString()}::timestamptz THEN NULL ELSE scan_requested_at END WHERE id = ${due.id}`;

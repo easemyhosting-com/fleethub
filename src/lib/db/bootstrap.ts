@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { errorSummary } from "@/lib/log/safe-error";
 import { queryClient } from "./client";
 
 export async function bootstrapDatabase() {
@@ -557,13 +558,13 @@ export async function bootstrapDatabase() {
       try {
         await seedInitialIdentitiesAndAccounts();
       } catch (err: any) {
-        console.warn("Demo data was not seeded; the schema is ready:", err.message);
+        console.warn("Demo data was not seeded; the schema is ready:", errorSummary(err));
       }
     }
     return { success: true, message: "Database schema and migrations ready" };
   } catch (err: any) {
-    console.error("Bootstrap error (DB may be offline during build, graceful fallback active):", err.message);
-    return { success: false, error: err.message };
+    console.error("Bootstrap error (DB may be offline during build, graceful fallback active):", errorSummary(err));
+    return { success: false, error: errorSummary(err) };
   }
 }
 
@@ -637,7 +638,7 @@ export async function backfillProviderAccountIdentities(): Promise<{ backfilledC
 
     return { backfilledCount };
   } catch (err: any) {
-    console.warn("[Identity Backfill] Warning:", err.message);
+    console.warn("[Identity Backfill] Warning:", errorSummary(err));
     return { backfilledCount: 0 };
   }
 }

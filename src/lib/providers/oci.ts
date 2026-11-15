@@ -5,6 +5,7 @@
  */
 
 import { execFile } from "child_process";
+import { errorSummary } from "@/lib/log/safe-error";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
@@ -188,7 +189,7 @@ export async function getOciFleetResources(): Promise<OciFleetReport> {
         })
       );
     } catch (e) {
-      console.warn("[OCI] CLI discovery error; no instances discovered:", e);
+      console.warn("[OCI] CLI discovery error; no instances discovered:", errorSummary(e));
     }
   }
 

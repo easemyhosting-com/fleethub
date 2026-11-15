@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorSummary } from "@/lib/log/safe-error";
 import { getInfisicalStatus } from "@/lib/infisical/client";
 import { queryClient } from "@/lib/db/client";
 import {
@@ -68,7 +69,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error("[Infisical API] request failed:", errorSummary(error));
+    return NextResponse.json({ error: "Infisical request failed" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { errorSummary } from "@/lib/log/safe-error";
 import { readBoundedJson } from "@/lib/http/bounded";
 import { secureServiceUrl } from "@/lib/onboarding/transport";
 
@@ -110,7 +111,7 @@ async function getUniversalAuthToken(credentials: ReturnType<typeof getCredentia
     }
     return null;
   } catch (err: any) {
-    console.warn(`[Infisical] Error acquiring token:`, err.message);
+    console.warn(`[Infisical] Error acquiring token:`, errorSummary(err));
     return null;
   }
 }
@@ -207,7 +208,7 @@ export async function getInfisicalStatus(): Promise<InfisicalVaultStatus> {
         }
       }
     } catch (err: any) {
-      console.warn(`[Infisical] Workspace fetch error:`, err.message);
+      console.warn(`[Infisical] Workspace fetch error:`, errorSummary(err));
     }
   }
 
