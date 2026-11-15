@@ -92,6 +92,11 @@ jobs:
           scan-ref: .
           exit-code: '1'
   inventory:
+    name: ${{ matrix.timezone == 'UTC' && 'inventory' || format('inventory ({0})', matrix.timezone) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [UTC, Asia/Kolkata, America/Los_Angeles]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -101,12 +106,14 @@ jobs:
           POSTGRES_USER: review
           POSTGRES_PASSWORD: ci-local
           POSTGRES_DB: fleethub_security
+          TZ: ${{ matrix.timezone }}
         ports:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U review -d fleethub_security"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
+      TZ: ${{ matrix.timezone }}
       AUTH_DATABASE_INTEGRATION: 'true'
       DATABASE_INTEGRATION: 'true'
       FLEETHUB_SEED_DEMO_DATA: 'false'
@@ -118,6 +125,18 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Verify database timezone coverage
+        run: |
+          node --input-type=module <<'JS'
+          import postgres from 'postgres';
+          const sql = postgres(process.env.DATABASE_URL);
+          try {
+            const [row] = await sql`SELECT current_setting('TimeZone') AS timezone`;
+            if (row.timezone !== process.env.TZ) throw new Error('Database timezone does not match the test matrix');
+          } finally {
+            await sql.end();
+          }
+          JS
       - run: npx vitest run --coverage --reporter=dot --fileParallelism=false
       - run: npm run build:worker
       - run: npm run build:mcp

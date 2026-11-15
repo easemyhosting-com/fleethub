@@ -37,3 +37,5 @@ On an account with stored credentials the Accounts panel shows **Replace**, **Ro
 ## Verification and limits
 
 Verified: unit tests for the registry, scope rules and the Cloudflare rotator against stubbed HTTP; route authorization tests; PostgreSQL integration tests with an in-memory vault covering swap, rollback, busy scans, vault outage before a roll, store failure after a roll, scheduling and backoff. Not verified: a live Cloudflare roll with a real token, and the exact permission Cloudflare requires for account-owned tokens. Other providers (Upstash, Supabase, Neon) support Replace; automatic rotation for them needs a rotator once their APIs are confirmed.
+
+Manual expiry dates mean the start of the selected day at 00:00:00 UTC, not local midnight or end-of-day. Storage and background expiry checks preserve that instant regardless of the application or database timezone.
