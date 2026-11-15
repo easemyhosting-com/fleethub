@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorSummary } from "@/lib/log/safe-error";
 import { verifyApiAccess, createUnauthorizedResponse, readJsonWithLimit } from "@/lib/auth/guard";
 import { bootstrapDatabase } from "@/lib/db/bootstrap";
 import { queryClient } from "@/lib/db/client";
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
       identities,
     });
   } catch (error: any) {
-    console.error("[Identities API] GET error:", error.message);
+    console.error("[Identities API] GET error:", errorSummary(error));
     return NextResponse.json(
       {
         status: "error",
@@ -226,7 +227,7 @@ export async function POST(req: Request) {
         );
     }
   } catch (error: any) {
-    console.error("[Identities API] POST error:", error.message);
+    console.error("[Identities API] POST error:", errorSummary(error));
     return NextResponse.json(
       { error: "Identity request failed", timestamp: new Date().toISOString() },
       { status: 500 }

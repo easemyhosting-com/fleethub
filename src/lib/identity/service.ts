@@ -1,4 +1,5 @@
 import { readProjectFleetMatches } from "@/lib/projects/fleet-scope";
+import { errorSummary } from "@/lib/log/safe-error";
 import { selectIdentityAccounts } from "./fleet-selection";
 import { queryClient } from "@/lib/db/client";
 import { filterIdentities, type FleetFilter } from "@/lib/fleet/filters";
@@ -657,7 +658,7 @@ async function loadIdentitiesWithAccounts(): Promise<IdentityWithAccounts[]> {
     return result;
   } catch (err: any) {
     if (process.env.FLEETHUB_DEMO_MODE === "true" || process.env.NODE_ENV === "test") {
-      console.warn("[Identity Service] DB query fallback to verified sample:", err.message);
+      console.warn("[Identity Service] DB query fallback to verified sample:", errorSummary(err));
       return publicFallbackIdentities();
     }
     return [];
