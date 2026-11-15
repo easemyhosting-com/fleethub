@@ -17,7 +17,7 @@ Grouping precedence on Kubernetes (strongest first): Argo Application resources,
 
 ## Safe by construction
 
-- `GET` only, redirects refused, 8 MB body cap, 10 s timeout, no URL credentials, no cloud metadata addresses, https required unless the connector is explicitly marked `allowHttp` (for a docker-socket-proxy on a private network).
+- `GET` only, redirects refused, 8 MB body cap, 10 s timeout, no URL credentials, no cloud metadata hosts or addresses (link-local, unspecified, multicast, AWS IPv6 metadata, in any IPv4 or IPv4-mapped spelling), DNS pinned so every resolved answer is checked and the socket connects only to validated addresses; private networks stay reachable, https required unless the connector is explicitly marked `allowHttp` (for a docker-socket-proxy on a private network).
 - Self-signed cluster CAs are supported by pasting the CA certificate; verification is never disabled.
 - Kubernetes Secrets are never listed. Docker inspect output is reduced to `HostConfig.NanoCpus`, `Memory` and `MemoryReservation`; environment variables and mounts are discarded inside the client and never stored or returned.
 - Credentials follow the same rule as provider accounts: **Infisical when its setup step is verified, otherwise the built-in encrypted store**. Only a `secret_refs` pointer is saved in the database (backend, project, path, secret name), never the value, and the API never returns it. If no secret store is verified the connector is refused (409). Removing a connector deletes its secret from whichever backend holds it.
