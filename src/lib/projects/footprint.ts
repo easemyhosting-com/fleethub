@@ -69,18 +69,25 @@ export async function readOrphans(limit = 100) {
   return rows.map(row => ({ resourceId: String(row.id), name: String(row.name), provider: String(row.provider), category: String(row.category), state: String(row.state), protected: Boolean(row.is_protected), billing: String(row.billing), role: String(row.role) }));
 }
 
-/** Resource id to the projects using it, for the "Used by" line in the resource drawer. */
-export async function readUsedBy() {
+export const usedByLimit = 2000;
+
+/**
+ * Resource id to the projects using it, for the "Used by" line in the resource drawer.
+ * Pass a resource id to read only that resource. `truncated` means links beyond the cap exist,
+ * so a resource missing from `usedBy` is unknown rather than unlinked.
+ */
+export async function readUsedBy(resourceId?: string, limit = usedByLimit) {
   const rows = await queryClient`SELECT l.resource_id, p.slug, p.name, l.source, l.status, l.confidence, l.last_seen,
     r.account_id, a.label AS account_label, COALESCE(i.display_name, a.owner_email) AS owner_label,
     (SELECT MAX(u.received_at) FROM project_usage_reports u WHERE u.project_id = p.id AND u.resource_id = r.id AND u.metrics->>'source' = 'prometheus') AS observed_at
     FROM project_resource_links l JOIN projects p ON p.id = l.project_id JOIN resources r ON r.id = l.resource_id
     LEFT JOIN provider_accounts a ON a.id = r.account_id LEFT JOIN identities i ON i.id = a.identity_id
     WHERE p.archived_at IS NULL AND r.retired_at IS NULL AND (a.id IS NULL OR a.archived_at IS NULL)
-    ORDER BY l.last_seen DESC LIMIT 2000`;
-  const out: Record<string, Array<{ slug: string; name: string; source: string; status: string; dependencyEvidence: DependencyEvidence }>> = {};
-  for (const row of rows) (out[String(row.resource_id)] ??= []).push({ slug: String(row.slug), name: String(row.name), source: String(row.source), status: String(row.status),
+      AND (${resourceId ?? null}::text IS NULL OR l.resource_id = ${resourceId ?? null})
+    ORDER BY l.last_seen DESC, l.id LIMIT ${limit + 1}`;
+  const usedBy: Record<string, Array<{ slug: string; name: string; source: string; status: string; dependencyEvidence: DependencyEvidence }>> = {};
+  for (const row of rows.slice(0, limit)) (usedBy[String(row.resource_id)] ??= []).push({ slug: String(row.slug), name: String(row.name), source: String(row.source), status: String(row.status),
     dependencyEvidence: dependencyEvidence({ source: String(row.source), confidence: row.confidence as number | null, lastSeen: row.last_seen, observedAt: row.observed_at ?? null,
       ownerLabel: row.owner_label ?? null, accountId: row.account_id ?? null, accountLabel: row.account_label ?? null }) });
-  return out;
+  return { usedBy, truncated: rows.length > limit };
 }

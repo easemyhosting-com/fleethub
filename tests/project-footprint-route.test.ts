@@ -8,3 +8,9 @@ it("rejects confirmed-only filtering without a project before reading inventory"
   expect(result.status).toBe(400);
   expect(bootstrap).not.toHaveBeenCalled();
 });
+it("rejects malformed or project-combined resource filters before reading inventory", async () => {
+  for (const query of ["resource=", `resource=${"a".repeat(513)}`, "resource=bad%0Aid", "resource=r1&project=app"]) {
+    expect((await GET(new Request(`http://localhost/api/projects/footprint?${query}`))).status).toBe(400);
+  }
+  expect(bootstrap).not.toHaveBeenCalled();
+});

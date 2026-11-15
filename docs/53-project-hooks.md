@@ -34,7 +34,7 @@ The original capacity design planned HMAC signatures with a per-source secret "s
 
 ## Dashboard and agents (built 2026-11-05)
 
-- `GET /api/projects/footprint` (read-only; `?project=slug` for one): footprints, orphans (resources no project links to) and the resource to projects map. A project with no usage reports shows `never`; one that stopped for 7 days shows `stale`, never zero.
+- `GET /api/projects/footprint` (read-only; `?project=slug` for one): footprints, orphans (resources no project links to) and the resource to projects map. The map holds the 2,000 most recently seen links; `usedByTruncated: true` means older links exist, so a resource absent from the map is unknown, not unlinked. `?resource=<id>` returns `{ usedBy, truncated }` for that one resource and cannot be combined with `project`; the resource drawer uses it. A project with no usage reports shows `never`; one that stopped for 7 days shows `stale`, never zero.
 - Projects tab: register a project, issue and revoke keys (key shown once, curl examples use placeholders), footprint cards with attention reasons, Orphans and idle. Resource drawer on the Fleet Map shows "Used by".
 - MCP (read-only; the authoritative tool list is `src/lib/mcp/tools.ts`): `find_free_capacity {kind, providers?}` and `get_project_footprint {project?}`. Declaring a need is deliberately not an MCP tool; projects post to the hook so MCP stays read-only.
 
