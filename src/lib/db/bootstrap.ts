@@ -572,6 +572,13 @@ export async function bootstrapDatabase() {
       project_id TEXT NOT NULL REFERENCES projects(id),
       PRIMARY KEY (credential_id, project_id)
     )`;
+    // Optional AI connection (EAS-22). One row at most; nothing else depends on it.
+    await queryClient`CREATE TABLE IF NOT EXISTS ai_connections (
+      id TEXT PRIMARY KEY CHECK (id = 'default'), endpoint TEXT NOT NULL,
+      protocol TEXT NOT NULL CHECK (protocol IN ('openai-chat-completions', 'openai-responses', 'anthropic-messages')),
+      model TEXT NOT NULL, secret_ref_id TEXT REFERENCES secret_refs(id),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
     // 2. Perform Migration & Backfill for any orphan provider_accounts
     await backfillProviderAccountIdentities();
 
