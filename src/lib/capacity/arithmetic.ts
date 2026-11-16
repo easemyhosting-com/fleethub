@@ -113,8 +113,12 @@ export function formatStorageBytes(bytes: number | null): string {
 
 export type ComputeUnit = "core" | "cores" | "ocpu" | "ocpus" | "vcpu" | "vcpus" | "milli" | "m";
 
-/** Parse compute representation into integer milliCPUs (1 core = 1000m). */
-export function parseComputeMilli(value: string | number | null | undefined): number | null {
+/**
+ * Parse compute representation into integer milliCPUs (1 core = 1000m).
+ * OCPUs need the architecture: one OCPU is one core on Arm shapes and two vCPUs on x86 shapes.
+ * Without it, OCPU input is rejected rather than guessed.
+ */
+export function parseComputeMilli(value: string | number | null | undefined, context: { arch?: "arm64" | "amd64" | null } = {}): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "number") {
     if (!Number.isFinite(value) || value < 0) return null;
@@ -133,7 +137,12 @@ export function parseComputeMilli(value: string | number | null | undefined): nu
   if (unit === "m" || unit === "milli" || unit === "millicpu" || unit === "millicpus") {
     return roundedBaseline(num);
   }
-  if (!unit || unit === "core" || unit === "cores" || unit === "ocpu" || unit === "ocpus" || unit === "vcpu" || unit === "vcpus") {
+  if (unit === "ocpu" || unit === "ocpus") {
+    if (context.arch === "arm64") return roundedBaseline(num * 1000);
+    if (context.arch === "amd64") return roundedBaseline(num * 2000);
+    return null;
+  }
+  if (!unit || unit === "core" || unit === "cores" || unit === "vcpu" || unit === "vcpus") {
     return roundedBaseline(num * 1000);
   }
   return null;

@@ -36,7 +36,11 @@ export async function recommendFor(need: NeedInput, projectId: string): Promise<
     if (row.is_protected) reasons.push("protected: FleetHub will never stop it");
     const candidate: Candidate = { resourceId: String(row.id), name: String(row.name), provider: String(row.provider), category: String(row.category), state: String(row.state), protected: Boolean(row.is_protected), usedByProjects: Number(row.others), reasons };
     if (need.kind === "compute") {
-      const advice = adviseCompute(hostsById.get(candidate.resourceId), need.spec);
+      const capacity = hostsById.get(candidate.resourceId);
+      // The resource row's own state still applies when capacity evidence could not be read.
+      const advice = !capacity && candidate.state !== "online"
+        ? { verdict: "mismatch" as const, basis: "unknown" as const, reasons: [`Host is ${candidate.state}`], measuredAt: null }
+        : adviseCompute(capacity, need.spec);
       candidate.computeFit = advice;
       candidate.reasons = [reasons[0], ...advice.reasons, ...reasons.slice(2)];
       if (advice.verdict === "mismatch") { excluded.push(candidate); continue; }

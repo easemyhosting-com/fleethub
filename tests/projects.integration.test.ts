@@ -176,6 +176,19 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("projects Post
     }
   });
 
+  it("keeps resource IDs that match inherited object keys", async () => {
+    const ids = ["constructor", "__proto__"];
+    await queryClient`INSERT INTO resources (id,name,category,provider,account_email,state) VALUES ('constructor','Constructor','database','neon','a@x.test','online'), ('__proto__','Proto','database','neon','a@x.test','online')`;
+    try {
+      await queryClient`INSERT INTO project_resource_links (id, project_id, resource_id, source) VALUES (${randomUUID()}, ${projectId}, 'constructor', 'declared'), (${randomUUID()}, ${projectId}, '__proto__', 'declared')`;
+      const { usedBy } = await readUsedBy();
+      for (const id of ids) expect(Object.hasOwn(usedBy, id) && usedBy[id]).toEqual([expect.objectContaining({ slug: "integration-app" })]);
+      expect(Object.hasOwn(JSON.parse(JSON.stringify(usedBy)), "__proto__")).toBe(true);
+    } finally {
+      await queryClient`DELETE FROM resources WHERE id = ANY(${ids})`;
+    }
+  });
+
   it("syncs gitops links, remembers rejections and confirmations, and marks unseen links stale", async () => {
     await queryClient`UPDATE resources SET name = 'integration-app-cache' WHERE id = 'proj-free-db'`;
     const manifest = `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: integration-app\n  annotations:\n    fleethub.dev/uses: "proj-paid-db"\nspec: {}\n`;

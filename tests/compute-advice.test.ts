@@ -49,6 +49,21 @@ describe("Compute constraints", () => {
     if (mismatched.measuredUsage) mismatched.measuredUsage.cpuCores = 8;
     expect(adviseCompute(mismatched, spec, now).verdict).toBe("unverified");
   });
+  it("rejects a known CPU shortage even when RAM size is unknown", () => {
+    const capacity = { ...host(), totalMemMi: null, freeMemMi: null, freeCpuMilli: 900 } as unknown as HostCapacity;
+    expect(adviseCompute(capacity, { ...spec, cpu: 2 }, now)).toMatchObject({ verdict: "mismatch", basis: "declared_only" });
+    expect(adviseCompute(capacity, { ...spec, cpu: 0.5 }, now).verdict).toBe("unverified");
+  });
+  it("accepts a host-reported memory total slightly below the configured size", () => {
+    const capacity = host();
+    if (capacity.measuredUsage) capacity.measuredUsage.memTotalMi = 7_850;
+    expect(adviseCompute(capacity, spec, now)).toMatchObject({ verdict: "fits", basis: "declared_and_observed" });
+    for (const total of [4_096, 9_000]) {
+      const off = host();
+      if (off.measuredUsage) off.measuredUsage.memTotalMi = total;
+      expect(adviseCompute(off, spec, now).verdict).toBe("unverified");
+    }
+  });
   it("adds optional region to the existing strict need contract", () => {
     expect(needInput.parse({ kind: "compute", purpose: "test", spec }).spec.region).toBe("region-a");
     expect(needInput.safeParse({ kind: "compute", purpose: "test", spec: { ...spec, unknown: true } }).success).toBe(false);
@@ -76,6 +91,14 @@ describe("Compute recommendation integration", () => {
     expect(result.candidates.map(item => item.resourceId)).toEqual(["good", "unknown"]);
     expect(result.excluded?.map(item => item.resourceId)).toEqual(["wrong"]);
     expect(result.candidates[0].computeFit?.verdict).toBe("fits");
+  });
+  it("excludes known non-online rows when capacity evidence cannot be read", async () => {
+    storage.queryClient.mockResolvedValue([{ ...row("down"), state: "offline" }, row("up")]);
+    storage.readHostCapacities.mockRejectedValue(new Error("Unavailable"));
+    const result = await recommendFor({ kind: "compute", purpose: "test", spec }, "project");
+    expect(result.candidates.map(item => item.resourceId)).toEqual(["up"]);
+    expect(result.excluded?.map(item => item.resourceId)).toEqual(["down"]);
+    expect(result.excluded?.[0].computeFit?.reasons).toContain("Host is offline");
   });
   it("isolates missing compute evidence and leaves other categories unverified", async () => {
     storage.queryClient.mockResolvedValue([row("unknown")]);
