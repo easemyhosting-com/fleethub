@@ -14,10 +14,12 @@ One connection, stored in `ai_connections` (a single row with id `default`):
 | API base URL | The endpoint including its version path, such as `https://api.example.com/v1` or `http://127.0.0.1:11434/v1` for a local server |
 | Protocol | `openai-chat-completions`, `openai-responses` or `anthropic-messages` |
 | Model | The model name the endpoint expects |
-| Key | An existing encrypted-store secret reference, or none for a server that needs no key |
+| Key | An existing single-key encrypted-store secret reference, or none for a server that needs no key. References holding several keys are not offered, because they do not say which one is the AI key |
 
 The three protocols are separate capabilities. Supporting one says nothing about the
-others, and a reply in another protocol's shape counts as a failure.
+others, and a reply in another protocol's shape counts as a failure. A Responses reply that reports
+`status: "failed"` or an `error` counts as a failure; `incomplete` (the token cap was
+reached) still shows that the model answered.
 
 Keys are never entered on this page. The connection stores a secret reference ID. While a
 connection points at a reference, `removeUnusedSecretRef` keeps that secret, as it does

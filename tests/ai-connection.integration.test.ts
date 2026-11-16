@@ -8,10 +8,12 @@ import { deleteAiConnection, readAiConnection, readAiKey, saveAiConnection } fro
 
 describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("optional AI connection (disposable PostgreSQL)", () => {
   const ref = `ai-${randomUUID()}-ref`;
+  let guarded = false;
   const settings = { endpoint: "https://ai.example.com/v1", protocol: "openai-responses" as const, model: "fixture-model", secretRefId: ref };
   beforeAll(async () => {
     const url = new URL(process.env.DATABASE_URL ?? "");
     if (url.hostname !== "127.0.0.1" || url.pathname !== "/fleethub_security") throw new Error("Requires disposable local test database");
+    guarded = true;
     expect((await bootstrapDatabase()).success).toBe(true);
     vi.stubEnv("FLEETHUB_SECRET_STORE_KEY", "fixture".repeat(8));
     await createBuiltinVault().write(ref, "synthetic-ai-credential");
@@ -19,6 +21,8 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("optional AI c
   });
   afterAll(async () => {
     try {
+      // Never touch a database that failed the disposable-database guard.
+      if (!guarded) return;
       await deleteAiConnection();
       await queryClient`DELETE FROM secret_refs WHERE id = ${ref}`;
       await queryClient`DELETE FROM secret_store WHERE name = ${ref}`;
@@ -52,6 +56,18 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("optional AI c
     await deleteAiConnection();
     expect((await queryClient`SELECT id FROM secret_refs WHERE id = ${ref}`)).toHaveLength(1);
     expect((await readAiConnection()).connection).toBeNull();
+  });
+
+  it("refuses a multi-key reference because it does not identify the AI key", async () => {
+    const multi = `${ref}-multi`;
+    await queryClient`INSERT INTO secret_refs(id,label,vault_url,path,keys) VALUES (${multi}, 'Several keys', 'builtin:fleethub', '/', ${JSON.stringify([`${multi}-a`, `${multi}-b`])}::jsonb)`;
+    try {
+      expect(await saveAiConnection({ ...settings, secretRefId: multi })).toBe(false);
+      expect((await readAiConnection()).secretRefs.map(item => item.id)).not.toContain(multi);
+      await expect(readAiKey(multi)).rejects.toThrow("credential_unavailable");
+    } finally {
+      await queryClient`DELETE FROM secret_refs WHERE id = ${multi}`;
+    }
   });
 
   it("enforces one row and known protocols in the database", async () => {

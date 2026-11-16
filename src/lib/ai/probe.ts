@@ -16,7 +16,9 @@ const inference: Record<AiProtocol, { path: string; body: (model: string) => unk
   "openai-responses": {
     path: "/responses",
     body: model => ({ model, input: prompt, max_output_tokens: 16 }),
-    schema: z.object({ output: z.array(z.unknown()) }),
+    // A 200 reply can still describe a failed generation. "incomplete" (token cap reached) still proves the model answered.
+    schema: z.object({ output: z.array(z.unknown()), status: z.string().optional(), error: z.unknown().optional() })
+      .refine(reply => reply.status !== "failed" && (reply.error === undefined || reply.error === null)),
   },
   "anthropic-messages": {
     path: "/messages",

@@ -6,7 +6,8 @@ import { aiConnectionSnapshot, type AiConnectionInput } from "./model";
 export async function saveAiConnection(input: AiConnectionInput): Promise<boolean> {
   const rows = await queryClient`INSERT INTO ai_connections (id, endpoint, protocol, model, secret_ref_id, updated_at)
     SELECT 'default', ${input.endpoint}, ${input.protocol}, ${input.model}, ${input.secretRefId}, NOW()
-    WHERE ${input.secretRefId}::text IS NULL OR EXISTS (SELECT 1 FROM secret_refs WHERE id = ${input.secretRefId})
+    WHERE ${input.secretRefId}::text IS NULL
+      OR EXISTS (SELECT 1 FROM secret_refs WHERE id = ${input.secretRefId} AND jsonb_array_length(keys) = 1)
     ON CONFLICT (id) DO UPDATE SET endpoint = EXCLUDED.endpoint, protocol = EXCLUDED.protocol, model = EXCLUDED.model,
       secret_ref_id = EXCLUDED.secret_ref_id, updated_at = EXCLUDED.updated_at
     RETURNING id`;
@@ -22,7 +23,8 @@ export async function readAiConnection() {
   const [[row], refs] = await Promise.all([
     queryClient`SELECT endpoint, protocol, model, secret_ref_id AS "secretRefId", updated_at AS "updatedAt"
       FROM ai_connections WHERE id = 'default'`,
-    queryClient`SELECT id, label FROM secret_refs ORDER BY id LIMIT 1001`,
+    // A multi-key reference does not say which key is the AI key, so only single-key references are offered.
+    queryClient`SELECT id, label FROM secret_refs WHERE jsonb_array_length(keys) = 1 ORDER BY id LIMIT 1001`,
   ]);
   return aiConnectionSnapshot.parse({
     connection: row ? { ...row, updatedAt: new Date(row.updatedAt).toISOString() } : null,
@@ -34,6 +36,6 @@ export async function readAiConnection() {
 export async function readAiKey(secretRefId: string): Promise<string> {
   const [ref] = await queryClient`SELECT r.vault_url, r.infisical_project, r.environment, r.path, r.keys, s.config AS current_config
     FROM secret_refs r LEFT JOIN onboarding_steps s ON s.id = 'infisical' WHERE r.id = ${secretRefId}`;
-  if (!ref || !Array.isArray(ref.keys) || typeof ref.keys[0] !== "string") throw new Error("credential_unavailable");
+  if (!ref || !Array.isArray(ref.keys) || ref.keys.length !== 1 || typeof ref.keys[0] !== "string") throw new Error("credential_unavailable");
   return (await openVaultForRef(ref as unknown as VaultRef, ref.current_config)).read(ref.keys[0]);
 }

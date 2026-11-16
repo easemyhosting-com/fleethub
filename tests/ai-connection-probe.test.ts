@@ -61,6 +61,18 @@ describe("optional AI connection check", () => {
     expect(result.inference).toEqual({ state: "failed", reason: "invalid_response" });
   });
 
+  it("treats a failed Responses generation as a failure but accepts a capped one", async () => {
+    const responses = { ...base, protocol: "openai-responses" as const };
+    for (const [reply, state] of [
+      [{ output: [], status: "failed", error: { code: "server_error" } }, "failed"],
+      [{ output: [], error: { code: "server_error" } }, "failed"],
+      [{ output: [{}], status: "incomplete", error: null }, "supported"],
+    ] as const) {
+      fetchMock.mockImplementation(async (url: string) => json(String(url).endsWith("/models") ? models : reply));
+      expect((await checkAiConnection(responses, { consentToBillableProbe: true, readKey })).inference.state).toBe(state);
+    }
+  });
+
   it("reports an unlisted model without claiming inference works", async () => {
     const result = await checkAiConnection({ ...base, model: "absent" }, { consentToBillableProbe: false, readKey });
     expect(result.modelList).toEqual({ state: "not_listed", modelCount: 2 });
