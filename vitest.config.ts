@@ -19,6 +19,7 @@ export default defineConfig({
         "src/lib/ai/model.ts",
         "src/lib/ai/probe.ts",
         "src/app/api/ai-connection/**/route.ts",
+        "src/app/api/credentials/route.ts",
         "src/lib/enrollment/**/*.ts",
         "src/lib/agent-context/**/*.ts",
         "src/lib/inventory/**/*.ts",

@@ -46,6 +46,21 @@ export default function AppAccountsPage() {
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Could not save."); }
     finally { setBusy(false); }
   }
+  async function storeKey(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch("/api/credentials", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: values.get("label"), value: values.get("value") }) });
+      // Clear the value whatever happens; it must not linger in the page.
+      form.reset();
+      if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "Sign in as an operator before storing a key." : response.status === 409 ? "Verify a secret store in setup first." : "Could not store the key. Try again.");
+      try { await load(); setMessage("Key stored encrypted. Choose it as the secret reference in step 3."); }
+      catch { setData(null); setMessage("Key stored, but the ledger could not refresh. Reload before linking it."); }
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Could not store the key."); }
+    finally { setBusy(false); }
+  }
   function section(title: string, action: string, children: ReactNode) {
     return <form onSubmit={event => void save(event, action)}><fieldset disabled={busy} className="grid gap-4 rounded-xl border border-zinc-800 p-5 sm:grid-cols-2"><legend className="px-2 text-base font-medium">{title}</legend>{children}<div className="sm:col-span-2"><button className={button}>Save {action === "consumer" ? "consumer link" : action}</button></div></fieldset></form>;
   }
@@ -58,7 +73,7 @@ export default function AppAccountsPage() {
     <header className="max-w-3xl space-y-3"><a href="/?tab=identities" className="text-sm text-cyan-300 underline underline-offset-4">Back to FleetHub</a>
       <p className="pt-4 text-xs uppercase tracking-widest text-zinc-500">Manual ledger / supporting services</p><h1 className="text-3xl font-semibold tracking-tight">App accounts &amp; consumers</h1>
       <p className="text-sm leading-6 text-zinc-400">Record who owns an account, who issued a credential, and which projects use it. These are manual relationships. They add no cloud capacity and trigger no service calls.</p>
-      <p className="text-sm leading-6 text-zinc-400">Enter labels and non-secret metadata only. Never paste API keys here. Create people and contacts in FleetHub first. Credential links use existing encrypted-store references; arbitrary-key storage is not available here.</p>
+      <p className="text-sm leading-6 text-zinc-400">Enter labels and non-secret metadata only. Never paste API keys here. Create people and contacts in FleetHub first. Credential links use encrypted-store references; store a new key below if it is not in FleetHub yet.</p>
       <button onClick={() => void refresh()} disabled={busy} className={button}>{busy ? "Working…" : "Load / refresh ledger"}</button>
     </header>
     <p role="status" aria-live="polite" className="text-sm text-cyan-200">{message}</p>
@@ -83,6 +98,11 @@ export default function AppAccountsPage() {
       </section>
       {section("1. Account & owner", "account", <><Input name="label" label="Account label" /><Input name="service" label="Service name" /><Select name="ownerContactId" label="Owner contact" options={data.contacts} /></>)}
       {section("2. Workspace", "workspace", <><Select name="accountId" label="Account" options={data.accounts} /><Input name="label" label="Workspace label" /></>)}
+      <form onSubmit={event => void storeKey(event)} autoComplete="off"><fieldset disabled={busy} className="grid gap-4 rounded-xl border border-zinc-800 p-5 sm:grid-cols-2"><legend className="px-2 text-base font-medium">Store a new key (optional)</legend>
+        <p className="text-sm leading-6 text-zinc-400 sm:col-span-2">The key goes to the verified secret store and is never shown again. Removing FleetHub&apos;s copy later does not revoke it at the issuer.</p>
+        <Input name="label" label="Reference label" /><label className="text-sm text-zinc-300">Key value<input name="value" type="password" required maxLength={8192} autoComplete="new-password" spellCheck={false} className={field} /></label>
+        <div className="sm:col-span-2"><button className={button}>Store key</button></div>
+      </fieldset></form>
       {section("3. Credential reference", "credential", <>
         <Select name="workspaceId" label="Workspace" options={data.workspaces.map(item => ({ id: item.id, label: workspaceLabel(item.id) }))} /><Select name="secretRefId" label="Existing secret reference" options={data.secretRefs} />
         <Input name="label" label="Credential label" /><Input name="issuer" label="Credential issuer" /><Input name="purpose" label="Purpose" maxLength={300} /><Input name="environment" label="Environment" />
