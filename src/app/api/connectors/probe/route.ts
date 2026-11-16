@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       }
     } catch { /* known hosts are a convenience; typed addresses still work */ }
   }
-  if (peers.size === 0) return NextResponse.json({ error: "No Tailscale addresses found. Provide addresses assigned by your Tailscale network." }, { status: 400, headers });
+  if (peers.size === 0) return NextResponse.json({ error: "No Tailscale addresses found. Provide IPv4 addresses assigned by your Tailscale network: 100.x.y.z with a second octet from 64 to 127. IPv6 and other addresses are not supported." }, { status: 400, headers });
   const hosts = await probeHosts([...peers.values()]);
   try {
     // Remember an address only when its name points at one machine: not shared by two FleetHub resources (web-1, web1) or by two peers in this run.

@@ -85,9 +85,13 @@ export async function readUsedBy(resourceId?: string, limit = usedByLimit) {
     WHERE p.archived_at IS NULL AND r.retired_at IS NULL AND (a.id IS NULL OR a.archived_at IS NULL)
       AND (${resourceId ?? null}::text IS NULL OR l.resource_id = ${resourceId ?? null})
     ORDER BY l.last_seen DESC, l.id LIMIT ${limit + 1}`;
-  const usedBy: Record<string, Array<{ slug: string; name: string; source: string; status: string; dependencyEvidence: DependencyEvidence }>> = {};
-  for (const row of rows.slice(0, limit)) (usedBy[String(row.resource_id)] ??= []).push({ slug: String(row.slug), name: String(row.name), source: String(row.source), status: String(row.status),
+  type UsedBy = { slug: string; name: string; source: string; status: string; dependencyEvidence: DependencyEvidence };
+  // A Map, so resource IDs such as "constructor" or "__proto__" cannot resolve to inherited properties.
+  const byResource = new Map<string, UsedBy[]>();
+  const entries = (id: string) => byResource.get(id) ?? byResource.set(id, []).get(id)!;
+  for (const row of rows.slice(0, limit)) entries(String(row.resource_id)).push({ slug: String(row.slug), name: String(row.name), source: String(row.source), status: String(row.status),
     dependencyEvidence: dependencyEvidence({ source: String(row.source), confidence: row.confidence as number | null, lastSeen: row.last_seen, observedAt: row.observed_at ?? null,
       ownerLabel: row.owner_label ?? null, accountId: row.account_id ?? null, accountLabel: row.account_label ?? null }) });
+  const usedBy: Record<string, UsedBy[]> = Object.fromEntries(byResource);
   return { usedBy, truncated: rows.length > limit };
 }

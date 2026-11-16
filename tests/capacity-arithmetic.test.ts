@@ -70,7 +70,10 @@ describe("Compute unit normalization", () => {
     expect(parseComputeMilli("1")).toBe(1000);
     expect(parseComputeMilli("1 core")).toBe(1000);
     expect(parseComputeMilli("2 cores")).toBe(2000);
-    expect(parseComputeMilli("2 OCPU")).toBe(2000);
+    expect(parseComputeMilli("2 OCPU")).toBeNull();
+    expect(parseComputeMilli("2 OCPU", { arch: "arm64" })).toBe(2000);
+    expect(parseComputeMilli("2 OCPU", { arch: "amd64" })).toBe(4000);
+    expect(parseComputeMilli("2 vcpu", { arch: "amd64" })).toBe(2000);
     expect(parseComputeMilli("4 vcpu")).toBe(4000);
     expect(parseComputeMilli("500m")).toBe(500);
     expect(parseComputeMilli("250 milli")).toBe(250);

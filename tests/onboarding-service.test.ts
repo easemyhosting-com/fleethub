@@ -240,7 +240,7 @@ describe("persisted setup state", () => {
     verification.run.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
     const pending = verifySetupStep("tailscale");
     await vi.waitFor(() => expect(verification.run).toHaveBeenCalled());
-    await saveSetupStep("tailscale", { tailnet: "your-tailnet.ts.net", deviceId: "node_1" });
+    await saveSetupStep("tailscale", { tailnet: "your-tailnet.ts.net", deviceId: "node_2" });
     release();
     await expect(pending).rejects.toThrow("Settings changed during verification");
     expect(db.rows.get("tailscale")?.status).toBe("configured");
