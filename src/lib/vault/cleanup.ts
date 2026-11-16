@@ -1,3 +1,4 @@
+import { builtinVaultUrl, createBuiltinVault, secretRows } from "./builtin";
 import { queryClient } from "@/lib/db/client";
 import { z } from "zod";
 import { openVaultForRef } from "@/lib/onboarding/vault-ref";
@@ -16,7 +17,9 @@ export async function removeUnusedSecretRef(refId: string): Promise<void> {
     if (usage.used) return;
     const [step] = await tx`SELECT config FROM onboarding_steps WHERE id = 'infisical'`;
     const metadata = z.object({ vault_url: z.string().nullable(), infisical_project: z.string(), environment: z.string(), path: z.string(), keys: z.array(z.string().min(1)).min(1) }).parse(ref);
-    const vault = await openVaultForRef(metadata, step?.config);
+    const vault = metadata.vault_url === builtinVaultUrl
+      ? createBuiltinVault(secretRows(tx))
+      : await openVaultForRef(metadata, step?.config);
     for (const name of metadata.keys) await vault.remove(name);
     await tx`DELETE FROM secret_refs WHERE id = ${refId}`;
   });
