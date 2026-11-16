@@ -36,6 +36,7 @@ export const secretRefs = pgTable("secret_refs", {
   label: text("label").notNull(),
   infisicalProject: text("infisical_project").notNull().default("fleet"),
   vaultUrl: text("vault_url"),
+  genericOwned: boolean("generic_owned").notNull().default(false),
   environment: text("environment").notNull().default("prod"),
   path: text("path").notNull(),
   keys: jsonb("keys").$type<string[]>().notNull().default([]),

@@ -336,6 +336,7 @@ export async function bootstrapDatabase() {
     await queryClient`ALTER TABLE onboarding_steps ADD COLUMN IF NOT EXISTS verification_id TEXT;`;
     await queryClient`ALTER TABLE onboarding_steps ADD COLUMN IF NOT EXISTS skipped BOOLEAN NOT NULL DEFAULT FALSE;`;
     await queryClient`ALTER TABLE secret_refs ADD COLUMN IF NOT EXISTS vault_url TEXT;`;
+    await queryClient`ALTER TABLE secret_refs ADD COLUMN IF NOT EXISTS generic_owned BOOLEAN NOT NULL DEFAULT FALSE;`;
 
     await queryClient`
       CREATE TABLE IF NOT EXISTS external_observations (

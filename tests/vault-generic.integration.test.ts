@@ -67,7 +67,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("generic crede
   });
 
   it("never removes a reference it did not create", async () => {
-    const foreign = `${label}-foreign`;
+    const foreign = `FLEETHUB_GENERIC_${randomUUID().replaceAll("-", "")}`;
     await queryClient`INSERT INTO secret_refs(id,label,vault_url,path,keys) VALUES (${foreign}, ${label}, 'builtin:fleethub', '/', ${JSON.stringify([foreign])}::jsonb)`;
     await createBuiltinVault().write(foreign, "synthetic-foreign-credential");
     expect(await removeGenericCredential(foreign)).toBe("not_generic");

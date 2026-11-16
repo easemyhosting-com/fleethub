@@ -1,5 +1,6 @@
 "use client";
 
+import { z } from "zod";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { appAccountSnapshot, type AppAccountSnapshot } from "@/lib/app-accounts/model";
 
@@ -13,6 +14,7 @@ function Input({ name, label, maxLength = 120 }: { name: string; label: string; 
 }
 export default function AppAccountsPage() {
   const [data, setData] = useState<AppAccountSnapshot | null>(null);
+  const [storedRefs, setStoredRefs] = useState<{ id: string; label: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   async function load() {
@@ -56,6 +58,8 @@ export default function AppAccountsPage() {
       // Clear the value whatever happens; it must not linger in the page.
       form.reset();
       if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "Sign in as an operator before storing a key." : response.status === 409 ? "Verify a secret store in setup first." : "Could not store the key. Try again.");
+      const { id } = z.object({ id: z.string().min(1) }).parse(await response.json());
+      setStoredRefs(previous => [...previous, { id, label: String(values.get("label") ?? "Stored key") }]);
       try { await load(); setMessage("Key stored encrypted. Choose it as the secret reference in step 3."); }
       catch { setData(null); setMessage("Key stored, but the ledger could not refresh. Reload before linking it."); }
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Could not store the key."); }
@@ -104,7 +108,7 @@ export default function AppAccountsPage() {
         <div className="sm:col-span-2"><button className={button}>Store key</button></div>
       </fieldset></form>
       {section("3. Credential reference", "credential", <>
-        <Select name="workspaceId" label="Workspace" options={data.workspaces.map(item => ({ id: item.id, label: workspaceLabel(item.id) }))} /><Select name="secretRefId" label="Existing secret reference" options={data.secretRefs} />
+        <Select name="workspaceId" label="Workspace" options={data.workspaces.map(item => ({ id: item.id, label: workspaceLabel(item.id) }))} /><Select name="secretRefId" label="Existing secret reference" options={[...data.secretRefs, ...storedRefs.filter(ref => !data.secretRefs.some(item => item.id === ref.id))]} />
         <Input name="label" label="Credential label" /><Input name="issuer" label="Credential issuer" /><Input name="purpose" label="Purpose" maxLength={300} /><Input name="environment" label="Environment" />
         <label className="text-sm text-zinc-300">Granted scopes, comma separated. Blank means unknown.<input name="scopes" maxLength={4800} className={field} /></label>
         <label className="text-sm text-zinc-300">Expiry date, UTC. Blank means unknown.<input name="expiresAt" type="date" className={field} /></label>

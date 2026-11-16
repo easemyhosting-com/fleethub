@@ -56,6 +56,8 @@ link (step 3), so metadata changes never touch the secret.
 `DELETE /api/credentials` with `{"refId": "..."}` removes FleetHub's stored copy and
 its reference. It is refused while a provider account, connector, ledger link or the
 optional AI connection still uses the key, and it applies only to keys stored through
-this flow; imported or provider references are never removed here. Removal is not
+this flow, identified by an explicit creation marker in reference metadata; existing
+references default to unowned, even if their key names match the generic format.
+Imported or provider references are never removed here. Removal is not
 revocation. The key stays valid at its issuer until the operator revokes it there,
 and the response says `"revokedUpstream": false`.
