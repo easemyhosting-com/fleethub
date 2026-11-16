@@ -102,7 +102,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("manual SaaS l
     await createBuiltinVault().write(shared, "synthetic-concurrent-credential");
     await queryClient`INSERT INTO secret_refs(id,label,vault_url,path,keys)
       VALUES (${shared}, 'Concurrent fixture', 'builtin:fleethub', '/', ${JSON.stringify([shared])}::jsonb)`;
-    let cleanup: Promise<void> | undefined;
+    let cleanup: Promise<unknown> | undefined;
     try {
       await queryClient.begin(async tx => {
         await tx`INSERT INTO app_credential_links(id,workspace_id,secret_ref_id,label,issuer,purpose,environment)

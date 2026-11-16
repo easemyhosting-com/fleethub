@@ -55,8 +55,9 @@ Unit tests for encryption (round trip, wrong key, tamper, moved ciphertext, shor
 Secret values belong only in the selected encrypted backend. Inventory and account
 views should expose credential references and metadata such as purpose, scopes,
 expiry and consumers, never plaintext values. General app-account credentials and
-many-to-many consumer links are target work in docs/64; do not assume every arbitrary
-SaaS API key can already use the provider-specific registration and rotation paths.
+many-to-many consumer links are implemented as a manual ledger with generic key
+storage (docs/69). Generic keys do not use the provider-specific registration and
+rotation paths.
 Provider credential replacement is distinct from rotating the store's master key.
 
 ## Master-key backup and recovery

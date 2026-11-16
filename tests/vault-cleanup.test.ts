@@ -30,13 +30,13 @@ beforeEach(() => {
 
 describe("removeUnusedSecretRef", () => {
   it("does nothing for a reference that is already gone", async () => {
-    await removeUnusedSecretRef("missing");
+    expect(await removeUnusedSecretRef("missing")).toBe("missing");
     expect(fx.calls).toHaveLength(1);
   });
 
   it("locks first, then checks every dependent in a separate statement and keeps a used secret", async () => {
     fx.ref = builtin; fx.used = true;
-    await removeUnusedSecretRef("shared");
+    expect(await removeUnusedSecretRef("shared")).toBe("in_use");
     expect(fx.calls[0]).toContain("FOR UPDATE");
     for (const table of ["app_credential_links", "provider_accounts", "connectors", "ai_connections"]) expect(fx.calls[1]).toContain(`FROM ${table} WHERE secret_ref_id`);
     expect(fx.calls.some(sql => sql.startsWith("DELETE"))).toBe(false);
@@ -45,7 +45,7 @@ describe("removeUnusedSecretRef", () => {
 
   it("deletes builtin secrets and the reference on the cleanup transaction", async () => {
     fx.ref = builtin;
-    await removeUnusedSecretRef("unused");
+    expect(await removeUnusedSecretRef("unused")).toBe("removed");
     expect(fx.open).not.toHaveBeenCalled();
     const deletes = fx.calls.filter(sql => sql.startsWith("DELETE"));
     expect(deletes).toEqual(["DELETE FROM secret_store WHERE name = ?", "DELETE FROM secret_store WHERE name = ?", "DELETE FROM secret_refs WHERE id = ?"]);

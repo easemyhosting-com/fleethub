@@ -42,9 +42,9 @@ project descriptions, GitHub docs, Linear issues, logs or handoffs. Prefer separ
 least-privilege keys per consumer where supported. Unknown validity stays unknown;
 removing a local reference is not proof the upstream key has been revoked.
 
-Start with manual account/workspace/consumer relationships. A dedicated Linear
-collector, arbitrary-key storage flow and automatic key rotation are not implemented
-or prerequisites. Reuse the account, credential-reference and project-link concepts
+Start with manual account/workspace/consumer relationships. Generic key storage is
+implemented (docs/69). A dedicated Linear collector and automatic key rotation are
+not implemented or prerequisites. Reuse the account, credential-reference and project-link concepts
 where they fit; verify schema gaps before building a parallel account system.
 
 ## Minimum useful installation
@@ -348,8 +348,9 @@ used-by read. Its bounded result is not an authoritative proof of all dependenci
 The manual account/workspace/credential-reference/consumer journey is available at
 `/app-accounts`. It reuses identity contacts, encrypted-store reference IDs and
 projects. See [manual app accounts](69-manual-app-accounts.md) for implemented
-operations and limitations. This does not implement arbitrary-key storage, a live
-SaaS collector or upstream validity checks.
+operations and limitations. Generic keys can be stored and their FleetHub copy
+removed when unused; removal is not upstream revocation. There is no live SaaS
+collector and no upstream validity check.
 
 ## Implemented optional AI connection
 
