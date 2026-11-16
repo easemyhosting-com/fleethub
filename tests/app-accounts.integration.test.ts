@@ -81,6 +81,17 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("manual SaaS l
     await expect(createBuiltinVault().read(unused)).rejects.toThrow();
     await removeUnusedSecretRef(unused);
   });
+  it("cleans more builtin references concurrently than the connection pool size", async () => {
+    const ids = Array.from({ length: 12 }, (_, index) => `${prefix}-pool-${index}`);
+    for (const id of ids) {
+      await createBuiltinVault().write(id, "synthetic-pool-fixture");
+      await queryClient`INSERT INTO secret_refs(id,label,vault_url,path,keys)
+        VALUES (${id}, 'Pool fixture', 'builtin:fleethub', '/', ${JSON.stringify([id])}::jsonb)`;
+    }
+    await Promise.all(ids.map(id => removeUnusedSecretRef(id)));
+    expect((await queryClient`SELECT id FROM secret_refs WHERE id = ANY(${ids})`)).toHaveLength(0);
+    expect((await queryClient`SELECT name FROM secret_store WHERE name = ANY(${ids})`)).toHaveLength(0);
+  });
   it("waits for a concurrent link and checks dependencies with a fresh snapshot", async () => {
     const shared = `${prefix}-concurrent`;
     const link = `${prefix}-concurrent-link`;
@@ -96,6 +107,7 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("manual SaaS l
         // Observe the real lock wait rather than assuming a delay proves contention.
         const deadline = Date.now() + 5000;
         while (true) {
+          await tx`SELECT pg_stat_clear_snapshot()`;
           const [state] = await tx`SELECT EXISTS (SELECT 1 FROM pg_stat_activity
             WHERE datname = current_database() AND wait_event_type = 'Lock'
             AND query LIKE '%FROM secret_refs WHERE id = $1 FOR UPDATE%') AS waiting`;
