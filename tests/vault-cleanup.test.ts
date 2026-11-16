@@ -38,7 +38,7 @@ describe("removeUnusedSecretRef", () => {
     fx.ref = builtin; fx.used = true;
     await removeUnusedSecretRef("shared");
     expect(fx.calls[0]).toContain("FOR UPDATE");
-    for (const table of ["app_credential_links", "provider_accounts", "connectors"]) expect(fx.calls[1]).toContain(`FROM ${table} WHERE secret_ref_id`);
+    for (const table of ["app_credential_links", "provider_accounts", "connectors", "ai_connections"]) expect(fx.calls[1]).toContain(`FROM ${table} WHERE secret_ref_id`);
     expect(fx.calls.some(sql => sql.startsWith("DELETE"))).toBe(false);
     expect(fx.open).not.toHaveBeenCalled();
   });
