@@ -341,3 +341,11 @@ keeps `headroom` and `sharingPermission` unverified. Stale links and observation
 remain visible with their timestamps; account ownership is not inferred from a key.
 Archived projects/accounts and retired resources are excluded from the global
 used-by read. Its bounded result is not an authoritative proof of all dependencies.
+
+## Implemented manual app ledger
+
+The manual account/workspace/credential-reference/consumer journey is available at
+`/app-accounts`. It reuses identity contacts, encrypted-store reference IDs and
+projects. See [manual app accounts](69-manual-app-accounts.md) for implemented
+operations and limitations. This does not implement arbitrary-key storage, a live
+SaaS collector or upstream validity checks.

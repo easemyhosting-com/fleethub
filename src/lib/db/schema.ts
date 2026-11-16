@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, integer, bigint, doublePrecision, timestamp, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, integer, bigint, doublePrecision, timestamp, jsonb, unique, primaryKey } from "drizzle-orm/pg-core";
 
 export const onboardingSteps = pgTable("onboarding_steps", {
   id: text("id").primaryKey().$type<"tailscale" | "infisical" | "cliproxy">(),
@@ -210,3 +210,28 @@ export const externalObservations = pgTable("external_observations", {
   receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
   facts: jsonb("facts").notNull(),
 }, table => [unique().on(table.reporterId, table.idempotencyKey)]);
+
+// Manual SaaS ledger, separate from provider capacity and collection queues.
+export const appAccounts = pgTable("app_accounts", {
+  id: text("id").primaryKey(), label: text("label").notNull(), service: text("service").notNull(),
+  ownerContactId: text("owner_contact_id").notNull().references(() => identityContacts.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export const appWorkspaces = pgTable("app_workspaces", {
+  id: text("id").primaryKey(), accountId: text("account_id").notNull().references(() => appAccounts.id),
+  label: text("label").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export const appCredentialLinks = pgTable("app_credential_links", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull().references(() => appWorkspaces.id),
+  secretRefId: text("secret_ref_id").notNull().references(() => secretRefs.id), label: text("label").notNull(),
+  issuer: text("issuer").notNull(), purpose: text("purpose").notNull(), environment: text("environment").notNull(),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  validity: text("validity").$type<"unknown" | "active" | "revoked">().notNull().default("unknown"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export const appCredentialConsumers = pgTable("app_credential_consumers", {
+  credentialId: text("credential_id").notNull().references(() => appCredentialLinks.id),
+  // projects uses raw SQL; bootstrapDatabase installs its foreign key.
+  projectId: text("project_id").notNull(),
+}, table => [primaryKey({ columns: [table.credentialId, table.projectId] })]);

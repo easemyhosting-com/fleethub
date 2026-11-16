@@ -550,6 +550,28 @@ export async function bootstrapDatabase() {
       )
     `;
     await queryClient`ALTER TABLE device_pairings ADD COLUMN IF NOT EXISTS created_by_session TEXT`;
+    await queryClient`CREATE TABLE IF NOT EXISTS app_accounts (
+      id TEXT PRIMARY KEY, label TEXT NOT NULL, service TEXT NOT NULL,
+      owner_contact_id TEXT NOT NULL REFERENCES identity_contacts(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await queryClient`CREATE TABLE IF NOT EXISTS app_workspaces (
+      id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES app_accounts(id), label TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await queryClient`CREATE TABLE IF NOT EXISTS app_credential_links (
+      id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES app_workspaces(id),
+      secret_ref_id TEXT NOT NULL REFERENCES secret_refs(id), label TEXT NOT NULL,
+      issuer TEXT NOT NULL, purpose TEXT NOT NULL, environment TEXT NOT NULL,
+      scopes JSONB NOT NULL DEFAULT '[]', expires_at TIMESTAMPTZ,
+      validity TEXT NOT NULL DEFAULT 'unknown' CHECK (validity IN ('unknown', 'active', 'revoked')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await queryClient`CREATE TABLE IF NOT EXISTS app_credential_consumers (
+      credential_id TEXT NOT NULL REFERENCES app_credential_links(id),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      PRIMARY KEY (credential_id, project_id)
+    )`;
     // 2. Perform Migration & Backfill for any orphan provider_accounts
     await backfillProviderAccountIdentities();
 
