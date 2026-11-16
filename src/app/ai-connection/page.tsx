@@ -59,10 +59,14 @@ export default function AiConnectionPage() {
   }
   function test(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const consentToBillableProbe = new FormData(event.currentTarget).get("consent") === "on";
+    const form = event.currentTarget;
+    const consentToBillableProbe = new FormData(form).get("consent") === "on";
+    form.reset();
+    const expectedConnection = data?.connection;
+    if (!expectedConnection) return;
     void run(async () => {
-      const response = await fetch("/api/ai-connection/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consentToBillableProbe }) });
-      if (!response.ok) throw new Error(denied(response.status) ? "Sign in as an operator before checking." : response.status === 409 ? "Save a connection first." : "Check failed. Confirm the endpoint origin is in FLEETHUB_ONBOARDING_ALLOWED_ORIGINS and uses HTTPS outside this machine.");
+      const response = await fetch("/api/ai-connection/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consentToBillableProbe, expectedConnection }) });
+      if (!response.ok) throw new Error(denied(response.status) ? "Sign in as an operator before checking." : response.status === 409 ? "Connection changed or was removed. Reload settings and confirm consent again." : "Check failed. Confirm the endpoint origin is in FLEETHUB_ONBOARDING_ALLOWED_ORIGINS and uses HTTPS outside this machine.");
       setCheck(await response.json() as AiCheckResult);
       return "";
     });
@@ -96,7 +100,7 @@ export default function AiConnectionPage() {
         <label className="text-sm text-zinc-300">Key<select name="secretRefId" className={field} defaultValue={current?.secretRefId ?? ""}><option value="">No key (local server)</option>{current?.secretRefId && !data.secretRefs.some(ref => ref.id === current.secretRefId) ? <option value={current.secretRefId}>Saved key (not in the listed references)</option> : null}{data.secretRefs.map(ref => <option key={ref.id} value={ref.id}>{ref.label}</option>)}</select></label>
         <div className="flex flex-wrap gap-3"><button className={button}>Save connection</button>{current && <button type="button" onClick={disconnect} className="text-sm text-zinc-400 underline">Disconnect</button>}</div>
       </fieldset></form>
-      {current && <form onSubmit={test}><fieldset disabled={busy} className="space-y-4 rounded-xl border border-zinc-800 p-5">
+      {current && <form onSubmit={test} key={JSON.stringify(current)}><fieldset disabled={busy} className="space-y-4 rounded-xl border border-zinc-800 p-5">
         <legend className="px-2 text-base font-medium">Check</legend>
         <p className="text-sm leading-6 text-zinc-400">The check lists models, which is free on most servers. It proves only that the endpoint answers.</p>
         <label className="flex items-start gap-3 text-sm text-zinc-300"><input type="checkbox" name="consent" className="mt-1" />Also send one minimal request to {current.model}. This may be billed by the provider.</label>

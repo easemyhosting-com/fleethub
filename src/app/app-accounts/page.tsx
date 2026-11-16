@@ -54,9 +54,10 @@ export default function AppAccountsPage() {
     const values = new FormData(form);
     setBusy(true); setMessage("");
     try {
-      const response = await fetch("/api/credentials", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: values.get("label"), value: values.get("value") }) });
-      // Clear the value whatever happens; it must not linger in the page.
+      const body = JSON.stringify({ label: values.get("label"), value: values.get("value") });
+      // Clear before awaiting the network, including rejected requests.
       form.reset();
+      const response = await fetch("/api/credentials", { method: "POST", headers: { "Content-Type": "application/json" }, body });
       if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "Sign in as an operator before storing a key." : response.status === 409 ? "Verify a secret store in setup first." : "Could not store the key. Try again.");
       const { id } = z.object({ id: z.string().min(1) }).parse(await response.json());
       setStoredRefs(previous => [...previous, { id, label: String(values.get("label") ?? "Stored key") }]);

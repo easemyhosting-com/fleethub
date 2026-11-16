@@ -11,7 +11,7 @@ const origin = "http://localhost:3060";
 const settings = { endpoint: "https://ai.example.com/v1", protocol: "anthropic-messages", model: "fixture-model", secretRefId: null };
 const request = (path: string, method: string, payload?: unknown, key = "ai-admin-fixture") => new Request(`${origin}${path}`, { method, headers: { authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
 const connection = (method: string, payload?: unknown, key?: string) => request("/api/ai-connection", method, payload, key);
-const check = (payload: unknown, key?: string) => request("/api/ai-connection/check", "POST", payload, key);
+const check = (payload: unknown, key?: string) => request("/api/ai-connection/check", "POST", { expectedConnection: { ...settings, updatedAt: "2026-01-01T00:00:00.000Z" }, ...(typeof payload === "object" && payload !== null ? payload : {}) }, key);
 
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("FLEETHUB_AUTH_REQUIRED", "true");
@@ -35,7 +35,7 @@ describe("optional AI connection API", () => {
   });
 
   it("validates settings strictly and never accepts an inline key", async () => {
-    for (const bad of [{ ...settings, apiKey: "inline-fixture" }, { ...settings, protocol: "any" }, { ...settings, endpoint: "not a url" }]) {
+    for (const bad of [{ ...settings, apiKey: "inline-fixture" }, { ...settings, protocol: "any" }, { ...settings, endpoint: "not a url" }, ...["https://user:synthetic@ai.example.com/v1", "https://ai.example.com/v1?key=synthetic", "https://ai.example.com/v1#synthetic"].map(endpoint => ({ ...settings, endpoint }))]) {
       expect((await PUT(connection("PUT", bad))).status).toBe(400);
     }
     expect(fixture.save).not.toHaveBeenCalled();
@@ -51,6 +51,15 @@ describe("optional AI connection API", () => {
     expect(fixture.check).not.toHaveBeenCalled();
     expect((await POST(check({ consentToBillableProbe: false }))).status).toBe(200);
     expect(fixture.check.mock.calls[0][1]).toMatchObject({ consentToBillableProbe: false });
+  });
+
+  it("rejects stale consent before reading a key or probing", async () => {
+    for (const changed of [{ model: "replacement" }, { updatedAt: "2026-01-02T00:00:00.000Z" }]) {
+      fixture.read.mockResolvedValueOnce({ connection: { ...settings, updatedAt: "2026-01-01T00:00:00.000Z", ...changed }, secretRefs: [], limited: false });
+      expect((await POST(check({ consentToBillableProbe: true }))).status).toBe(409);
+    }
+    expect(fixture.key).not.toHaveBeenCalled();
+    expect(fixture.check).not.toHaveBeenCalled();
   });
 
   it("asks for settings first and hides check failure details", async () => {

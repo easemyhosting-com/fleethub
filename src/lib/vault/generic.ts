@@ -43,7 +43,7 @@ export async function storeGenericCredential(input: GenericCredentialInput): Pro
       // Serializes with setup saves, so a changed prerequisite cannot authorize this write.
       await transaction`SELECT pg_advisory_xact_lock(76411213)`;
       const current = await getSetupState(async () => await transaction`SELECT id, config, revision, status, verified_at AS "verifiedAt", fingerprint FROM onboarding_steps`);
-      if (!current.ready || current.steps.some((step, index) => step.revision !== state.steps[index].revision)) throw new Error("Setup changed while storing the credential");
+      if (!current.ready || current.steps.find(step => step.id === (useInfisical ? "infisical" : "builtin"))?.status !== "verified" || current.steps.some((step, index) => step.revision !== state.steps[index].revision)) throw new Error("Setup changed while storing the credential");
       await transaction`INSERT INTO secret_refs (id, label, vault_url, infisical_project, environment, path, keys, status, last_verified_at, generic_owned)
         VALUES (${refId}, ${input.label}, ${scope.apiUrl}, ${scope.projectId}, ${scope.environment}, ${scope.secretPath}, ${JSON.stringify([secretName])}, 'verified', NOW(), TRUE)`;
     });
