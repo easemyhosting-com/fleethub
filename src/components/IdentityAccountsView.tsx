@@ -430,6 +430,7 @@ export function IdentityAccountsView({ onRefreshParent, filter, matches, fleetAc
               </h2>
               <p className="text-xs text-zinc-400">
                 Audit provider accounts linked to each identity across Oracle, Cloudflare, NVIDIA, Google, and Upstash.
+                {" "}<a href="/app-accounts" className="text-cyan-300 underline underline-offset-4">Manage supporting app accounts and consumers</a>
               </p>
             </div>
           </div>
