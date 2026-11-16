@@ -11,7 +11,7 @@ class HistoryTests(unittest.TestCase):
     def test_old_bad_blob_is_detected_after_tip_is_cleaned(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            env = {**os.environ, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': 'Example', 'GIT_COMMITTER_NAME': 'Example', 'GIT_AUTHOR_EMAIL': '347839428+easemyhosting-com@users.noreply.github.com', 'GIT_COMMITTER_EMAIL': 'noreply@github.com'}
+            env = {**os.environ, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': 'Example', 'GIT_COMMITTER_NAME': 'Example', 'GIT_AUTHOR_EMAIL': 'user@example.com', 'GIT_COMMITTER_EMAIL': 'user@example.com'}
             def git(*args):
                 subprocess.run(['git', *args], cwd=root, env=env, check=True, capture_output=True)
             git('init', '--quiet')
@@ -31,7 +31,7 @@ class HistoryTests(unittest.TestCase):
     def test_blob_shared_by_sensitive_and_clean_paths_reports_both_names(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            env = {**os.environ, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': 'Example', 'GIT_COMMITTER_NAME': 'Example', 'GIT_AUTHOR_EMAIL': '347839428+easemyhosting-com@users.noreply.github.com', 'GIT_COMMITTER_EMAIL': 'noreply@github.com'}
+            env = {**os.environ, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': 'Example', 'GIT_COMMITTER_NAME': 'Example', 'GIT_AUTHOR_EMAIL': 'user@example.com', 'GIT_COMMITTER_EMAIL': 'user@example.com'}
             def git(*args):
                 subprocess.run(['git', *args], cwd=root, env=env, check=True, capture_output=True)
             git('init', '--quiet')
