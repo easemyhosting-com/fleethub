@@ -107,7 +107,7 @@ compose up -d cli-proxy-api        # re-runs the one-shot ownership step first
 compose up -d infisical            # its PostgreSQL and Redis start as dependencies
 ```
 
-Restore the previous `runtime.env` values, and in **Setup connections** set the saved URLs back. Then run **Verify** again. Writes made only to the external instance during the overlap are not copied back. OAuth tokens that the external CLIProxy refreshed may leave the bundled copy stale. If that happens, log in again in its Management Center. If you upgraded since the pre-change setup, keep `CLIPROXY_UID`/`CLIPROXY_GID` in the env file (see [self-onboarding](23-self-onboarding.md)). `scripts/verify-cliproxy-nonroot.sh` exercises the ownership step on a disposable project, not on your volumes.
+Restore the previous `runtime.env` values, and in **Setup connections** set the saved URLs back. If Infisical step 4 changed DNS or proxy routing for the saved API URL, restore that routing to the bundled `infisical` service before anything else, because the URL itself did not change. Then run **Verify** again and confirm it reached the bundled instance, for example by stopping the external instance first. A pass against the external instance proves nothing about rollback. Writes made only to the external instance during the overlap are not copied back. OAuth tokens that the external CLIProxy refreshed may leave the bundled copy stale. If that happens, log in again in its Management Center. If you upgraded since the pre-change setup, keep `CLIPROXY_UID`/`CLIPROXY_GID` in the env file (see [self-onboarding](23-self-onboarding.md)). `scripts/verify-cliproxy-nonroot.sh` exercises the ownership step on a disposable project, not on your volumes.
 
 ## Retirement
 
