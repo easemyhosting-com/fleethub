@@ -7,15 +7,18 @@ vi.mock("@/lib/auth/rate-limit", () => ({ consumeSharedLimit: vi.fn(async () => 
 import { DELETE, GET, PUT } from "../src/app/api/ai-connection/route";
 import { POST } from "../src/app/api/ai-connection/check/route";
 
+let operatorKey = "ai-admin-fixture";
+let testSequence = 0;
 const origin = "http://localhost:3060";
 const settings = { endpoint: "https://ai.example.com/v1", protocol: "anthropic-messages", model: "fixture-model", secretRefId: null };
-const request = (path: string, method: string, payload?: unknown, key = "ai-admin-fixture") => new Request(`${origin}${path}`, { method, headers: { authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
+const request = (path: string, method: string, payload?: unknown, key = operatorKey) => new Request(`${origin}${path}`, { method, headers: { authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
 const connection = (method: string, payload?: unknown, key?: string) => request("/api/ai-connection", method, payload, key);
 const check = (payload: unknown, key?: string) => request("/api/ai-connection/check", "POST", { expectedConnection: { ...settings, updatedAt: "2026-01-01T00:00:00.000Z" }, ...(typeof payload === "object" && payload !== null ? payload : {}) }, key);
 
 beforeEach(() => {
+  operatorKey = `ai-admin-fixture-${++testSequence}`;
   vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("FLEETHUB_AUTH_REQUIRED", "true");
-  vi.stubEnv("FLEETHUB_API_KEY", "ai-admin-fixture"); vi.stubEnv("FLEETHUB_READONLY_KEY", "ai-read-fixture");
+  vi.stubEnv("FLEETHUB_API_KEY", operatorKey); vi.stubEnv("FLEETHUB_READONLY_KEY", "ai-read-fixture");
   fixture.boot.mockReset().mockResolvedValue({ success: true });
   fixture.read.mockReset().mockResolvedValue({ connection: { ...settings, updatedAt: "2026-01-01T00:00:00.000Z" }, secretRefs: [], limited: false });
   fixture.save.mockReset().mockResolvedValue(true); fixture.remove.mockReset().mockResolvedValue(undefined);
@@ -51,6 +54,15 @@ describe("optional AI connection API", () => {
     expect(fixture.check).not.toHaveBeenCalled();
     expect((await POST(check({ consentToBillableProbe: false }))).status).toBe(200);
     expect(fixture.check.mock.calls[0][1]).toMatchObject({ consentToBillableProbe: false });
+  });
+
+  it("checks saved multibyte endpoints whose serialized settings exceed four KiB", async () => {
+    const expectedConnection = { ...settings, endpoint: `https://ai.example.com/${"界".repeat(1400)}`, updatedAt: "2026-01-01T00:00:00.000Z" };
+    expect(new TextEncoder().encode(JSON.stringify({ consentToBillableProbe: false, expectedConnection })).length).toBeGreaterThan(4096);
+    fixture.read.mockResolvedValueOnce({ connection: expectedConnection, secretRefs: [], limited: false });
+    expect((await PUT(connection("PUT", { ...settings, endpoint: expectedConnection.endpoint }))).status).toBe(200);
+    expect((await POST(check({ consentToBillableProbe: false, expectedConnection }))).status).toBe(200);
+    expect(fixture.check).toHaveBeenCalledOnce();
   });
 
   it("rejects stale consent before reading a key or probing", async () => {
