@@ -20,11 +20,13 @@ it("clears a submitted key before awaiting a network request, including rejectio
   let input = "synthetic-key";
   const form = { reset: () => { input = ""; } };
   vi.stubGlobal("FormData", class { value = input; get(name: string) { return name === "value" ? this.value : "Fixture"; } });
-  const fetch = vi.fn(async () => { expect(input).toBe(""); throw new Error("Network unavailable"); });
+  let inputAtRequest: string | undefined;
+  const fetch = vi.fn(async () => { inputAtRequest = input; throw new Error("Network unavailable"); });
   vi.stubGlobal("fetch", fetch);
   const submit = keyForm(AppAccountsPage());
   expect(submit).toBeDefined();
   await submit?.({ preventDefault: vi.fn(), currentTarget: form });
   expect(fetch).toHaveBeenCalledOnce();
+  expect(inputAtRequest).toBe("");
   expect(input).toBe("");
 });
