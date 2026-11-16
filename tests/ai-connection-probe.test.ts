@@ -55,6 +55,15 @@ describe("optional AI connection check", () => {
     }
   });
 
+  it("bounds reasoning-model probes with the compatible parameter and never retries", async () => {
+    fetchMock.mockImplementation(async (url: string) => json(String(url).endsWith("/models") ? models : { choices: [{}] }));
+    await checkAiConnection({ ...base, model: "o3-mini" }, { consentToBillableProbe: true, readKey });
+    expect(calls()).toHaveLength(2);
+    const body = JSON.parse(String(calls()[1].init.body));
+    expect(body.max_completion_tokens).toBe(1);
+    expect(body.max_tokens).toBeUndefined();
+  });
+
   it("does not accept another protocol's reply as proof of inference", async () => {
     fetchMock.mockImplementation(async (url: string) => json(String(url).endsWith("/models") ? models : { choices: [{}] }));
     const result = await checkAiConnection({ ...base, protocol: "anthropic-messages" }, { consentToBillableProbe: true, readKey });

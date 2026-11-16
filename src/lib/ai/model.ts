@@ -6,7 +6,10 @@ export type AiProtocol = typeof aiProtocols[number];
 
 const id = z.string().regex(/^[A-Za-z0-9_.:-]{1,256}$/);
 /** The API base including its version prefix, for example https://api.example.com/v1. */
-const endpoint = z.string().trim().max(2048).pipe(z.url({ protocol: /^https?$/ }));
+const endpoint = z.string().trim().max(2048).pipe(z.url({ protocol: /^https?$/ })).refine(value => {
+  const url = URL.parse(value);
+  return url !== null && !url.username && !url.password && !url.search && !url.hash;
+}, "Endpoint must not contain credentials, a query or a fragment");
 
 export const aiConnectionInput = z.strictObject({
   endpoint,
@@ -17,10 +20,14 @@ export const aiConnectionInput = z.strictObject({
 });
 export type AiConnectionInput = z.infer<typeof aiConnectionInput>;
 
-export const aiCheckRequest = z.strictObject({ consentToBillableProbe: z.boolean() });
+const savedConnection = aiConnectionInput.extend({ updatedAt: z.string() });
+export const aiCheckRequest = z.strictObject({
+  consentToBillableProbe: z.boolean(),
+  expectedConnection: savedConnection,
+});
 
 export const aiConnectionSnapshot = z.object({
-  connection: aiConnectionInput.extend({ updatedAt: z.string() }).nullable(),
+  connection: savedConnection.nullable(),
   secretRefs: z.array(z.object({ id: z.string(), label: z.string() })),
   limited: z.boolean(),
 });

@@ -40,12 +40,15 @@ Requests use the same transport rules as other service connections:
 ## Checking a connection
 
 `POST /api/ai-connection/check` (operator, write access) requires
-`{"consentToBillableProbe": true|false}`. There is no default.
+`{consentToBillableProbe: true|false, expectedConnection: <displayed connection>}`.
+There is no default. The displayed connection includes its saved timestamp and
+settings; a mismatch returns 409 before reading a key or contacting the endpoint.
+Reload settings and obtain consent again.
 
 1. The model list (`GET <base>/models`) is free on common servers. Its result is
    `listed`, `not_listed` or `failed`. A listed model is not proof that requests work.
 2. Only with consent, one minimal request goes to the protocol's own path:
-   `/chat/completions` (`max_tokens: 1`), `/responses` (`max_output_tokens: 16`) or
+   `/chat/completions` (`max_completion_tokens: 1` for o-series models, otherwise `max_tokens: 1`), `/responses` (`max_output_tokens: 16`) or
    `/messages` (`max_tokens: 1`). The provider may bill it.
 3. Usage and quota are always reported as `unsupported` for this connection. They belong
    to separate management adapters, such as the CLIProxy capability report, and the

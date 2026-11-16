@@ -10,7 +10,7 @@ const modelsSchema = z.object({ data: z.array(z.object({ id: z.string().min(1).m
 const inference: Record<AiProtocol, { path: string; body: (model: string) => unknown; schema: z.ZodType }> = {
   "openai-chat-completions": {
     path: "/chat/completions",
-    body: model => ({ model, messages: [{ role: "user", content: prompt }], max_tokens: 1 }),
+    body: model => ({ model, messages: [{ role: "user", content: prompt }], ...(/^o[1-9](?:-|$)/.test(model) ? { max_completion_tokens: 1 } : { max_tokens: 1 }) }),
     schema: z.object({ choices: z.array(z.unknown()).min(1) }),
   },
   "openai-responses": {

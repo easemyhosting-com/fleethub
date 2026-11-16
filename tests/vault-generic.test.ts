@@ -82,6 +82,16 @@ describe("generic credential storage", () => {
     expect(fx.sql.some(text => text.startsWith("INSERT INTO secret_refs"))).toBe(false);
   });
 
+  it("rolls back if the selected backend loses verification without a revision change", async () => {
+    fx.state.steps[0] = { id: "infisical", status: "verified", revision: 1, config: { apiUrl: "https://vault.example.com", consoleUrl: "https://vault.example.com", projectId: "project", environment: "dev", secretPath: "/generic" } };
+    fx.current = { ready: true, steps: fx.state.steps.map(step => ({ ...step, status: step.id === "infisical" ? "stale" : step.status })) };
+    try {
+      await expect(storeGenericCredential({ label: "Key", value })).rejects.toThrow("Credential could not be stored");
+      expect(fx.removed).toHaveLength(1);
+      expect(fx.sql.some(text => text.startsWith("INSERT INTO secret_refs"))).toBe(false);
+    } finally { fx.state.steps[0] = { id: "infisical", status: "unconfigured", revision: 0, config: {} }; }
+  });
+
   it("removes only FleetHub-created generic references and reports why others stay", async () => {
     expect(await removeGenericCredential("missing")).toBe("missing");
     for (const keys of [["opaque"], ["FLEETHUB_ACCOUNT_0123456789abcdef0123456789abcdef"], ["FLEETHUB_GENERIC_0123456789abcdef0123456789abcdef", "other"], "not-a-list"]) {
