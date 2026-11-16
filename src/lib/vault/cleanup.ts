@@ -13,7 +13,8 @@ export async function removeUnusedSecretRef(refId: string): Promise<void> {
     const [usage] = await tx`SELECT
       EXISTS (SELECT 1 FROM app_credential_links WHERE secret_ref_id = ${refId}) OR
       EXISTS (SELECT 1 FROM provider_accounts WHERE secret_ref_id = ${refId}) OR
-      EXISTS (SELECT 1 FROM connectors WHERE secret_ref_id = ${refId}) AS used`;
+      EXISTS (SELECT 1 FROM connectors WHERE secret_ref_id = ${refId}) OR
+      EXISTS (SELECT 1 FROM ai_connections WHERE secret_ref_id = ${refId}) AS used`;
     if (usage.used) return;
     const [step] = await tx`SELECT config FROM onboarding_steps WHERE id = 'infisical'`;
     const metadata = z.object({ vault_url: z.string().nullable(), infisical_project: z.string(), environment: z.string(), path: z.string(), keys: z.array(z.string().min(1)).min(1) }).parse(ref);

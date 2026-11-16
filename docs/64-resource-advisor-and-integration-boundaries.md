@@ -91,7 +91,8 @@ model and credential reference. Treat OpenAI-compatible Chat Completions, Respon
 and Anthropic-compatible Messages as separate capabilities, not one compatibility
 checkbox. Test only implemented contracts; a model list is not proof of inference,
 quota telemetry, tool support or upstream availability. No billable inference probe
-without explicit consent. Generic endpoint support is not implemented yet.
+without explicit consent. The connection contract is implemented; see
+docs/70-optional-ai-connection.md. No assistant consumes it yet.
 
 CLIProxyAPI is one possible external adapter. Other proxies, direct authorized APIs
 and local model servers should fit the same capability boundaries. Gateway management
@@ -206,8 +207,8 @@ Project compute recommendations reuse host fit, checking declared CPU/RAM budget
 and fresh observed load independently, plus requested architecture and region,
 before ranking. Known mismatches are returned as exclusions. Other categories
 retain basic provider/billing/state/sharing ranking and explicitly unverified fit.
-The complete cross-category comparison model and generic AI connection described
-here remain target work.
+The complete cross-category comparison model described here remains target work.
+The generic AI connection contract is implemented (docs/70); an assistant using it is not.
 The pure arithmetic module separates declared allocation budgets from measured pool
 headroom. Measured headroom requires fresh observations for every supplied member
 and an explicit complete-inventory assertion. Callers must derive freshness from
@@ -349,3 +350,12 @@ The manual account/workspace/credential-reference/consumer journey is available 
 projects. See [manual app accounts](69-manual-app-accounts.md) for implemented
 operations and limitations. This does not implement arbitrary-key storage, a live
 SaaS collector or upstream validity checks.
+
+## Implemented optional AI connection
+
+`/ai-connection` stores one operator-selected endpoint, protocol, model and optional
+secret reference. Chat Completions, Responses and Messages are separate capabilities.
+The check lists models for free and sends one minimal inference request only with
+explicit consent; usage and quota stay with separate management adapters. See
+[optional AI connection](70-optional-ai-connection.md). No assistant, routing or
+bundled-profile retirement is part of this slice.

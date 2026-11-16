@@ -230,6 +230,12 @@ export const appCredentialLinks = pgTable("app_credential_links", {
   validity: text("validity").$type<"unknown" | "active" | "revoked">().notNull().default("unknown"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+export const aiConnections = pgTable("ai_connections", {
+  id: text("id").primaryKey(), endpoint: text("endpoint").notNull(),
+  protocol: text("protocol").$type<"openai-chat-completions" | "openai-responses" | "anthropic-messages">().notNull(),
+  model: text("model").notNull(), secretRefId: text("secret_ref_id").references(() => secretRefs.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 export const appCredentialConsumers = pgTable("app_credential_consumers", {
   credentialId: text("credential_id").notNull().references(() => appCredentialLinks.id),
   // projects uses raw SQL; bootstrapDatabase installs its foreign key.
