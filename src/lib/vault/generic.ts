@@ -44,8 +44,8 @@ export async function storeGenericCredential(input: GenericCredentialInput): Pro
       await transaction`SELECT pg_advisory_xact_lock(76411213)`;
       const current = await getSetupState(async () => await transaction`SELECT id, config, revision, status, verified_at AS "verifiedAt", fingerprint FROM onboarding_steps`);
       if (!current.ready || current.steps.some((step, index) => step.revision !== state.steps[index].revision)) throw new Error("Setup changed while storing the credential");
-      await transaction`INSERT INTO secret_refs (id, label, vault_url, infisical_project, environment, path, keys, status, last_verified_at)
-        VALUES (${refId}, ${input.label}, ${scope.apiUrl}, ${scope.projectId}, ${scope.environment}, ${scope.secretPath}, ${JSON.stringify([secretName])}, 'verified', NOW())`;
+      await transaction`INSERT INTO secret_refs (id, label, vault_url, infisical_project, environment, path, keys, status, last_verified_at, generic_owned)
+        VALUES (${refId}, ${input.label}, ${scope.apiUrl}, ${scope.projectId}, ${scope.environment}, ${scope.secretPath}, ${JSON.stringify([secretName])}, 'verified', NOW(), TRUE)`;
     });
     return refId;
   } catch {
@@ -65,9 +65,9 @@ const genericKey = /^FLEETHUB_GENERIC_[0-9a-f]{32}$/;
  */
 export async function removeGenericCredential(refId: string): Promise<CleanupOutcome | "not_generic"> {
   // Reference keys are never updated after insert, so checking them before the locked cleanup is stable.
-  const [ref] = await queryClient`SELECT keys FROM secret_refs WHERE id = ${refId}`;
+  const [ref] = await queryClient`SELECT keys, generic_owned FROM secret_refs WHERE id = ${refId}`;
   if (!ref) return "missing";
   const keys = z.array(z.string()).safeParse(ref.keys);
-  if (!keys.success || keys.data.length !== 1 || !genericKey.test(keys.data[0])) return "not_generic";
+  if (ref.generic_owned !== true || !keys.success || keys.data.length !== 1 || !genericKey.test(keys.data[0])) return "not_generic";
   return removeUnusedSecretRef(refId);
 }

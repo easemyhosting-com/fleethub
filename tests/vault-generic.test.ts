@@ -4,6 +4,7 @@ const fx = vi.hoisted(() => ({
   sql: [] as string[],
   values: [] as unknown[][],
   keys: undefined as unknown,
+  owned: true,
   state: { ready: true, steps: [{ id: "infisical", status: "unconfigured", revision: 0, config: {} }, { id: "builtin", status: "verified", revision: 2, config: {} }] } as { ready: boolean; steps: { id: string; status: string; revision: number; config: unknown }[] },
   current: undefined as unknown,
   stored: new Map<string, string>(),
@@ -21,7 +22,7 @@ const { vault, sql } = vi.hoisted(() => {
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
   const text = strings.join("?").replace(/\s+/g, " ").trim();
   fx.sql.push(text); fx.values.push(values);
-  if (text.startsWith("SELECT keys FROM secret_refs")) return Promise.resolve(fx.keys === undefined ? [] : [{ keys: fx.keys }]);
+  if (text.startsWith("SELECT keys, generic_owned FROM secret_refs")) return Promise.resolve(fx.keys === undefined ? [] : [{ keys: fx.keys, generic_owned: fx.owned }]);
   return Promise.resolve([]);
 };
   return { vault, sql };
@@ -38,7 +39,7 @@ import { genericCredentialInput, removeGenericCredential, storeGenericCredential
 
 const value = "synthetic-generic-value";
 beforeEach(() => {
-  fx.sql = []; fx.values = []; fx.keys = undefined; fx.current = undefined; fx.readOverride = undefined; fx.removed = []; fx.stored.clear();
+  fx.owned = true; fx.sql = []; fx.values = []; fx.keys = undefined; fx.current = undefined; fx.readOverride = undefined; fx.removed = []; fx.stored.clear();
   fx.state.ready = true; fx.state.steps[0].status = "unconfigured";
   fx.session.mockReset().mockResolvedValue(vault); fx.cleanup.mockClear();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -89,6 +90,10 @@ describe("generic credential storage", () => {
     }
     expect(fx.cleanup).not.toHaveBeenCalled();
     fx.keys = ["FLEETHUB_GENERIC_0123456789abcdef0123456789abcdef"];
+    fx.owned = false;
+    expect(await removeGenericCredential("ref")).toBe("not_generic");
+    expect(fx.cleanup).not.toHaveBeenCalled();
+    fx.owned = true;
     expect(await removeGenericCredential("ref")).toBe("removed");
     expect(fx.cleanup).toHaveBeenCalledWith("ref");
   });
