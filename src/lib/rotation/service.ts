@@ -1,3 +1,4 @@
+import { removeUnusedSecretRef } from "@/lib/vault/cleanup";
 import { randomUUID } from "node:crypto";
 import { queryClient } from "@/lib/db/client";
 import { openVaultForRef, type Vault, type VaultRef } from "@/lib/onboarding/vault-ref";
@@ -84,8 +85,7 @@ export async function replaceCredentials(accountId: string, config: unknown, tri
   }
   let cleaned = true;
   try {
-    await context.vault.remove(context.secretName);
-    await queryClient`DELETE FROM secret_refs WHERE id = ${context.refId} AND NOT EXISTS (SELECT 1 FROM provider_accounts WHERE secret_ref_id = ${context.refId})`;
+    await removeUnusedSecretRef(context.refId);
   } catch { cleaned = false; console.error("[Rotation] Old credential secret was not removed; delete it in the vault"); }
   await record(accountId, trigger === "manual" ? "replace" : "rotate", "ok", actor, cleaned ? undefined : "old_secret_not_removed");
   await refreshCredentialExpiry(accountId, true).catch(() => undefined);

@@ -1,3 +1,4 @@
+import { removeUnusedSecretRef } from "@/lib/vault/cleanup";
 import { randomUUID } from "node:crypto";
 import { queryClient } from "@/lib/db/client";
 import { builtinVaultUrl, createBuiltinVault } from "@/lib/vault/builtin";
@@ -76,13 +77,12 @@ export async function listConnectors() {
 export async function deleteConnector(id: string): Promise<boolean> {
   const [row] = await queryClient`SELECT secret_ref_id FROM connectors WHERE id = ${id}`;
   if (!row) return false;
-  if (row.secret_ref_id) {
-    const [ref] = await queryClient`SELECT r.vault_url, r.infisical_project, r.environment, r.path, r.keys, s.config AS current_config FROM secret_refs r LEFT JOIN onboarding_steps s ON s.id = 'infisical' WHERE r.id = ${String(row.secret_ref_id)}`;
-    try { if (ref?.keys?.[0]) await (await openVaultForRef(ref as unknown as VaultRef, ref.current_config)).remove(ref.keys[0]); } catch { /* the credential may already be gone; the connector is still removed */ }
-    await queryClient`DELETE FROM secret_refs WHERE id = ${String(row.secret_ref_id)}`.catch(() => undefined);
-  }
   await queryClient`DELETE FROM host_measurements WHERE connector_id = ${id}`;
   await queryClient`DELETE FROM connectors WHERE id = ${id}`;
+  if (row.secret_ref_id) {
+    try { await removeUnusedSecretRef(String(row.secret_ref_id)); }
+    catch { console.error("[Connector] Unused credential cleanup could not complete; reference preserved"); }
+  }
   return true;
 }
 

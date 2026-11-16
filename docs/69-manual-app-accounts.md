@@ -17,6 +17,10 @@ API keys and agent sessions cannot read contacts or change these relationships.
 Only non-secret metadata belongs in these fields. Never paste key values. This
 feature neither creates arbitrary secrets nor rotates them. Credential links reuse
 `secret_refs`; the API does not return vault paths, key names or decrypted values.
+Connector removal and provider credential replacement preserve stored credentials
+and references that still have ledger dependents. Replacement does not move ledger
+links to a new key; update consumer arrangements deliberately. Cleanup locks the
+reference before checking dependents, so a concurrent link cannot race deletion.
 Adding a link does not verify the backend, scopes or upstream key validity.
 Reported active or revoked status is an operator statement. Unknown stays unknown.
 Dates entered in the form mean midnight UTC. Expiry is separate from reported validity.
