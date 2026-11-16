@@ -78,17 +78,25 @@ The tar container can use any local image that includes `tar`. The pinned Postgr
 FleetHub stores each Infisical credential reference with the exact API URL it was written through. A reference opens only while the verified setup has the same origin, project and environment (`src/lib/onboarding/vault-ref.ts`). After an origin change, every stored reference fails with "Vault reference does not match the verified setup". FleetHub has no tool that re-points references. **Continue only if the external instance will answer at the API URL already saved in FleetHub.** The bundled default `http://infisical:8080` is a Compose service name, so in practice that rules out most bundled installations. If yours uses it, stop here and keep the bundled profile. An origin change needs its own explicit, per-credential migration, which this runbook does not cover.
 
 1. **Stand up the external instance and keep it stopped.** Install with the upstream guide, using the same `INFISICAL_IMAGE` digest as the bundled one so database migrations match. Upgrade only after the cutover is verified.
-2. **Restore the data, keys included.** Before Infisical's first start, restore the dump into the external PostgreSQL:
+2. **Freeze credential writes, then take the final dump.** The backup in section 2 ran with everything live, so a credential saved after it would be missing from the external instance while FleetHub still points at it. Stop every writer first: FleetHub's web app and worker, and the bundled Infisical service so no other client writes through it. Its database keeps running for the dump:
+
+   ```sh
+   compose stop fleetdeck inventory-worker infisical
+   compose exec -T infisical-db pg_dump -U infisical -d infisical -Fc > /path/to/backup/infisical-final.dump
+   ```
+
+   Keep these services stopped until step 4. Restore `infisical-final.dump`, not the earlier copy. To abort before step 4, run `compose up -d infisical fleetdeck inventory-worker`; nothing was changed.
+3. **Restore the data, keys included.** Before Infisical's first start, restore the final dump into the external PostgreSQL:
 
    ```sh
    docker run --rm -i -e DEST_DB_URI postgres:16.15-alpine \
-     sh -c 'pg_restore --no-owner --dbname "$DEST_DB_URI"' < /path/to/backup/infisical.dump
+     sh -c 'pg_restore --no-owner --dbname "$DEST_DB_URI"' < /path/to/backup/infisical-final.dump
    ```
 
    Here `DEST_DB_URI` is `postgresql://infisical:<password>@db.example.com:5432/infisical`, exported in the shell and never written to a file in the repository. Set the external `ENCRYPTION_KEY` and `AUTH_SECRET` to the values of `INFISICAL_ENCRYPTION_KEY` and `INFISICAL_AUTH_SECRET` from the private env file. **The keys must move with the database.** A database restored without its original `ENCRYPTION_KEY` starts, but every stored secret is unreadable, and no FleetHub action can recover it. Redis holds cache and queue state only and is not copied.
-3. **Point FleetHub at it.** Make the saved API URL resolve to the external instance from FleetHub's container. Set `INFISICAL_URL` in `runtime/runtime.env` to that same URL, keep its origin in `FLEETHUB_ONBOARDING_ALLOWED_ORIGINS`, and keep the existing machine identity unless you deliberately replace it.
-4. **Verify through FleetHub.** On the Infisical step, **Verify** must pass: it creates, reads back and deletes a probe secret in the saved scope. Then scan at least one account whose credential is in Infisical. That confirms the web app and the inventory worker can both open existing references.
-5. **Stop the bundled services and keep the volume.** Run `compose stop infisical infisical-redis infisical-db`. `infisical_pg_data` is left as it is.
+4. **Point FleetHub at it, then lift the freeze.** Start the external Infisical. Make the saved API URL resolve to the external instance from FleetHub's container. Set `INFISICAL_URL` in `runtime/runtime.env` to that same URL, keep its origin in `FLEETHUB_ONBOARDING_ALLOWED_ORIGINS`, and keep the existing machine identity unless you deliberately replace it. Only then run `compose up -d fleetdeck inventory-worker`. Do not start the bundled `infisical` again.
+5. **Verify through FleetHub.** On the Infisical step, **Verify** must pass: it creates, reads back and deletes a probe secret in the saved scope. Then scan at least one account whose credential is in Infisical. That confirms the web app and the inventory worker can both open existing references.
+6. **Stop the remaining bundled services and keep the volume.** Run `compose stop infisical-redis infisical-db`. `infisical_pg_data` is left as it is.
 
 ## Rollback
 
