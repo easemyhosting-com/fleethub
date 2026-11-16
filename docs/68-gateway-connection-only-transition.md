@@ -102,7 +102,7 @@ FleetHub stores each Infisical credential reference with the exact API URL it wa
 
 The bundled volumes were never changed, so rollback means restarting on them.
 
-**Before changing any routing, freeze writes again.** Run `compose stop fleetdeck inventory-worker`. Any credential FleetHub saved, replaced or rotated after the Infisical cutover exists only in the external instance; after rollback its reference would point at a bundled instance that does not hold it. List those accounts and connectors now (their last credential change is later than the cutover time) and decide for each one: enter it again after rollback, or do not roll back and fix forward instead. Keep FleetHub stopped until the bundled services are verified below, then run `compose up -d fleetdeck inventory-worker` and re-enter the listed credentials.
+**Before changing any routing, freeze writes again.** Run `compose stop fleetdeck inventory-worker`. Any credential FleetHub saved, replaced or rotated after the Infisical cutover exists only in the external instance; after rollback its reference would point at a bundled instance that does not hold it. List those accounts and connectors now (their last credential change is later than the cutover time) and decide for each one: enter it again after rollback, or do not roll back and fix forward instead. Keep FleetHub stopped until the bundled services are running and the saved URL's routing is restored. Then start only the web app with `compose up -d fleetdeck`, which **Setup connections** and **Verify** need. Until **Verify** passes against the bundled instance, change only the saved URLs and do not save or rotate any credential. After it passes, run `compose up -d inventory-worker` and re-enter the listed credentials.
 
 
 ```sh
