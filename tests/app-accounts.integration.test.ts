@@ -25,11 +25,15 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("manual SaaS l
   });
   afterAll(async () => {
     await queryClient`DELETE FROM app_credential_consumers WHERE project_id IN (${projects[0]}, ${projects[1]})`;
-    await queryClient`DELETE FROM app_credential_links WHERE secret_ref_id = ${ref}`;
+    // Sweep by prefix so fixtures from a failed test are removed too.
+    const fixtures = `${prefix}-%`;
+    await queryClient`DELETE FROM app_credential_links WHERE secret_ref_id LIKE ${fixtures} OR id LIKE ${fixtures}`;
+    await queryClient`DELETE FROM connectors WHERE id LIKE ${fixtures}`;
     await queryClient`DELETE FROM app_workspaces WHERE account_id = ${account}`;
     await queryClient`DELETE FROM app_accounts WHERE id = ${account}`;
     await queryClient`DELETE FROM projects WHERE id IN (${projects[0]}, ${projects[1]})`;
-    await queryClient`DELETE FROM secret_refs WHERE id = ${ref}`;
+    await queryClient`DELETE FROM secret_refs WHERE id LIKE ${fixtures}`;
+    await queryClient`DELETE FROM secret_store WHERE name LIKE ${fixtures}`;
     await queryClient`DELETE FROM identity_contacts WHERE id = ${contact}`;
     await queryClient`DELETE FROM identities WHERE id = ${owner}`;
     await createBuiltinVault().remove(ref);
@@ -120,7 +124,8 @@ describe.skipIf(process.env.AUTH_DATABASE_INTEGRATION !== "true")("manual SaaS l
       expect(await createBuiltinVault().read(shared)).toBe("synthetic-concurrent-credential");
       expect((await queryClient`SELECT id FROM secret_refs WHERE id = ${shared}`)).toHaveLength(1);
     } finally {
-      await cleanup;
+      // Settle without rethrowing so a failed cleanup cannot skip fixture removal.
+      await cleanup?.catch(() => undefined);
       await queryClient`DELETE FROM app_credential_links WHERE id = ${link}`;
       await removeUnusedSecretRef(shared);
     }
