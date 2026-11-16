@@ -20,8 +20,8 @@ def message(text):
         return False
     allowed = set((Path(__file__).parent.parent / 'security/allowed-trailer-emails.txt').read_text().splitlines())
     for line in text.splitlines():
-        if re.match(r'^\s*(Co-authored-by|Signed-off-by):', line, re.I):
-            match = re.fullmatch(r'\s*(?:Co-authored-by|Signed-off-by):[^<>]*<([^<>]+)>\s*', line, re.I)
+        if re.match(r'^\s*(Co-authored-by|Signed-off-by)[ \t]*:', line, re.I):
+            match = re.fullmatch(r'\s*(?:Co-authored-by|Signed-off-by)[ \t]*:[^<>]*<([^<>]+)>\s*', line, re.I)
             if not match or match[1] not in allowed:
                 return False
     return True
