@@ -23,6 +23,9 @@ const cases = [
   ['root bind', 'volumes: ["/:/host"]', 'volumes: ["./data:/data"]'],
   ['etc bind', 'volumes: [{type: bind, source: /etc, target: /host}]', 'volumes: [{type: bind, source: ./data, target: /data}]'],
   ['run bind', 'volumes: ["/var/run:/host"]', 'volumes: ["data:/data"]'],
+  ['systemd run bind', 'volumes: ["/run:/host-run"]', 'volumes: ["./run:/data"]'],
+  ['systemd run subpath bind', 'volumes: ["/run/user:/host-run"]', 'volumes: ["./runtime:/data"]'],
+  ['long systemd run bind', 'volumes: [{type: bind, source: /run, target: /host-run}]', 'volumes: [{type: bind, source: ./data, target: /data}]'],
   ['proc bind', 'volumes: ["/proc:/host"]', 'volumes: ["data:/data"]'],
   ['sys bind', 'volumes: ["/sys:/host"]', 'volumes: ["data:/data"]'],
   ['HOME bind', 'volumes: ["$HOME:/host"]', 'volumes: ["./data:/data"]'],
@@ -69,6 +72,10 @@ test('no process environment interpolation is used', () => {
 test('named-volume driver options cannot hide a socket', () => {
   const input = service('volumes: ["data:/data"]') + 'volumes:\n  data:\n    driver_opts:\n      device: /var/run/docker.sock\n';
   assert.ok(checkCompose(input).failures.some(f => f.rule === 'COMPOSE-DOCKER-SOCKET'));
+});
+test('named-volume driver options cannot bind the systemd run directory', () => {
+  const input = service('volumes: ["data:/data"]') + 'volumes:\n  data:\n    driver_opts:\n      device: /run\n';
+  assert.ok(checkCompose(input).failures.some(f => f.rule === 'COMPOSE-SENSITIVE-BIND'));
 });
 test('service exception is exact by field and date', () => {
   const policy = { exceptions: [{ id: 'EX-TEST', finding: 'COMPOSE-UNRESOLVABLE', path: 'compose.yml', service: 'app', location: 'services.app.user', severity: 'HIGH', owner: '@easemyhosting-com', review_by: '2026-12-15', reason: 'Synthetic fixture', risk: 'Synthetic fixture' }] };

@@ -1,5 +1,5 @@
 # rule<TAB>Python regular expression. No private identifiers belong here.
-local-path	/Users/|/home/[a-z]|C:\\\\Users\\\\
+local-path	/Users/|/home/[a-z]|C:\\+Users\\+
 tailnet	(?:[A-Za-z0-9-]+\.)*ts\.net\b
 private-ip	(?<![\d.])(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(?![\d.])
 private-key	-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----

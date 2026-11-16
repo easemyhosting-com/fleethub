@@ -14,13 +14,18 @@ export function approved(reviews, head) {
   return latest?.state === 'APPROVED' && latest.commit_id === head;
 }
 
+// Three-dot diff: only files this PR changed since it left the base branch.
+export function changedPaths(base, head, cwd) {
+  return execFileSync('git', ['diff', '--name-only', `${base}...${head}`], { encoding: 'utf8', cwd }).trim().split('\n').filter(Boolean);
+}
+
 export async function run() {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
   const pr = event.pull_request;
   if (!pr) return 0;
   const base = pr.base.sha, head = pr.head.sha;
   if (![base, head].every(value => /^[a-f0-9]{40}$/.test(value))) return 2;
-  const paths = execFileSync('git', ['diff', '--name-only', base, head], { encoding: 'utf8' }).trim().split('\n');
+  const paths = changedPaths(base, head);
   if (!paths.some(path => protectedFiles.has(path))) {
     console.log('Protected identifier/exception policy unchanged.');
     return 0;

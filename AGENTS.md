@@ -41,7 +41,9 @@ data, docs, and logs, will be world-readable forever. Assume a hostile reader.
 - No string-built SQL/shell/paths. Parameterize; avoid `exec`/`eval`; resolve and confine file paths.
 - Outbound requests: allowlist hosts, block private ranges (SSRF), set timeouts and size limits.
 - Errors: generic messages to clients; details only in server logs; never log secrets or PII.
-- Configuration comes from environment variables documented in `.env.example` (placeholders only).
+- Configuration comes from environment variables documented in the README "Production configuration"
+  section and the relevant `docs/` page, with placeholders only. This repository commits no `.env*` files,
+  including examples, so rule 5 has no exception.
   Fail closed when required config is missing.
 - Any security-relevant change needs a test that would have failed before the fix.
 

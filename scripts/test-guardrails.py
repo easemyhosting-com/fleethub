@@ -25,7 +25,7 @@ commits = module('commit_policy', 'check-commit-policy.py')
 
 class Guardrails(unittest.TestCase):
     def test_forbidden_examples(self):
-        samples = ['/'.join(['', 'Users', 'x']), 'gh' + 'p_' + 'A' * 36, 'person@' + 'unapproved.invalid', 'person@' + 'private-host', '10.' + '1.2.3', '100.' + '99.1.1', 'node.private.ts.' + 'net']
+        samples = ['/'.join(['', 'Users', 'x']), 'gh' + 'p_' + 'A' * 36, 'person@' + 'unapproved.invalid', 'person@' + 'private-host', '10.' + '1.2.3', '100.' + '99.1.1', 'node.private.ts.' + 'net', 'C:' + '\\Users\\x', 'C:' + '\\\\Users\\\\x']
         for sample in samples:
             with self.subTest(sample_kind=samples.index(sample)):
                 self.assertTrue(policy.forbidden_hits(sample, 'sample.txt'))
@@ -82,6 +82,10 @@ class Guardrails(unittest.TestCase):
         self.assertFalse(commits.message('misc changes'))
         self.assertTrue(commits.message('test: add fixture\n\nCo-authored-by: Example <' + commits.EMAIL + '>'))
         self.assertFalse(commits.message('test: add fixture\n\nSigned-off-by: Example <synthetic@example.com>'))
+        for key in ['Signed-off-by', 'Co-authored-by']:
+            for gap in [' ', '\t', ' \t ']:
+                self.assertFalse(commits.message(f'test: add fixture\n\n{key}{gap}: Example <synthetic@example.com>'))
+            self.assertTrue(commits.message(f'test: add fixture\n\n{key} : Example <' + commits.EMAIL + '>'))
 
     def test_actual_hooks_on_synthetic_repository(self):
         with tempfile.TemporaryDirectory() as directory:

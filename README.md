@@ -12,7 +12,7 @@ for the target adapter boundaries and the gaps in today's placement advice.
 You make the resource choice; FleetHub provides visibility and comparisons. Provider-specific
 terms approval is not a setup or recommendation requirement.
 
-Use Node.js 24.22.1, as specified in `.nvmrc`. Run `npm ci`, then `npm run dev`. Run `npm test`, `npm run typecheck`, and `npm run build` before shipping changes.
+Use Node.js 24.22.1, as specified in `.nvmrc`. Run `npm ci`, then `npm run prepare` to install the local Git hooks (`.npmrc` disables lifecycle scripts, so `npm ci` does not install them), then `npm run dev`. Run `npm test`, `npm run typecheck`, and `npm run build` before shipping changes.
 
 ## Start a local installation
 

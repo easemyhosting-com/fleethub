@@ -76,7 +76,7 @@ const pathParts = source => typeof source === 'string' ? source.replaceAll('\\',
 const socket = value => typeof value === 'string' && pathParts(value).endsWith('docker.sock');
 const sensitive = source => {
   const path = pathParts(source) === '' ? '/' : posix.normalize(pathParts(source));
-  return path === '' || path === '/' || path === '..' || path.startsWith('../') || ['/etc', '/var/run', '/proc', '/sys'].some(p => path === p || path.startsWith(`${p}/`)) || path === '~' || path.startsWith('~/') || path === '$HOME' || path.startsWith('$HOME/') || path.includes('${HOME');
+  return path === '' || path === '/' || path === '..' || path.startsWith('../') || ['/etc', '/run', '/var/run', '/proc', '/sys'].some(p => path === p || path.startsWith(`${p}/`)) || path === '~' || path.startsWith('~/') || path === '$HOME' || path.startsWith('$HOME/') || path.includes('${HOME');
 };
 
 export function checkCompose(text, { policyText, today = new Date().toISOString().slice(0, 10), path = 'compose.yml' } = {}) {
