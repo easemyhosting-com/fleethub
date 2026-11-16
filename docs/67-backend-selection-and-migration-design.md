@@ -85,8 +85,11 @@ A partial unique index on `owner_id` allows only one non-terminal migration per 
    secrets, then deletes the source `secret_refs` row if nothing references it. This
    uses the same guard as the cleanup step in `replaceCredentials`.
 
-Terminal states: `aborted` (before the switch), `rolled_back` (after the switch) and
-`superseded` (the owner's reference changed underneath the migration).
+Terminal states: `cleaned` (completed), `aborted` (before the switch), `rolled_back`
+(after the switch) and `superseded` (the owner's reference changed underneath the
+migration). The partial unique index excludes every terminal state, so a cleaned
+migration does not block the reverse migration below. The implementation needs a test
+that starts a new migration for the same owner after `cleaned`.
 
 ## Rollback
 
