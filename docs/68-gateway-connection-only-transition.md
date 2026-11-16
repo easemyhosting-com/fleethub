@@ -100,14 +100,17 @@ FleetHub stores each Infisical credential reference with the exact API URL it wa
 
 ## Rollback
 
-The bundled volumes were never changed, so rollback means restarting on them:
+The bundled volumes were never changed, so rollback means restarting on them.
+
+**Before changing any routing, freeze writes again.** Run `compose stop fleetdeck inventory-worker`. Any credential FleetHub saved, replaced or rotated after the Infisical cutover exists only in the external instance; after rollback its reference would point at a bundled instance that does not hold it. List those accounts and connectors now (their last credential change is later than the cutover time) and decide for each one: enter it again after rollback, or do not roll back and fix forward instead. Keep FleetHub stopped until the bundled services are verified below, then run `compose up -d fleetdeck inventory-worker` and re-enter the listed credentials.
+
 
 ```sh
 compose up -d cli-proxy-api        # re-runs the one-shot ownership step first
 compose up -d infisical            # its PostgreSQL and Redis start as dependencies
 ```
 
-Restore the previous `runtime.env` values, and in **Setup connections** set the saved URLs back. If Infisical step 4 changed DNS or proxy routing for the saved API URL, restore that routing to the bundled `infisical` service before anything else, because the URL itself did not change. Then run **Verify** again and confirm it reached the bundled instance, for example by stopping the external instance first. A pass against the external instance proves nothing about rollback. Writes made only to the external instance during the overlap are not copied back. OAuth tokens that the external CLIProxy refreshed may leave the bundled copy stale. If that happens, log in again in its Management Center. If you upgraded since the pre-change setup, keep `CLIPROXY_UID`/`CLIPROXY_GID` in the env file (see [self-onboarding](23-self-onboarding.md)). `scripts/verify-cliproxy-nonroot.sh` exercises the ownership step on a disposable project, not on your volumes.
+Restore the previous `runtime.env` values, and in **Setup connections** set the saved URLs back. If Infisical step 4 changed DNS or proxy routing for the saved API URL, restore that routing to the bundled `infisical` service before anything else, because the URL itself did not change. Then run **Verify** again and confirm it reached the bundled instance, for example by stopping the external instance first. A pass against the external instance proves nothing about rollback. Writes made only to the external instance are not copied back; the freeze above is how you account for them. OAuth tokens that the external CLIProxy refreshed may leave the bundled copy stale. If that happens, log in again in its Management Center. If you upgraded since the pre-change setup, keep `CLIPROXY_UID`/`CLIPROXY_GID` in the env file (see [self-onboarding](23-self-onboarding.md)). `scripts/verify-cliproxy-nonroot.sh` exercises the ownership step on a disposable project, not on your volumes.
 
 ## Retirement
 
