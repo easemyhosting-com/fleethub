@@ -1,4 +1,4 @@
-import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 
 /** Settings that may change while FleetHub runs. Security-critical toggles (auth secret, database URL, auth-required, proxy trust) deliberately need a restart. */
 export const reloadableKeys: ReadonlySet<string> = new Set([
@@ -26,20 +26,20 @@ export function parseEnvFile(text: string): Record<string, string> {
 }
 
 /** Reads metadata and content from one descriptor so a file swapped between the size check and the read cannot bypass the limit. */
-function readBounded(path: string): { signature: string; text?: string } {
-  const fd = openSync(path, "r");
+function readBounded(path: string, previous: string): { signature: string; text?: string } {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
   try {
     const stats = fstatSync(fd);
     if (!stats.isFile()) throw new Error("not a regular file");
     const signature = `${stats.ino}:${stats.mtimeMs}:${stats.size}`;
-    if (stats.size > maxFileBytes) return { signature };
+    if (signature === previous || stats.size > maxFileBytes) return { signature };
     const buffer = Buffer.alloc(maxFileBytes + 1);
     let length = 0;
     for (let read; length < buffer.length && (read = readSync(fd, buffer, length, buffer.length - length, length)) > 0;) length += read;
     if (length > maxFileBytes) return { signature };
     return { signature, text: buffer.toString("utf8", 0, length) };
   } finally {
-    closeSync(fd);
+    try { closeSync(fd); } catch { /* the read result or original error is what matters */ }
   }
 }
 
@@ -68,7 +68,7 @@ export function createRuntimeEnv(options: Options = {}, shared = false) {
     let next: string;
     let parsed: Record<string, string> = {};
     try {
-      const file = readBounded(path);
+      const file = readBounded(path, state.signature);
       next = file.signature;
       if (next === state.signature) return [];
       if (file.text === undefined) { log("Runtime configuration file is larger than 64 KB and was ignored"); state.signature = next; return []; }

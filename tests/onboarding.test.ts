@@ -9,13 +9,13 @@ const open = vi.hoisted(() => vi.fn());
 vi.mock("node:os", () => ({ networkInterfaces }));
 vi.mock("node:fs/promises", () => ({ open }));
 const closed = vi.fn();
-function snapshot(content: string, metadata: { size?: number; mtimeMs?: number; isFile?: boolean } = {}) {
+function snapshot(content: string, metadata: { size?: number; mtimeMs?: number; isFile?: boolean; closeFails?: boolean } = {}) {
   const bytes = Buffer.from(content);
   const stats = { size: metadata.size ?? bytes.length, mtimeMs: metadata.mtimeMs ?? Date.now(), isFile: () => metadata.isFile ?? true };
   open.mockResolvedValueOnce({
     stat: async () => stats,
     read: async (buffer: Buffer, offset: number, length: number, position: number) => ({ bytesRead: bytes.copy(buffer, offset, position, position + length) }),
-    close: async () => { closed(); },
+    close: async () => { closed(); if (metadata.closeFails) throw new Error("close failed"); },
   });
 }
 
@@ -232,7 +232,7 @@ describe("service verification", () => {
     fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] }));
     snapshot(JSON.stringify({ BackendState: "Running", Self: { ID: "node_1", TailscaleIPs: ["100.101.102.103"] } }));
     await verifyStep("tailscale", tailscale);
-    expect(open).toHaveBeenCalledWith("/status/tailscale.json", "r");
+    expect(open).toHaveBeenCalledWith("/status/tailscale.json", expect.any(Number));
     expect(closed).toHaveBeenCalledTimes(1);
   });
   it("rejects stale, oversized, mismatched, and malformed status-file proof", async () => {
@@ -256,6 +256,21 @@ describe("service verification", () => {
     await expect(verifyStep("tailscale", tailscale)).rejects.toThrow("Refresh the host");
     expect(open).toHaveBeenCalledTimes(1);
     expect(closed).toHaveBeenCalledTimes(1);
+  });
+  it("accepts a snapshot of exactly 1 MiB and rejects one byte more, keeping the original error when close fails", async () => {
+    networkInterfaces.mockReturnValue({ eth0: [{ address: "172.18.0.2" }] });
+    process.env.TAILSCALE_STATUS_FILE = "/status/tailscale.json";
+    const body = JSON.stringify({ BackendState: "Running", Self: { ID: "node_1", TailscaleIPs: ["100.101.102.103"] } });
+    const exact = body.padEnd(1024 * 1024, " ");
+    fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); snapshot(exact);
+    await verifyStep("tailscale", tailscale);
+    fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); snapshot(`${exact} `);
+    await expect(verifyStep("tailscale", tailscale)).rejects.toThrow("Refresh the host");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); snapshot("{}", { mtimeMs: 0, closeFails: true });
+    await expect(verifyStep("tailscale", tailscale)).rejects.toThrow("Refresh the host");
+    expect(errors).toHaveBeenCalledWith("[Setup] Could not close the Tailscale status snapshot");
+    errors.mockRestore();
   });
   it("rejects invalid public config before contacting services", async () => {
     await expect(verifyStep("tailscale", { ...tailscale, token: "secret" })).rejects.toThrow();

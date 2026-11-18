@@ -1,5 +1,6 @@
 import { SetupError } from "./model";
 import { networkInterfaces } from "node:os";
+import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { z } from "zod";
 import { configSchemas, type StepId } from "./model";
@@ -55,7 +56,7 @@ const maxStatusBytes = 1024 * 1024;
 
 /** Checks freshness and size on the opened descriptor and reads through it, so a file swapped after the check cannot be read instead. */
 async function readStatusSnapshot(path: string): Promise<string> {
-  const handle = await open(path, "r");
+  const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
   try {
     const metadata = await handle.stat();
     if (!metadata.isFile() || metadata.size > maxStatusBytes || Math.abs(Date.now() - metadata.mtimeMs) > 5 * 60 * 1000) throw new SetupError("Refresh the host Tailscale status snapshot before verification");
@@ -65,7 +66,7 @@ async function readStatusSnapshot(path: string): Promise<string> {
     if (length > maxStatusBytes) throw new SetupError("Refresh the host Tailscale status snapshot before verification");
     return buffer.toString("utf8", 0, length);
   } finally {
-    await handle.close();
+    await handle.close().catch(() => console.error("[Setup] Could not close the Tailscale status snapshot"));
   }
 }
 
