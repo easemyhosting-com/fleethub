@@ -5,10 +5,19 @@ import { vaultSession, verifyVault } from "../src/lib/onboarding/vault";
 import { verifyStep } from "../src/lib/onboarding/verify";
 
 const networkInterfaces = vi.hoisted(() => vi.fn());
-const stat = vi.hoisted(() => vi.fn());
-const readFile = vi.hoisted(() => vi.fn());
+const open = vi.hoisted(() => vi.fn());
 vi.mock("node:os", () => ({ networkInterfaces }));
-vi.mock("node:fs/promises", () => ({ stat, readFile }));
+vi.mock("node:fs/promises", () => ({ open }));
+const closed = vi.fn();
+function snapshot(content: string, metadata: { size?: number; mtimeMs?: number; isFile?: boolean } = {}) {
+  const bytes = Buffer.from(content);
+  const stats = { size: metadata.size ?? bytes.length, mtimeMs: metadata.mtimeMs ?? Date.now(), isFile: () => metadata.isFile ?? true };
+  open.mockResolvedValueOnce({
+    stat: async () => stats,
+    read: async (buffer: Buffer, offset: number, length: number, position: number) => ({ bytesRead: bytes.copy(buffer, offset, position, position + length) }),
+    close: async () => { closed(); },
+  });
+}
 
 const infisical = {
   apiUrl: "https://vault.example.test",
@@ -34,7 +43,7 @@ beforeEach(() => {
   delete process.env.TAILSCALE_STATUS_FILE;
   delete process.env.TAILSCALE_API_AUTH;
   networkInterfaces.mockReturnValue({ en0: [{ address: "100.101.102.103" }] });
-  fetchMock.mockReset(); stat.mockReset(); readFile.mockReset();
+  fetchMock.mockReset(); open.mockReset(); closed.mockReset();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -221,23 +230,32 @@ describe("service verification", () => {
     networkInterfaces.mockReturnValue({ eth0: [{ address: "172.18.0.2" }] });
     process.env.TAILSCALE_STATUS_FILE = "/status/tailscale.json";
     fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] }));
-    stat.mockResolvedValueOnce({ size: 150, mtimeMs: Date.now() });
-    readFile.mockResolvedValueOnce(JSON.stringify({ BackendState: "Running", Self: { ID: "node_1", TailscaleIPs: ["100.101.102.103"] } }));
+    snapshot(JSON.stringify({ BackendState: "Running", Self: { ID: "node_1", TailscaleIPs: ["100.101.102.103"] } }));
     await verifyStep("tailscale", tailscale);
-    expect(stat).toHaveBeenCalledWith("/status/tailscale.json");
-    expect(readFile).toHaveBeenCalledWith("/status/tailscale.json", "utf8");
+    expect(open).toHaveBeenCalledWith("/status/tailscale.json", "r");
+    expect(closed).toHaveBeenCalledTimes(1);
   });
   it("rejects stale, oversized, mismatched, and malformed status-file proof", async () => {
     networkInterfaces.mockReturnValue({ eth0: [{ address: "172.18.0.2" }] });
     process.env.TAILSCALE_STATUS_FILE = "/status/tailscale.json";
-    for (const metadata of [{ size: 1024 * 1024 + 1, mtimeMs: Date.now() }, { size: 100, mtimeMs: Date.now() - 10 * 60 * 1000 }]) {
-      fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); stat.mockResolvedValueOnce(metadata);
+    for (const metadata of [{ size: 1024 * 1024 + 1 }, { mtimeMs: Date.now() - 10 * 60 * 1000 }, { isFile: false }]) {
+      fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); snapshot("{}", metadata);
       await expect(verifyStep("tailscale", tailscale)).rejects.toThrow("Refresh the host");
     }
+    expect(closed).toHaveBeenCalledTimes(3);
     for (const status of [{ BackendState: "Running", Self: { ID: "other", TailscaleIPs: ["100.101.102.103"] } }, { BackendState: "Running", Self: { ID: "node_1", TailscaleIPs: ["100.0.0.1"] } }, { BackendState: "Stopped", Self: { ID: "node_1", TailscaleIPs: ["100.101.102.103"] } }]) {
-      fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); stat.mockResolvedValueOnce({ size: 100, mtimeMs: Date.now() }); readFile.mockResolvedValueOnce(JSON.stringify(status));
+      fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] })); snapshot(JSON.stringify(status));
       await expect(verifyStep("tailscale", tailscale)).rejects.toThrow();
     }
+  });
+  it("bounds the read to the checked descriptor when the snapshot grows after its metadata check", async () => {
+    networkInterfaces.mockReturnValue({ eth0: [{ address: "172.18.0.2" }] });
+    process.env.TAILSCALE_STATUS_FILE = "/status/tailscale.json";
+    fetchMock.mockResolvedValueOnce(json({ devices: [freshDevice()] }));
+    snapshot(`${JSON.stringify({ BackendState: "Running", Self: { ID: "node_1", TailscaleIPs: ["100.101.102.103"] } })}${" ".repeat(1024 * 1024)}`, { size: 150 });
+    await expect(verifyStep("tailscale", tailscale)).rejects.toThrow("Refresh the host");
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(closed).toHaveBeenCalledTimes(1);
   });
   it("rejects invalid public config before contacting services", async () => {
     await expect(verifyStep("tailscale", { ...tailscale, token: "secret" })).rejects.toThrow();

@@ -1,6 +1,6 @@
 import { SetupError } from "./model";
 import { networkInterfaces } from "node:os";
-import { readFile, stat } from "node:fs/promises";
+import { open } from "node:fs/promises";
 import { z } from "zod";
 import { configSchemas, type StepId } from "./model";
 import { approvedApiUrl, requestJson } from "./transport";
@@ -45,12 +45,28 @@ async function verifyTailscale(config: z.infer<typeof configSchemas.tailscale>) 
   if (device.addresses.some(address => localAddresses.includes(address))) return;
   const statusFile = process.env.TAILSCALE_STATUS_FILE;
   if (statusFile) {
-    const metadata = await stat(statusFile);
-    if (metadata.size > 1024 * 1024 || Math.abs(Date.now() - metadata.mtimeMs) > 5 * 60 * 1000) throw new SetupError("Refresh the host Tailscale status snapshot before verification");
-    const status = z.object({ BackendState: z.literal("Running"), Self: z.object({ ID: z.string(), TailscaleIPs: z.array(z.string()) }) }).parse(JSON.parse(await readFile(statusFile, "utf8")));
+    const status = z.object({ BackendState: z.literal("Running"), Self: z.object({ ID: z.string(), TailscaleIPs: z.array(z.string()) }) }).parse(JSON.parse(await readStatusSnapshot(statusFile)));
     if ([device.id, device.nodeId].includes(status.Self.ID) && device.addresses.some(address => status.Self.TailscaleIPs.includes(address))) return;
   }
   throw new SetupError("FleetHub host enrollment is unverified; expose its Tailscale interface or configure a fresh TAILSCALE_STATUS_FILE snapshot");
+}
+
+const maxStatusBytes = 1024 * 1024;
+
+/** Checks freshness and size on the opened descriptor and reads through it, so a file swapped after the check cannot be read instead. */
+async function readStatusSnapshot(path: string): Promise<string> {
+  const handle = await open(path, "r");
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > maxStatusBytes || Math.abs(Date.now() - metadata.mtimeMs) > 5 * 60 * 1000) throw new SetupError("Refresh the host Tailscale status snapshot before verification");
+    const buffer = Buffer.alloc(maxStatusBytes + 1);
+    let length = 0;
+    for (let read; length < buffer.length && (read = (await handle.read(buffer, length, buffer.length - length, length)).bytesRead) > 0;) length += read;
+    if (length > maxStatusBytes) throw new SetupError("Refresh the host Tailscale status snapshot before verification");
+    return buffer.toString("utf8", 0, length);
+  } finally {
+    await handle.close();
+  }
 }
 
 export async function verifyStep(id: StepId, config: Record<string, unknown>): Promise<void> {
