@@ -44,6 +44,7 @@ export function CapacityLimitsPanel() {
   const providers = [...new Set(data.entitlements.map(item => item.provider))];
   return <section className="space-y-5">
     <a href="/compare/object-storage" className="inline-block rounded-lg border border-cyan-800 px-4 py-2 text-sm text-cyan-300 hover:bg-cyan-950 focus-visible:outline-2 focus-visible:outline-cyan-300">Compare object-storage buckets</a>
+    <a href="/freebies" className="ml-2 inline-block rounded-lg border border-cyan-800 px-4 py-2 text-sm text-cyan-300 hover:bg-cyan-950 focus-visible:outline-2 focus-visible:outline-cyan-300">Browse cloud freebies</a>
     <p className="text-xs text-zinc-400">What each plan offers, and what you allow FleetHub to plan with. Planning uses the smaller of the two. Unverified figures are shown but never counted as available. Edit a figure if it has changed; every change is recorded.</p>
     {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}{notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}
     {providers.map(provider => <div key={provider} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
