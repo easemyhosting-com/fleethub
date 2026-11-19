@@ -33,7 +33,8 @@ describe("freebies catalog data", () => {
     expect(get("oci.compute-a1")?.homeRegionOnly).toBe(true);
     expect(get("oci.block-volume")?.limit.value).toBe(200);
     expect(get("oci.object-storage")?.limit.value).toBe(20);
-    expect(get("oci.object-storage")?.caveats.some(caveat => caveat.sharesWith?.includes("oci.container-registry"))).toBe(true);
+    expect(get("oci.flexible-load-balancer")?.homeRegionOnly).toBe(true);
+    expect(FREEBIES.some(entry => entry.homeRegionOnly === false)).toBe(false);
     expect(get("oci.queue")?.verification).toBe("unverified");
   });
 
@@ -51,6 +52,9 @@ describe("freebies catalog data", () => {
     expect(md).toContain("| no |");
     expect(md).not.toContain("### A | B");
     expect(md).toContain("- **other:** Note.");
+    const tagOnly = renderFreebiesMarkdown("Test", [sample({ fitTags: ["uptime-probe"] }), sample({ id: "test.empty" })]);
+    expect(tagOnly).toContain("- **Fit tags:** uptime-probe");
+    expect(tagOnly).not.toContain("(`test.empty`)");
   });
 
   it("rejects non-https sources and unknown fields", () => {

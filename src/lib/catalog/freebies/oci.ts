@@ -1,6 +1,7 @@
 import type { FreebieEntry } from "./schema";
 
 const AF = "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm";
+const LB = "https://docs.oracle.com/en-us/iaas/Content/Balance/Tasks/managingloadbalancer_topic-Creating_Load_Balancers.htm";
 const LIM = "https://docs.oracle.com/en-us/iaas/Content/General/service-limits/default.htm";
 const OCIR = "https://www.oracle.com/cloud/cloud-native/container-registry/";
 const FN = "https://www.oracle.com/cloud/cloud-native/functions/";
@@ -14,7 +15,7 @@ const reclamation = {
   text: "Idle Always Free VMs can be stopped: CPU p95, network and (A1 only) memory all under 20% for 7 days. Oracle emails first. Pay-as-you-go accounts are exempt.",
 } as const;
 
-const objectPool = ["oci.object-storage", "oci.container-registry"];
+const homeRegionDefault = { kind: "home_region", text: "Oracle states Always Free resources are free in the tenancy's home region; this service's own section adds no region rule. Create it in the home region to be safe." } as const;
 
 /** OCI Always Free, from Oracle's Always Free Resources page and linked pages. Every limit is per tenancy. */
 export const OCI_FREEBIES: FreebieEntry[] = [
@@ -34,9 +35,10 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     suggestedUses: ["Data volume for a VM host", "Pre-change volume snapshots (within the 5-backup cap)"] },
   { ...base, id: "oci.object-storage", service: "Object Storage (Standard, Infrequent Access, Archive)", category: "storage",
     limit: { type: "capacity", value: 20, unit: "GB", note: "Always-Free-only accounts: 20 GB combined across Standard, Infrequent Access and Archive, plus 50,000 API requests per month. Paid or trial accounts: 10 GB each tier." },
-    homeRegionOnly: false,
+    homeRegionOnly: null,
     caveats: [
-      { kind: "shared_quota", text: "Container Registry images are stored as Object Storage and count against the same 20 GB.", sharesWith: objectPool },
+      homeRegionDefault,
+      { kind: "other", text: "Container Registry images are billed at the Object Storage Standard rate. Oracle does not say whether they draw from this 20 GB, so budget for it." },
       { kind: "other", text: "On an Always-Free-only account, writes fail past 20 GB rather than bill. Multipart uploads count toward the request allowance. Archive restores take at least an hour." },
     ],
     sourceUrl: AF, verification: "verified", fitTags: ["offsite-backups"],
@@ -55,11 +57,11 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     sourceUrl: AF, verification: "verified", fitTags: ["scratch-database"], suggestedUses: ["Key-value side store for experiments"] },
   { ...base, id: "oci.flexible-load-balancer", service: "Flexible Load Balancer", category: "networking",
     limit: { type: "count", value: 1, unit: "load balancers", note: "One load balancer at 10 Mbps with 16 listeners, 16 hostnames, 16 backend sets and 1,024 backends." },
-    homeRegionOnly: false, caveats: [{ kind: "other", text: "10 Mbps is too slow for most web traffic." }],
-    sourceUrl: AF, verification: "verified", fitTags: [], suggestedUses: ["Low-traffic internal HTTP routing"] },
+    homeRegionOnly: true, caveats: [{ kind: "home_region", text: "The free 10 Mbps applies in the home region; load balancers elsewhere bill normally." }, { kind: "other", text: "10 Mbps is too slow for most web traffic." }],
+    sourceUrl: LB, verification: "verified", fitTags: [], suggestedUses: ["Low-traffic internal HTTP routing"] },
   { ...base, id: "oci.network-load-balancer", service: "Network Load Balancer", category: "networking",
     limit: { type: "count", value: 1, unit: "load balancers", note: "One layer-4 load balancer with 50 listeners and 50 backend sets. Preserves the client IP; no bandwidth cap is listed." },
-    homeRegionOnly: false, caveats: [], sourceUrl: AF, verification: "verified", fitTags: ["ingress-ip"],
+    homeRegionOnly: null, caveats: [homeRegionDefault], sourceUrl: AF, verification: "verified", fitTags: ["ingress-ip"],
     suggestedUses: ["Stable public IP in front of a VM so the instance can be rebuilt"] },
   { ...base, id: "oci.vcn-vpn", service: "VCN and Site-to-Site VPN", category: "networking",
     limit: { type: "count", value: 2, unit: "VCNs", note: "Two virtual cloud networks and 50 IPSec connections." },
@@ -110,7 +112,7 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     homeRegionOnly: null, caveats: [], sourceUrl: AF, verification: "verified", fitTags: ["iac-runner"], suggestedUses: ["Managed Terraform runs for OCI resources"] },
   { ...base, id: "oci.container-registry", service: "Container Registry (OCIR)", category: "devtools",
     limit: { type: "unlimited", value: null, unit: null, note: "No service charge. Images are billed as Object Storage Standard." },
-    homeRegionOnly: null, caveats: [{ kind: "shared_quota", text: "Images count against the 20 GB Object Storage allowance.", sharesWith: objectPool }],
+    homeRegionOnly: null, caveats: [{ kind: "other", text: "Image storage is billed at the Object Storage Standard rate. Whether it draws from the free 20 GB is not documented; assume it may." }],
     sourceUrl: OCIR, verification: "marketing", fitTags: ["image-mirror"], suggestedUses: ["Pull fallback for a few critical base images"] },
   { ...base, id: "oci.functions", service: "Functions", category: "serverless",
     limit: { type: "monthly", value: 2_000_000, unit: "invocations", note: "2 million invocations and 400,000 GB-seconds per month." },

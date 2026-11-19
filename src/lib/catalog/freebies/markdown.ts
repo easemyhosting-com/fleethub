@@ -20,7 +20,7 @@ export function renderFreebiesMarkdown(providerName: string, entries: readonly F
     "",
   ];
   for (const entry of entries) {
-    if (!entry.caveats.length && !entry.suggestedUses.length) continue;
+    if (!entry.caveats.length && !entry.suggestedUses.length && !entry.fitTags.length) continue;
     lines.push(`### ${entry.service} (\`${entry.id}\`)`, "");
     for (const caveat of entry.caveats) lines.push(`- **${caveat.kind.replace("_", " ")}:** ${caveat.text}${caveat.sharesWith?.length ? ` Shares with ${caveat.sharesWith.map(id => `\`${id}\``).join(", ")}.` : ""}`);
     if (entry.suggestedUses.length) lines.push(`- **Uses:** ${entry.suggestedUses.join("; ")}.`);

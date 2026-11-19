@@ -9,12 +9,12 @@ Provider statements only, not measured usage. Search and filter these entries in
 | `oci.compute-a1` | Compute A1.Flex (Arm) | compute | 1,500 OCPU-hours and 9,000 GB-hours per month, which is 2 OCPU and 12 GB running continuously: one VM, or two 1-OCPU VMs. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.compute-e2-micro` | Compute VM.Standard.E2.1.Micro (AMD) | compute | Two VMs, each 1/8 OCPU burstable, 1 GB RAM, 50 Mbps internet. Both must be in one availability domain. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.block-volume` | Block and boot volumes | storage | 200 GB combined boot and block volume storage, plus 5 volume backups. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
-| `oci.object-storage` | Object Storage (Standard, Infrequent Access, Archive) | storage | Always-Free-only accounts: 20 GB combined across Standard, Infrequent Access and Archive, plus 50,000 API requests per month. Paid or trial accounts: 10 GB each tier. | per tenancy | no | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
+| `oci.object-storage` | Object Storage (Standard, Infrequent Access, Archive) | storage | Always-Free-only accounts: 20 GB combined across Standard, Infrequent Access and Archive, plus 50,000 API requests per month. Paid or trial accounts: 10 GB each tier. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.autonomous-database` | Autonomous AI Database (ATP, ADW, JSON, APEX) | database | Two serverless databases, each 1 OCPU, 20 GB storage, 20 sessions. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.mysql-heatwave` | MySQL HeatWave | database | One standalone DB system with single-node HeatWave, 50 GB storage and 50 GB backup. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.nosql` | NoSQL Database | database | 133 million reads and 133 million writes per month, 3 tables of 25 GB each. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
-| `oci.flexible-load-balancer` | Flexible Load Balancer | networking | One load balancer at 10 Mbps with 16 listeners, 16 hostnames, 16 backend sets and 1,024 backends. | per tenancy | no | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
-| `oci.network-load-balancer` | Network Load Balancer | networking | One layer-4 load balancer with 50 listeners and 50 backend sets. Preserves the client IP; no bandwidth cap is listed. | per tenancy | no | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
+| `oci.flexible-load-balancer` | Flexible Load Balancer | networking | One load balancer at 10 Mbps with 16 listeners, 16 hostnames, 16 backend sets and 1,024 backends. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/Balance/Tasks/managingloadbalancer_topic-Creating_Load_Balancers.htm) |
+| `oci.network-load-balancer` | Network Load Balancer | networking | One layer-4 load balancer with 50 listeners and 50 backend sets. Preserves the client IP; no bandwidth cap is listed. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.vcn-vpn` | VCN and Site-to-Site VPN | networking | Two virtual cloud networks and 50 IPSec connections. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.outbound-data` | Outbound data transfer | networking | 10 TB outbound per month. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.vault` | Vault and Key Management | security | Unlimited software keys, 20 HSM key versions, 150 secrets with 40 versions each. Virtual private vault is not included. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
@@ -55,7 +55,8 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 ### Object Storage (Standard, Infrequent Access, Archive) (`oci.object-storage`)
 
-- **shared quota:** Container Registry images are stored as Object Storage and count against the same 20 GB. Shares with `oci.object-storage`, `oci.container-registry`.
+- **home region:** Oracle states Always Free resources are free in the tenancy's home region; this service's own section adds no region rule. Create it in the home region to be safe.
+- **other:** Container Registry images are billed at the Object Storage Standard rate. Oracle does not say whether they draw from this 20 GB, so budget for it.
 - **other:** On an Always-Free-only account, writes fail past 20 GB rather than bill. Multipart uploads count toward the request allowance. Archive restores take at least an hour.
 - **Uses:** Encrypted off-host database dumps with a retention rule; Small static artifacts.
 - **Fit tags:** offsite-backups
@@ -80,11 +81,13 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 ### Flexible Load Balancer (`oci.flexible-load-balancer`)
 
+- **home region:** The free 10 Mbps applies in the home region; load balancers elsewhere bill normally.
 - **other:** 10 Mbps is too slow for most web traffic.
 - **Uses:** Low-traffic internal HTTP routing.
 
 ### Network Load Balancer (`oci.network-load-balancer`)
 
+- **home region:** Oracle states Always Free resources are free in the tenancy's home region; this service's own section adds no region rule. Create it in the home region to be safe.
 - **Uses:** Stable public IP in front of a VM so the instance can be rebuilt.
 - **Fit tags:** ingress-ip
 
@@ -154,7 +157,7 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 ### Container Registry (OCIR) (`oci.container-registry`)
 
-- **shared quota:** Images count against the 20 GB Object Storage allowance. Shares with `oci.object-storage`, `oci.container-registry`.
+- **other:** Image storage is billed at the Object Storage Standard rate. Whether it draws from the free 20 GB is not documented; assume it may.
 - **Uses:** Pull fallback for a few critical base images.
 - **Fit tags:** image-mirror
 
