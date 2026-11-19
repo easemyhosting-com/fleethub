@@ -223,7 +223,11 @@ services:
         condition: service_healthy
       infisical-redis:
         condition: service_healthy
-    mem_limit: 1024m
+    # First boot on an empty database peaks near 870 MiB during migrations. A kill at 1 GiB can
+    # leave infisical_migrations_lock.is_locked = 1, and later boots then fail with "Migration
+    # table is already locked". On a disposable database only: stop infisical, set is_locked = 0,
+    # start it again.
+    mem_limit: 2048m
 
 volumes:
   # Fresh PostgreSQL 18 volumes, restored from the PostgreSQL 16 dumps; see the pull request's upgrade notes.
