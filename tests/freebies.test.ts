@@ -35,7 +35,9 @@ describe("freebies catalog data", () => {
     expect(get("oci.object-storage")?.limit.value).toBe(20);
     expect(get("oci.flexible-load-balancer")?.homeRegionOnly).toBe(true);
     expect(FREEBIES.some(entry => entry.homeRegionOnly === false)).toBe(false);
-    expect(get("oci.queue")?.verification).toBe("unverified");
+    expect(get("oci.queue")?.verification).toBe("verified");
+    expect(get("oci.api-gateway-streaming")?.limit.type).toBe("none");
+    expect(get("oci.autonomous-database")?.caveats.some(caveat => caveat.kind === "reclamation")).toBe(true);
   });
 
   it("docs/freebies/oci.md matches the data (run npm run docs:freebies)", () => {

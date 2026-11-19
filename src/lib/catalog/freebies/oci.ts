@@ -2,6 +2,7 @@ import type { FreebieEntry } from "./schema";
 
 const AF = "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm";
 const LB = "https://docs.oracle.com/en-us/iaas/Content/Balance/Tasks/managingloadbalancer_topic-Creating_Load_Balancers.htm";
+const ADB = "https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/autonomous-always-free.html";
 const LIM = "https://docs.oracle.com/en-us/iaas/Content/General/service-limits/default.htm";
 const OCIR = "https://www.oracle.com/cloud/cloud-native/container-registry/";
 const FN = "https://www.oracle.com/cloud/cloud-native/functions/";
@@ -40,13 +41,17 @@ export const OCI_FREEBIES: FreebieEntry[] = [
       homeRegionDefault,
       { kind: "other", text: "Container Registry images are billed at the Object Storage Standard rate. Oracle does not say whether they draw from this 20 GB, so budget for it." },
       { kind: "other", text: "On an Always-Free-only account, writes fail past 20 GB rather than bill. Multipart uploads count toward the request allowance. Archive restores take at least an hour." },
+      { kind: "other", text: "If a Free Trial ends with more than 20 GB stored, Oracle deletes all objects. Get under 20 GB, or upgrade, before the trial ends." },
     ],
     sourceUrl: AF, verification: "verified", fitTags: ["offsite-backups"],
     suggestedUses: ["Encrypted off-host database dumps with a retention rule", "Small static artifacts"] },
   { ...base, id: "oci.autonomous-database", service: "Autonomous AI Database (ATP, ADW, JSON, APEX)", category: "database",
     limit: { type: "count", value: 2, unit: "databases", note: "Two serverless databases, each 1 OCPU, 20 GB storage, 20 sessions." },
-    homeRegionOnly: true, caveats: [{ kind: "coupling", text: "Oracle-specific engine with a 20-session cap. Keep it off request paths of services hosted elsewhere." }],
-    sourceUrl: AF, verification: "verified", fitTags: ["scratch-database"], suggestedUses: ["Scratch or analytics database", "APEX prototypes"] },
+    homeRegionOnly: true, caveats: [
+      { kind: "reclamation", text: "Stopped automatically after 7 days without connections or CPU use. A database that stays stopped or inactive for 90 cumulative days may be permanently deleted; start it to reset the count." },
+      { kind: "coupling", text: "Oracle-specific engine with a 20-session cap. Keep it off request paths of services hosted elsewhere." },
+    ],
+    sourceUrl: ADB, verification: "verified", fitTags: ["scratch-database"], suggestedUses: ["Scratch or analytics database", "APEX prototypes"] },
   { ...base, id: "oci.mysql-heatwave", service: "MySQL HeatWave", category: "database",
     limit: { type: "count", value: 1, unit: "DB systems", note: "One standalone DB system with single-node HeatWave, 50 GB storage and 50 GB backup." },
     homeRegionOnly: true, caveats: [{ kind: "coupling", text: "A database in a different place from its service adds a network round-trip and a failure dependency." }],
@@ -79,9 +84,9 @@ export const OCI_FREEBIES: FreebieEntry[] = [
   { ...base, id: "oci.certificates", service: "Certificates", category: "security",
     limit: { type: "count", value: 150, unit: "certificates", note: "5 certificate authorities and 150 certificates." },
     homeRegionOnly: null, caveats: [], sourceUrl: AF, verification: "verified", fitTags: ["tls-certificates"], suggestedUses: ["Private CA for internal TLS"] },
-  { ...base, id: "oci.bastion", service: "Bastion", category: "security",
-    limit: { type: "unlimited", value: null, unit: null, note: "Free; no count is stated. Sessions are short-lived." },
-    homeRegionOnly: null, caveats: [], sourceUrl: AF, verification: "verified", fitTags: ["admin-access"],
+  { ...base, scope: "per_region", id: "oci.bastion", service: "Bastion", category: "security",
+    limit: { type: "count", value: 5, unit: "bastions per region", note: "No charge for the service. Service limits allow 5 bastions per region and 20 sessions per bastion. Sessions are short-lived." },
+    homeRegionOnly: null, caveats: [], sourceUrl: LIM, verification: "verified", fitTags: ["admin-access"],
     suggestedUses: ["Break-glass SSH path when the usual access route is down"] },
   { ...base, id: "oci.monitoring", service: "Monitoring and Alarms", category: "observability",
     limit: { type: "monthly", value: 500_000_000, unit: "ingestion datapoints", note: "500 million ingestion and 1 billion retrieval datapoints per month." },
@@ -119,9 +124,13 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     homeRegionOnly: null, caveats: [{ kind: "coupling", text: "Placing a function on another host's request path couples the two." }],
     sourceUrl: FN, verification: "marketing", fitTags: ["event-functions"], suggestedUses: ["Event handlers for OCI alarms or object events"] },
   { ...base, id: "oci.queue", service: "Queue", category: "messaging",
-    limit: { type: "monthly", value: 1_000_000, unit: "requests", note: "1 million requests per month in 64 KB units, 10 queues per region. Read from a search snippet; the price list page could not be fetched." },
-    homeRegionOnly: null, caveats: [], sourceUrl: PL, verification: "unverified", fitTags: [], suggestedUses: ["Low-volume work queue"] },
-  { ...base, id: "oci.api-gateway-streaming-devops", service: "API Gateway, Streaming, DevOps", category: "devtools",
-    limit: { type: "none", value: null, unit: null, note: "No Always Free allowance found. Pay per use within default limits; DevOps build runners bill as compute. Treat as not free." },
+    limit: { type: "monthly", value: 1_000_000, unit: "requests", note: "First 1 million requests per month free. A request is 64 KB; larger messages count as several requests." },
+    homeRegionOnly: null, caveats: [], sourceUrl: PL, verification: "verified", fitTags: [], suggestedUses: ["Low-volume work queue"] },
+  { ...base, id: "oci.devops", service: "DevOps", category: "devtools",
+    limit: { type: "unlimited", value: null, unit: null, note: "No charge for running pipelines. Deployment pipelines to OCI compute are free." },
+    homeRegionOnly: null, caveats: [{ kind: "other", text: "CI build runners bill for the OCPU and memory they use." }],
+    sourceUrl: PL, verification: "verified", fitTags: ["iac-runner"], suggestedUses: ["Deployment pipelines to OCI compute"] },
+  { ...base, id: "oci.api-gateway-streaming", service: "API Gateway, Streaming", category: "devtools",
+    limit: { type: "none", value: null, unit: null, note: "No Always Free allowance found. Both are priced per use on the price list. Treat as not free." },
     homeRegionOnly: null, caveats: [], sourceUrl: LIM, verification: "unverified", fitTags: [], suggestedUses: [] },
 ];
