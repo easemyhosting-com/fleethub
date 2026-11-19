@@ -108,7 +108,8 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     homeRegionOnly: null, caveats: [
       { kind: "blocked_port", text: "Submit on SMTP port 587; port 25 is blocked." },
       { kind: "other", text: "Needs SPF and DKIM on the sending domain. High bounce rates can suspend the sender; throttle repeat alerts." },
-    ], sourceUrl: AF, verification: "verified", fitTags: ["alert-email"], suggestedUses: ["Alert and transactional email sender"] },
+      { kind: "other", text: "The Email Delivery limits table lists 0 emails per 24 hours (and 10 approved senders) for an Always-Free-only tenancy. The 3,000/month allowance applies once the tenancy is upgraded to Pay As You Go, which stays free within the allowance." },
+    ], sourceUrl: AF, verification: "verified", fitTags: ["alert-email"], suggestedUses: ["Alert and transactional email sender (after upgrading the tenancy to Pay As You Go)"] },
   { ...base, id: "oci.connector-hub", service: "Connector Hub", category: "observability",
     limit: { type: "count", value: 2, unit: "connectors", note: "Two service connectors." },
     homeRegionOnly: null, caveats: [], sourceUrl: AF, verification: "verified", fitTags: ["log-archive"], suggestedUses: ["Move logs to Object Storage or Notifications"] },

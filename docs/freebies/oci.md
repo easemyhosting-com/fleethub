@@ -145,7 +145,8 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 - **blocked port:** Submit on SMTP port 587; port 25 is blocked.
 - **other:** Needs SPF and DKIM on the sending domain. High bounce rates can suspend the sender; throttle repeat alerts.
-- **Uses:** Alert and transactional email sender.
+- **other:** The Email Delivery limits table lists 0 emails per 24 hours (and 10 approved senders) for an Always-Free-only tenancy. The 3,000/month allowance applies once the tenancy is upgraded to Pay As You Go, which stays free within the allowance.
+- **Uses:** Alert and transactional email sender (after upgrading the tenancy to Pay As You Go).
 - **Fit tags:** alert-email
 
 ### Connector Hub (`oci.connector-hub`)
