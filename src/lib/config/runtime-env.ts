@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 
 /** Settings that may change while FleetHub runs. Security-critical toggles (auth secret, database URL, auth-required, proxy trust) deliberately need a restart. */
 export const reloadableKeys: ReadonlySet<string> = new Set([
@@ -25,6 +25,24 @@ export function parseEnvFile(text: string): Record<string, string> {
   return values;
 }
 
+/** Reads metadata and content from one descriptor so a file swapped between the size check and the read cannot bypass the limit. */
+function readBounded(path: string, previous: string): { signature: string; text?: string } {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
+  try {
+    const stats = fstatSync(fd);
+    if (!stats.isFile()) throw new Error("not a regular file");
+    const signature = `${stats.ino}:${stats.mtimeMs}:${stats.size}`;
+    if (signature === previous || stats.size > maxFileBytes) return { signature };
+    const buffer = Buffer.alloc(maxFileBytes + 1);
+    let length = 0;
+    for (let read; length < buffer.length && (read = readSync(fd, buffer, length, buffer.length - length, length)) > 0;) length += read;
+    if (length > maxFileBytes) return { signature };
+    return { signature, text: buffer.toString("utf8", 0, length) };
+  } finally {
+    try { closeSync(fd); } catch { /* the read result or original error is what matters */ }
+  }
+}
+
 type Options = { env?: Record<string, string | undefined>; now?: () => number; intervalMs?: number; log?: (message: string) => void };
 
 type State = { originals: Map<string, string | undefined>; signature: string; checkedAt: number };
@@ -40,7 +58,7 @@ export function createRuntimeEnv(options: Options = {}, shared = false) {
   const state: State = shared ? (holder[sharedState] ??= { originals: new Map(), signature: "", checkedAt: Number.NEGATIVE_INFINITY }) : { originals: new Map(), signature: "", checkedAt: Number.NEGATIVE_INFINITY };
   const { originals } = state;
 
-  /** Applies the allowlisted settings from FLEETHUB_RUNTIME_ENV_FILE. Cheap: at most one stat per interval. Returns the names (never values) of settings that changed. */
+  /** Applies the allowlisted settings from FLEETHUB_RUNTIME_ENV_FILE. Cheap: at most one open and stat per interval. Returns the names (never values) of settings that changed. */
   return function refresh(): string[] {
     const path = env.FLEETHUB_RUNTIME_ENV_FILE;
     if (!path) return [];
@@ -50,11 +68,11 @@ export function createRuntimeEnv(options: Options = {}, shared = false) {
     let next: string;
     let parsed: Record<string, string> = {};
     try {
-      const stats = statSync(path);
-      next = `${stats.mtimeMs}:${stats.size}`;
+      const file = readBounded(path, state.signature);
+      next = file.signature;
       if (next === state.signature) return [];
-      if (stats.size > maxFileBytes) { log("Runtime configuration file is larger than 64 KB and was ignored"); state.signature = next; return []; }
-      parsed = parseEnvFile(readFileSync(path, "utf8"));
+      if (file.text === undefined) { log("Runtime configuration file is larger than 64 KB and was ignored"); state.signature = next; return []; }
+      parsed = parseEnvFile(file.text);
     } catch {
       next = "missing";
       if (state.signature === next) return [];
