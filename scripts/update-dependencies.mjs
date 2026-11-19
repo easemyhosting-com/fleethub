@@ -25,7 +25,7 @@ for (const name of ['@types/node', '@types/react', 'typescript']) {
 pkg.private = true;
 delete pkg.main;
 delete pkg.directories;
-pkg.engines = { node: '24.22.1' };
+pkg.engines = { node: '24.22.3' };
 pkg.scripts.typecheck = 'tsc --noEmit';
 pkg.scripts['check:dependencies'] = 'node scripts/check-dependencies.mjs';
 pkg.scripts['check:hygiene'] = 'node scripts/check-hygiene.mjs';

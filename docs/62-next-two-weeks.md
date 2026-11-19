@@ -225,7 +225,7 @@ claim that the existing GitOps reader is missing or that quota usage is measured
 
 ## Common commands and evidence
 
-Use Node 24.22.1 from `.nvmrc`. Do not upgrade the stack as incidental sprint work.
+Use Node 24.22.3 from `.nvmrc`. Do not upgrade the stack as incidental sprint work.
 
 ```bash
 npm ci
