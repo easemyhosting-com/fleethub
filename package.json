@@ -28,12 +28,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@tursodatabase/api": "2.0.5",
+    "@tursodatabase/api": "2.0.6",
     "clsx": "2.1.1",
     "drizzle-orm": "0.45.4",
-    "lucide-react": "1.61.0",
-    "next": "16.4.2",
-    "postgres": "3.4.9",
+    "lucide-react": "1.70.0",
+    "next": "16.4.5",
+    "postgres": "4.1.0",
     "qrcode-generator": "2.0.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -42,16 +42,16 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "4.3.3",
-    "@types/node": "26.6.5",
+    "@tailwindcss/postcss": "4.3.5",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
     "drizzle-kit": "0.31.11",
     "esbuild": "0.28.2",
-    "postcss": "8.5.31",
-    "tailwindcss": "4.3.3",
+    "postcss": "8.5.32",
+    "tailwindcss": "4.3.5",
     "typescript": "7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   },
   "private": true,
   "engines": {
