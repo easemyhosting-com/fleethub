@@ -96,6 +96,11 @@ describe("filterFreebies", () => {
     expect(ids({ search: "20 emails" })).toEqual([]);
     expect(ids({ search: "other" })).toEqual(["b.mail"]);
   });
+  it("matches the numeric limit value when the note formats it differently", () => {
+    const hits = filterFreebies(FREEBIES, { search: "1500" }).map(entry => entry.id);
+    expect(hits).toContain(FREEBIES.find(entry => entry.limit.value === 1500)!.id);
+  });
+
   it("combines filters with AND", () => expect(ids({ provider: "a", search: "gb" })).toEqual(["a.bucket"]));
 });
 

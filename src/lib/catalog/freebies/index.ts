@@ -23,7 +23,7 @@ export interface FreebieFilter {
 
 function searchText(entry: FreebieEntry): string {
   return [
-    entry.id, entry.provider, entry.providerName, entry.service, entry.category, entry.limit.note, entry.limit.unit ?? "",
+    entry.id, entry.provider, entry.providerName, entry.service, entry.category, entry.limit.note, String(entry.limit.value ?? ""), entry.limit.unit ?? "",
     ...entry.caveats.map(caveat => caveat.text), ...entry.suggestedUses, ...entry.fitTags,
   ].join(" ").toLowerCase();
 }

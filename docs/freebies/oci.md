@@ -10,7 +10,7 @@ Provider statements only, not measured usage. Search and filter these entries in
 | `oci.compute-e2-micro` | Compute VM.Standard.E2.1.Micro (AMD) | compute | Two VMs, each 1/8 OCPU burstable, 1 GB RAM, 50 Mbps internet. Both must be in one availability domain. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.block-volume` | Block and boot volumes | storage | 200 GB combined boot and block volume storage, plus 5 volume backups. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.object-storage` | Object Storage (Standard, Infrequent Access, Archive) | storage | Always-Free-only accounts: 20 GB combined across Standard, Infrequent Access and Archive, plus 50,000 API requests per month. Paid or trial accounts: 10 GB each tier. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
-| `oci.autonomous-database` | Autonomous AI Database (ATP, ADW, JSON, APEX) | database | Two serverless databases, each 1 OCPU, 20 GB storage, 20 sessions. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/autonomous-always-free.html) |
+| `oci.autonomous-database` | Autonomous AI Database (ATP, ADW, JSON, APEX) | database | Two serverless databases, each 1 OCPU, 20 GB storage, up to 30 simultaneous sessions. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/autonomous-always-free.html) |
 | `oci.mysql-heatwave` | MySQL HeatWave | database | One standalone DB system with single-node HeatWave, 50 GB storage and 50 GB backup. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.nosql` | NoSQL Database | database | 133 million reads and 133 million writes per month, 3 tables of 25 GB each. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.flexible-load-balancer` | Flexible Load Balancer | networking | One load balancer at 10 Mbps with 16 listeners, 16 hostnames, 16 backend sets and 1,024 backends. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/Balance/Tasks/managingloadbalancer_topic-Creating_Load_Balancers.htm) |
@@ -66,7 +66,7 @@ Provider statements only, not measured usage. Search and filter these entries in
 ### Autonomous AI Database (ATP, ADW, JSON, APEX) (`oci.autonomous-database`)
 
 - **reclamation:** Stopped automatically after 7 days without connections or CPU use. A database that stays stopped or inactive for 90 cumulative days may be permanently deleted; start it to reset the count.
-- **coupling:** Oracle-specific engine with a 20-session cap. Keep it off request paths of services hosted elsewhere.
+- **coupling:** Oracle-specific engine with a 30-session cap. Keep it off request paths of services hosted elsewhere.
 - **Uses:** Scratch or analytics database; APEX prototypes.
 - **Fit tags:** scratch-database
 
@@ -137,7 +137,7 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 ### Notifications (`oci.notifications`)
 
-- **other:** Email subscriptions are capped at 1,000 per month; use Email Delivery for bulk mail.
+- **other:** Email deliveries are free up to 1,000 per month across email subscriptions; use Email Delivery for bulk mail.
 - **Uses:** Alert fan-out to chat webhooks.
 - **Fit tags:** alert-push
 
