@@ -36,7 +36,7 @@ it("generates private bootstrap files once and refuses to overwrite them", async
 });
 
 // Compose resolves profiles without starting a daemon or any containers.
-it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status === 0)("resolves every existing/local service combination without renaming data volumes", async () => {
+it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status === 0)("resolves every existing/local service combination with project-scoped PostgreSQL 18 data volumes", async () => {
   const root = await mkdtemp(join(tmpdir(), "fleethub-profiles-test-"));
   const target = join(root, "new-install");
   const execute = promisify(execFile);
@@ -53,9 +53,9 @@ it.runIf(spawnSync("docker", ["compose", "version"], { stdio: "ignore" }).status
       for (const service of ["fleetdeck", "inventory-worker"]) expect(config.services[service].environment?.FLEETHUB_ALLOW_INSECURE_SERVICE_HTTP).toBe("false");
       expect(config.services.fleetdeck.depends_on).toHaveProperty("fleetdeck-db");
       expect(Object.keys(config.services.fleetdeck.depends_on ?? {})).toEqual(["fleetdeck-db"]);
-      expect(config.volumes.fleetdeck_pg_data.name).toBe("fleethub-profile-test_fleetdeck_pg_data");
+      expect(config.volumes.fleetdeck_pg18_20261119.name).toBe("fleethub-profile-test_fleetdeck_pg18_20261119");
       if (config.services.infisical) {
-        expect(config.volumes.infisical_pg_data.name).toBe("fleethub-profile-test_infisical_pg_data");
+        expect(config.volumes.infisical_pg18_20261119.name).toBe("fleethub-profile-test_infisical_pg18_20261119");
         expect(config.services["infisical-db"].ports).toBeUndefined();
         expect(config.services["infisical-redis"].ports).toBeUndefined();
       }

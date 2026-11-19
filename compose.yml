@@ -11,7 +11,7 @@ x-low-write-postgres: &low-write-postgres
 
 services:
   fleetdeck-db:
-    image: postgres:16.15-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    image: postgres:18.7-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
     restart: unless-stopped
     command: *low-write-postgres
     logging: *logging
@@ -20,7 +20,8 @@ services:
       POSTGRES_PASSWORD: ${FLEETHUB_DB_PASSWORD:?Run the local setup helper or set a database password}
       POSTGRES_DB: fleethub
     volumes:
-      - fleetdeck_pg_data:/var/lib/postgresql/data
+      # PostgreSQL 18 keeps its cluster in a version subdirectory of this mount.
+      - fleetdeck_pg18_20261119:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fleethub -d fleethub"]
       interval: 10s
@@ -173,7 +174,7 @@ services:
 
   infisical-db:
     profiles: [infisical, integrations]
-    image: postgres:16.15-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    image: postgres:18.7-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
     restart: unless-stopped
     command: *low-write-postgres
     logging: *logging
@@ -182,7 +183,7 @@ services:
       POSTGRES_PASSWORD: ${INFISICAL_DB_PASSWORD:-}
       POSTGRES_DB: infisical
     volumes:
-      - infisical_pg_data:/var/lib/postgresql/data
+      - infisical_pg18_20261119:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U infisical -d infisical"]
       interval: 10s
@@ -190,9 +191,11 @@ services:
       retries: 5
     mem_limit: 256m
 
+  # Valkey is RESP-compatible with Redis; Infisical's queues and cache behave the same
+  # on it (verified against the previous redis:7 image). REDIS_URL is unchanged.
   infisical-redis:
     profiles: [infisical, integrations]
-    image: redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    image: valkey/valkey:9.1.3-alpine@sha256:bf09d58e96d6b4524a15396b65b242bbe18beebbcc15a04d8ee75ddac62fae0b
     restart: unless-stopped
     logging: *logging
     healthcheck:
@@ -223,8 +226,11 @@ services:
     mem_limit: 1024m
 
 volumes:
-  fleetdeck_pg_data:
-  infisical_pg_data:
+  # Fresh PostgreSQL 18 volumes, restored from the PostgreSQL 16 dumps; see the pull request's upgrade notes.
+  # The PostgreSQL 16 volumes (fleetdeck_pg_data, infisical_pg_data) are no longer declared.
+  # They still exist on the host; this change does not delete them.
+  fleetdeck_pg18_20261119:
+  infisical_pg18_20261119:
   cliproxy_auth:
   cliproxy_logs:
   cliproxy_plugins:
