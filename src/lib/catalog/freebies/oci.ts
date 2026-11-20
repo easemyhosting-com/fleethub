@@ -60,9 +60,9 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     limit: { type: "monthly", value: 133_000_000, unit: "reads", note: "133 million reads and 133 million writes per month, 3 tables of 25 GB each." },
     homeRegionOnly: true, caveats: [
       { kind: "home_region", text: "Always Free NoSQL tables are currently available only in Phoenix. A different home region does not provide this allowance." },
-      { kind: "reclamation", text: "A table unused or unaccessed for 30 days becomes inactive. Tables that remain inactive for 90 days are deleted. Perform a get, put or delete operation on a row to reactivate a table before deletion; DDL operations do not reactivate it." },
+      { kind: "reclamation", text: "A table unused or unaccessed for 30 days becomes inactive. Tables that remain inactive for 90 days are deleted. Perform a get, put or delete operation on a row to reactivate a table before deletion; DDL operations do not reactivate it. Region and inactivity policy: https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html" },
     ],
-    sourceUrl: "https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html", verification: "verified", fitTags: ["scratch-database"], suggestedUses: ["Key-value side store for experiments"] },
+    sourceUrl: AF, verification: "verified", fitTags: ["scratch-database"], suggestedUses: ["Key-value side store for experiments"] },
   { ...base, id: "oci.flexible-load-balancer", service: "Flexible Load Balancer", category: "networking",
     limit: { type: "count", value: 1, unit: "load balancers", note: "One load balancer at 10 Mbps with 16 listeners, 16 hostnames, 16 backend sets and 1,024 backends." },
     homeRegionOnly: true, caveats: [{ kind: "home_region", text: "The free 10 Mbps applies in the home region; load balancers elsewhere bill normally." }, { kind: "other", text: "10 Mbps is too slow for most web traffic." }],
