@@ -12,7 +12,7 @@ Provider statements only, not measured usage. Search and filter these entries in
 | `oci.object-storage` | Object Storage (Standard, Infrequent Access, Archive) | storage | Always-Free-only accounts: 20 GB combined across Standard, Infrequent Access and Archive, plus 50,000 API requests per month. Paid or trial accounts: 10 GB each tier. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.autonomous-database` | Autonomous AI Database (ATP, ADW, JSON, APEX) | database | Two serverless databases, each 1 OCPU, 20 GB storage, up to 30 simultaneous sessions. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/autonomous-always-free.html) |
 | `oci.mysql-heatwave` | MySQL HeatWave | database | One standalone DB system with single-node HeatWave, 50 GB storage and 50 GB backup. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
-| `oci.nosql` | NoSQL Database | database | 133 million reads and 133 million writes per month, 3 tables of 25 GB each. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
+| `oci.nosql` | NoSQL Database | database | 133 million reads and 133 million writes per month, 3 tables of 25 GB each. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html) |
 | `oci.flexible-load-balancer` | Flexible Load Balancer | networking | One load balancer at 10 Mbps with 16 listeners, 16 hostnames, 16 backend sets and 1,024 backends. | per tenancy | yes | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/Balance/Tasks/managingloadbalancer_topic-Creating_Load_Balancers.htm) |
 | `oci.network-load-balancer` | Network Load Balancer | networking | One layer-4 load balancer with 50 listeners and 50 backend sets. Preserves the client IP; no bandwidth cap is listed. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
 | `oci.vcn-vpn` | VCN and Site-to-Site VPN | networking | Two virtual cloud networks and 50 IPSec connections. | per tenancy | not stated | verified | 2026-11-20 | [link](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
@@ -78,7 +78,8 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 ### NoSQL Database (`oci.nosql`)
 
-- **home region:** Historically offered only in the Phoenix region; check availability in your home region.
+- **home region:** Always Free NoSQL tables are currently available only in Phoenix. A different home region does not provide this allowance.
+- **reclamation:** A table unused or unaccessed for 30 days becomes inactive. Tables that remain inactive for 90 days are deleted. Perform a get, put or delete operation on a row to reactivate a table before deletion; DDL operations do not reactivate it.
 - **Uses:** Key-value side store for experiments.
 - **Fit tags:** scratch-database
 
