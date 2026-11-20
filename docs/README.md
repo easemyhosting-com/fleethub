@@ -48,3 +48,5 @@ Never put private host state, credentials or local environment exports in docume
 - [Backend selection and credential migration](67-backend-selection-and-migration-design.md): design for an explicit per-credential backend choice and verified, reversible migration between stores.
 
 - [Gateway connection-only transition](68-gateway-connection-only-transition.md): unverified runbook for moving off the bundled CLIProxy and Infisical profiles with backups, rollback and owner-confirmed retirement.
+
+- [PostgreSQL 18 upgrade and rollback](69-postgresql-18-upgrade.md): final quiescent backups, restore validation and rollback limits for existing installations.
