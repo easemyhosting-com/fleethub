@@ -230,7 +230,7 @@ services:
     mem_limit: 2048m
 
 volumes:
-  # Fresh PostgreSQL 18 volumes, restored from the PostgreSQL 16 dumps; see the pull request's upgrade notes.
+  # Fresh PostgreSQL 18 volumes, restored from the PostgreSQL 16 dumps; see docs/69-postgresql-18-upgrade.md.
   # The PostgreSQL 16 volumes (fleetdeck_pg_data, infisical_pg_data) are no longer declared.
   # They still exist on the host; this change does not delete them.
   fleetdeck_pg18_20261119:
