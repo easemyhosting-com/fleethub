@@ -48,3 +48,4 @@ Never put private host state, credentials or local environment exports in docume
 - [Backend selection and credential migration](67-backend-selection-and-migration-design.md): design for an explicit per-credential backend choice and verified, reversible migration between stores.
 
 - [Gateway connection-only transition](68-gateway-connection-only-transition.md): unverified runbook for moving off the bundled CLIProxy and Infisical profiles with backups, rollback and owner-confirmed retirement.
+- [Cloud freebies catalog](freebies/README.md): searchable free-tier offerings, OCI first.
