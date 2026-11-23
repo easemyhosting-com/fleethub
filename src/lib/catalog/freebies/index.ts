@@ -80,7 +80,7 @@ export function parseFreebieFilter(params: URLSearchParams): FreebieFilter {
   const fitTags = params.getAll("fit").filter((tag): tag is FreebieFitTag => (FreebieFitTagSchema.options as readonly string[]).includes(tag));
   return {
     search: (params.get("q") ?? "").slice(0, 256) || undefined,
-    provider: provider && /^[a-z0-9-]{1,64}$/.test(provider) ? provider : undefined,
+    provider: provider && FREEBIES.some(entry => entry.provider === provider) ? provider : undefined,
     category: pick("category", FreebieCategorySchema.options),
     limitType: pick("limit", FreebieLimitTypeSchema.options),
     homeRegionOnly: region === "true" ? true : region === "false" ? false : undefined,

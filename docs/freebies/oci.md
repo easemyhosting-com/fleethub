@@ -80,6 +80,7 @@ Provider statements only, not measured usage. Search and filter these entries in
 
 - **home region:** Always Free NoSQL tables are currently available only in Phoenix. A different home region does not provide this allowance.
 - **reclamation:** A table unused or unaccessed for 30 days becomes inactive. Tables that remain inactive for 90 days are deleted. Perform a get, put or delete operation on a row to reactivate a table before deletion; DDL operations do not reactivate it. Region and inactivity policy: https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html
+- **other:** Each Always Free table has a fixed capacity of 50 read units and 50 write units that cannot be changed, so a busy table can be throttled while still under the monthly totals. Capacity limits: https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html
 - **Uses:** Key-value side store for experiments.
 - **Fit tags:** scratch-database
 

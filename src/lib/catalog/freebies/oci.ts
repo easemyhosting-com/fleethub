@@ -61,6 +61,7 @@ export const OCI_FREEBIES: FreebieEntry[] = [
     homeRegionOnly: true, caveats: [
       { kind: "home_region", text: "Always Free NoSQL tables are currently available only in Phoenix. A different home region does not provide this allowance." },
       { kind: "reclamation", text: "A table unused or unaccessed for 30 days becomes inactive. Tables that remain inactive for 90 days are deleted. Perform a get, put or delete operation on a row to reactivate a table before deletion; DDL operations do not reactivate it. Region and inactivity policy: https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html" },
+      { kind: "other", text: "Each Always Free table has a fixed capacity of 50 read units and 50 write units that cannot be changed, so a busy table can be throttled while still under the monthly totals. Capacity limits: https://docs.oracle.com/en/cloud/paas/nosql-cloud/dtddt/features-of-oracle-nosql-database-cloud-service.html" },
     ],
     sourceUrl: AF, verification: "verified", fitTags: ["scratch-database"], suggestedUses: ["Key-value side store for experiments"] },
   { ...base, id: "oci.flexible-load-balancer", service: "Flexible Load Balancer", category: "networking",

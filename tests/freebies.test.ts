@@ -40,11 +40,15 @@ describe("freebies catalog data", () => {
     expect(get("oci.autonomous-database")?.caveats.some(caveat => caveat.kind === "reclamation")).toBe(true);
   });
 
-  it("docs/freebies/oci.md matches the data (run npm run docs:freebies)", () => {
-    const doc = readFileSync(path.resolve(import.meta.dirname, "../docs/freebies/oci.md"), "utf8");
-    const oci = FREEBIES.filter(item => item.provider === "oci");
-    expect(doc).toBe(renderFreebiesMarkdown("Oracle Cloud (OCI)", oci));
-    for (const entry of oci) expect(doc, entry.id).toContain(`\`${entry.id}\``);
+  it("every docs/freebies/<provider>.md matches the data (run npm run docs:freebies)", () => {
+    const providers = [...new Set(FREEBIES.map(item => item.provider))];
+    expect(providers).toContain("oci");
+    for (const provider of providers) {
+      const entries = FREEBIES.filter(item => item.provider === provider);
+      const doc = readFileSync(path.resolve(import.meta.dirname, `../docs/freebies/${provider}.md`), "utf8");
+      expect(doc, provider).toBe(renderFreebiesMarkdown(entries[0].providerName, entries));
+      for (const entry of entries) expect(doc, entry.id).toContain(`\`${entry.id}\``);
+    }
   });
 
   it("escapes table pipes and skips entries with nothing to add", () => {
@@ -124,6 +128,8 @@ describe("facets and URL round trip", () => {
       search: undefined, provider: undefined, category: undefined, limitType: undefined, homeRegionOnly: undefined, verification: undefined, fitTags: undefined,
     });
     expect(parseFreebieFilter(new URLSearchParams(`q=${"x".repeat(300)}`)).search).toHaveLength(256);
+    expect(parseFreebieFilter(new URLSearchParams("provider=bogus")).provider).toBeUndefined();
+    expect(parseFreebieFilter(new URLSearchParams("provider=oci")).provider).toBe("oci");
     expect(freebieFilterToParams({}).toString()).toBe("");
   });
 });
