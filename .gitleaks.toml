@@ -1,2 +1,16 @@
 [extend]
 useDefault = true
+
+# Owner-approved historical exception (2026-11-23). Commit 0af8cd8 introduced two
+# synthetic, non-functional key fixtures that later commits replaced with
+# runtime-generated invalid values (tests/fixtures/invalid-key.ts). Published
+# history keeps them, so full-history scans report them. Every condition must
+# match: this exact commit, these exact paths and only the private-key rule. Any
+# other commit, path or rule is still reported. Edits require owner review
+# (scripts/check-owner-review.mjs) and scripts/test-guardrails.py pins this shape.
+[[allowlists]]
+description = "Synthetic key fixtures in the initial public commit only"
+condition = "AND"
+targetRules = ["private-key"]
+commits = ["0af8cd8a5d3de312a639414ec90c6a0aafe6dbb4"]
+paths = ['''^tests/oci-ignored\.test\.ts$''', '''^tests/import-and-expiry\.test\.ts$''']

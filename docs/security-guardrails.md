@@ -62,4 +62,12 @@ not recognize Compose targets; the static YAML checker covers Compose instead.
 The empty `.semgrepignore` replaces default test-path exclusions so test fixtures
 are included. No source suppression is authorized. Full-history gates can fail
 on pre-migration identifiers and synthetic historical fixtures; resolve them via
-the owner's separately approved history decision, never a scanner suppression.
+the owner's separately approved history decision, never a source suppression.
+
+The owner approved one history decision on 2026-11-23. The initial public commit
+holds two synthetic, non-functional key fixtures, replaced since by
+runtime-generated invalid values. `.gitleaks.toml` exempts only that commit, those
+two paths and the `private-key` rule, all three together. CI still runs
+`--ignore-gitleaks-allow` over the full history. `scripts/test-guardrails.py` pins
+the entry and checks that a synthetic key at the same paths in any other commit
+is still reported. Changes to `.gitleaks.toml` need current-head owner approval.

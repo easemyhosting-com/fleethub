@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const protectedFiles = new Set(['security/allowed-identifiers.txt', 'security/known-exceptions.md']);
+const protectedFiles = new Set(['.gitleaks.toml', 'security/allowed-identifiers.txt', 'security/known-exceptions.md']);
 const owner = 'easemyhosting-com';
 
 export function approved(reviews, head) {
@@ -15,8 +15,10 @@ export function approved(reviews, head) {
 }
 
 // Three-dot diff: only files this PR changed since it left the base branch.
+// --no-renames lists a renamed file under its old and new paths, so moving a
+// protected file away still requires owner review.
 export function changedPaths(base, head, cwd) {
-  return execFileSync('git', ['diff', '--name-only', `${base}...${head}`], { encoding: 'utf8', cwd }).trim().split('\n').filter(Boolean);
+  return execFileSync('git', ['diff', '--name-only', '--no-renames', `${base}...${head}`], { encoding: 'utf8', cwd }).trim().split('\n').filter(Boolean);
 }
 
 export async function run() {
