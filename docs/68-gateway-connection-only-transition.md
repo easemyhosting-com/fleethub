@@ -49,7 +49,7 @@ FleetHub does not take or check these backups. The volumes are mounted read-only
 ```sh
 for v in cliproxy_auth cliproxy_plugins; do
   docker run --rm --network none -v "<project>_$v:/src:ro" -v /path/to/backup:/backup \
-    --entrypoint tar postgres:16.15-alpine -C /src -czf "/backup/$v.tgz" .
+    --entrypoint tar postgres:18.7-alpine -C /src -czf "/backup/$v.tgz" .
 done
 compose exec -T infisical-db pg_dump -U infisical -d infisical -Fc > /path/to/backup/infisical.dump
 cp -p "$FLEETHUB_SETUP_DIR/.env" "$FLEETHUB_SETUP_DIR/cliproxy-config.yaml" /path/to/backup/
@@ -65,7 +65,7 @@ The tar container can use any local image that includes `tar`. The pinned Postgr
    ```sh
    docker volume create <external-project>_cliproxy_auth
    docker run --rm --network none -v <external-project>_cliproxy_auth:/dest -v /path/to/backup:/backup:ro \
-     --entrypoint tar postgres:16.15-alpine -C /dest -xzf /backup/cliproxy_auth.tgz
+     --entrypoint tar postgres:18.7-alpine -C /dest -xzf /backup/cliproxy_auth.tgz
    ```
 
    Use the copied `cliproxy-config.yaml` as its config, or configure new distinct inference and management keys. Two instances refreshing the same OAuth logins can invalidate each other's tokens, so keep the overlap short.
@@ -89,9 +89,11 @@ FleetHub stores each Infisical credential reference with the exact API URL it wa
 3. **Restore the data, keys included.** Before Infisical's first start, restore the final dump into the external PostgreSQL:
 
    ```sh
-   docker run --rm -i -e DEST_DB_URI postgres:16.15-alpine \
+   docker run --rm -i -e DEST_DB_URI postgres:18.7-alpine \
      sh -c 'pg_restore --no-owner --dbname "$DEST_DB_URI"' < /path/to/backup/infisical-final.dump
    ```
+
+   The restore client must be at least as new as the `pg_dump` that wrote the archive. The bundled database runs PostgreSQL 18, and an older `pg_restore` rejects its archive format, so keep the PostgreSQL 18 image here. The external PostgreSQL server must also be version 18 or later.
 
    Here `DEST_DB_URI` is `postgresql://infisical:<password>@db.example.com:5432/infisical`, exported in the shell and never written to a file in the repository. Set the external `ENCRYPTION_KEY` and `AUTH_SECRET` to the values of `INFISICAL_ENCRYPTION_KEY` and `INFISICAL_AUTH_SECRET` from the private env file. **The keys must move with the database.** A database restored without its original `ENCRYPTION_KEY` starts, but every stored secret is unreadable, and no FleetHub action can recover it. Redis holds cache and queue state only and is not copied.
 4. **Point FleetHub at it, then lift the freeze.** Start the external Infisical. Make the saved API URL resolve to the external instance from FleetHub's container. Set `INFISICAL_URL` in `runtime/runtime.env` to that same URL, keep its origin in `FLEETHUB_ONBOARDING_ALLOWED_ORIGINS`, and keep the existing machine identity unless you deliberately replace it. Only then run `compose up -d fleetdeck inventory-worker`. Do not start the bundled `infisical` again.
