@@ -20,6 +20,7 @@
     "verify:setup-ui": "node scripts/verify-setup-ui.mjs",
     "verify:fleet-ui": "node scripts/verify-fleet-ui.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",
+    "docs:freebies": "node scripts/generate-freebies-docs.mjs",
     "mcp": "node build/mcp-stdio.mjs",
     "prepare": "bash scripts/install-hooks.sh",
     "check:security": "bash scripts/check-forbidden.sh",
