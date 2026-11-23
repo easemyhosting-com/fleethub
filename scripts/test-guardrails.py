@@ -1,11 +1,13 @@
 """Synthetic policy and actual hook tests; never use a real credential."""
 import importlib.util
+import json
 from pathlib import Path
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 
 sys.dont_write_bytecode = True
@@ -21,6 +23,15 @@ def module(name, file):
 
 policy = module('repository_policy', 'check-repository-policy.py')
 commits = module('commit_policy', 'check-commit-policy.py')
+HISTORICAL_FIXTURE_COMMIT = '0af8cd8a5d3de312a639414ec90c6a0aafe6dbb4'
+HISTORICAL_FIXTURE_PATHS = ['tests/oci-ignored.test.ts', 'tests/import-and-expiry.test.ts']
+
+
+def synthetic_key():
+    # Built at runtime from random bytes; never a usable credential.
+    body = '\n'.join(os.urandom(48).hex()[index:index + 64] for index in range(0, 96, 64))
+    kind = 'PRIVATE' + ' KEY'
+    return f'-----BEGIN {kind}-----\n{body}\n{body}\n-----END {kind}-----\n'
 
 
 class Guardrails(unittest.TestCase):
@@ -64,6 +75,36 @@ class Guardrails(unittest.TestCase):
         self.assertFalse(policy.suppression_hits('```text\n' + token + '\n```', 'sample.md'))
         self.assertTrue(policy.suppression_hits('```text\nexample\n```\n' + token, 'sample.md'))
         self.assertTrue(policy.suppression_hits(token, '.github/workflows/sample.yml'))
+
+    def test_gitleaks_exception_stays_exact(self):
+        config = tomllib.loads((ROOT / '.gitleaks.toml').read_text())
+        self.assertEqual(set(config), {'extend', 'allowlists'})
+        self.assertEqual(config['extend'], {'useDefault': True})
+        self.assertEqual(config['allowlists'], [{
+            'description': 'Synthetic key fixtures in the initial public commit only',
+            'condition': 'AND',
+            'targetRules': ['private-key'],
+            'commits': [HISTORICAL_FIXTURE_COMMIT],
+            'paths': [r'^tests/oci-ignored\.test\.ts$', r'^tests/import-and-expiry\.test\.ts$'],
+        }])
+
+    @unittest.skipUnless(shutil.which('gitleaks'), 'gitleaks is required for the scanner fixture')
+    def test_gitleaks_exception_does_not_cover_new_commits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copyfile(ROOT / '.gitleaks.toml', root / '.gitleaks.toml')
+            env = {'PATH': os.environ['PATH'], 'HOME': str(root / 'empty-home'), 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_AUTHOR_NAME': commits.NAME, 'GIT_COMMITTER_NAME': commits.NAME, 'GIT_AUTHOR_EMAIL': commits.EMAIL, 'GIT_COMMITTER_EMAIL': commits.EMAIL}
+            run = lambda args: subprocess.run(args, cwd=root, env=env, capture_output=True, text=True)
+            self.assertEqual(run(['git', 'init', '--quiet']).returncode, 0)
+            for path in HISTORICAL_FIXTURE_PATHS:
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text(synthetic_key())
+            self.assertEqual(run(['git', 'add', '.']).returncode, 0)
+            self.assertEqual(run(['git', 'commit', '--quiet', '-m', 'test: synthetic key at excepted paths']).returncode, 0)
+            scan = run(['gitleaks', 'git', '--redact', '--no-banner', '--ignore-gitleaks-allow', '--report-format', 'json', '--report-path', str(root / 'report.json'), '.'])
+            self.assertNotEqual(scan.returncode, 0)
+            report = json.loads((root / 'report.json').read_text())
+            self.assertEqual(sorted({(f['RuleID'], f['File']) for f in report}), sorted(('private-key', path) for path in HISTORICAL_FIXTURE_PATHS))
 
     def test_sensitive_paths_fail_before_any_read(self):
         for path in ['.env.fixture', 'nested/.env.fixture', 'nested/id_rsa', 'nested/example.key', '.gitleaksignore', 'security/.local-forbidden.txt']:

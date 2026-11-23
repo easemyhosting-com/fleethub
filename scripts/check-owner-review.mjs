@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const protectedFiles = new Set(['security/allowed-identifiers.txt', 'security/known-exceptions.md']);
+const protectedFiles = new Set(['.gitleaks.toml', 'security/allowed-identifiers.txt', 'security/known-exceptions.md']);
 const owner = 'easemyhosting-com';
 
 export function approved(reviews, head) {
