@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -81,6 +81,24 @@ describe("runtime env refresh", () => {
     expect(refresh()).toEqual([]);
     expect(env.FLEETHUB_PAIRING_QR).toBeUndefined();
     expect(logs.join()).toContain("ignored");
+  });
+  it("accepts a file of exactly 64 KB and ignores one byte more", () => {
+    const { env, refresh, write, logs } = setup();
+    const exact = "FLEETHUB_PAIRING_QR=off\n".padEnd(64 * 1024, "#");
+    write(exact);
+    expect(refresh()).toEqual(["FLEETHUB_PAIRING_QR"]);
+    write(`${exact}#`);
+    expect(refresh()).toEqual([]);
+    expect(env.FLEETHUB_PAIRING_QR).toBe("off");
+    expect(logs.join()).toContain("ignored");
+  });
+  it("treats a directory at the configured path as missing", () => {
+    const { env, refresh, write, file } = setup();
+    write("FLEETHUB_PAIRING_QR=off\n");
+    expect(refresh()).toEqual(["FLEETHUB_PAIRING_QR"]);
+    unlinkSync(file); mkdirSync(file);
+    expect(refresh()).toEqual(["FLEETHUB_PAIRING_QR"]);
+    expect(env.FLEETHUB_PAIRING_QR).toBeUndefined();
   });
 });
 
