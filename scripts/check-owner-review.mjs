@@ -15,8 +15,10 @@ export function approved(reviews, head) {
 }
 
 // Three-dot diff: only files this PR changed since it left the base branch.
+// --no-renames lists a renamed file under its old and new paths, so moving a
+// protected file away still requires owner review.
 export function changedPaths(base, head, cwd) {
-  return execFileSync('git', ['diff', '--name-only', `${base}...${head}`], { encoding: 'utf8', cwd }).trim().split('\n').filter(Boolean);
+  return execFileSync('git', ['diff', '--name-only', '--no-renames', `${base}...${head}`], { encoding: 'utf8', cwd }).trim().split('\n').filter(Boolean);
 }
 
 export async function run() {
